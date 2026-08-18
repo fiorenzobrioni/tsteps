@@ -22,7 +22,7 @@ Regola del piano (ereditata da tweather): ogni decisione e ogni deviazione dalla
 - [x] `MainActivity` minima: splash screen (brand mark), edge-to-edge con barre forzate scure (stesso fix di tweather per i telefoni in light mode), placeholder `SkeletonScreen` che disegna uno `steps_data.json` statico con gutter e colori sintassi — il primo build ha già la faccia di tsteps
 - [x] Primo unit test (`ThemeProfileTest`) per esercitare la toolchain JVM; `robolectric.properties` (sdk 35, graphics NATIVE) copiato per i test Compose futuri
 - [x] Verifica: `testDebugUnitTest` + `assembleDebug` + `lintDebug` + `assembleRelease -PsignReleaseWithDebugKey` verdi in locale
-- [ ] Primo commit e push; verificare la CI sul remote
+- [x] Primo commit e push (`3cf60b1`); CI verde sul remote al primo run (test, lint, APK debug + release minificata, mapping R8)
 
 ## Fase 1 — Editor kit (import da tweather)
 
