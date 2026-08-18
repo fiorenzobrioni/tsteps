@@ -48,12 +48,12 @@ class WidgetContentBuilderTest {
         val lines = build().texts()
         assertEquals(
             listOf(
-                "steps: 8,432 / 10,000",
-                "check: ▓▓▓▓▓▓▓▓░░ 84%",
-                "dist: 6.1 km",
-                "active: 74 min",
-                "kcal: 327",
-                "streak: 6 days",
+                "Steps: 8,432 / 10,000",
+                "Check: ▓▓▓▓▓▓▓▓░░ 84%",
+                "Dist: 6.1 km",
+                "Active: 74 min",
+                "Kcal: 327",
+                "Streak: 6 days",
                 "# last walk: 09:32 (46 min)",
                 "# last_sync: 14:32"
             ),
@@ -67,7 +67,7 @@ class WidgetContentBuilderTest {
     fun `the tier budget cuts from the bottom, never reorders`() {
         val lines = build(tier = WidgetTier.Terminal(4)).texts()
         assertEquals(
-            listOf("steps: 8,432 / 10,000", "check: ▓▓▓▓▓▓▓▓░░ 84%", "dist: 6.1 km", "active: 74 min"),
+            listOf("Steps: 8,432 / 10,000", "Check: ▓▓▓▓▓▓▓▓░░ 84%", "Dist: 6.1 km", "Active: 74 min"),
             lines
         )
     }
@@ -75,13 +75,13 @@ class WidgetContentBuilderTest {
     @Test
     fun `no goal means no goal fraction, no check, no streak`() {
         val lines = build(data(goal = 0, streak = 0)).texts()
-        assertEquals("steps: 8,432", lines.first())
-        assertTrue(lines.none { it.startsWith("check") || it.startsWith("streak") })
+        assertEquals("Steps: 8,432", lines.first())
+        assertTrue(lines.none { it.startsWith("Check") || it.startsWith("Streak") })
     }
 
     @Test
     fun `no weight means no kcal line`() {
-        assertTrue(build(data(kcal = null)).texts().none { it.startsWith("kcal") })
+        assertTrue(build(data(kcal = null)).texts().none { it.startsWith("Kcal") })
     }
 
     @Test
@@ -148,6 +148,6 @@ class WidgetContentBuilderTest {
         val content = WidgetContentBuilder.build(
             data(), UnitsSystem.IMPERIAL, WidgetTier.Terminal(11), rome, Locale.ENGLISH, null
         )
-        assertTrue(content.texts().any { it == "dist: 3.8 mi" })
+        assertTrue(content.texts().any { it == "Dist: 3.8 mi" })
     }
 }

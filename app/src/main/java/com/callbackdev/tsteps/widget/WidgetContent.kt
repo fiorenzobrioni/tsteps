@@ -69,7 +69,10 @@ data class WidgetData(
 /**
  * Pure mapping from persisted state to the terminal transcript the widget shows.
  * Keys, prompt and `#` comments are code and stay English (the widget is a
- * terminal window); the emoji is the brand's 👣, constant on purpose.
+ * terminal window); the emoji is the brand's 👣, constant on purpose. Field
+ * names are Capitalized like tweather's widget (device feedback: the two
+ * widgets sit on the same home screen and must read as siblings) — the `#`
+ * comments stay lowercase, they're comments.
  */
 object WidgetContentBuilder {
 
@@ -150,7 +153,7 @@ object WidgetContentBuilder {
             add(
                 TerminalLine(
                     listOfNotNull(
-                        WidgetToken("steps", TokenRole.KEY),
+                        WidgetToken("Steps", TokenRole.KEY),
                         WidgetToken(": ", TokenRole.PLAIN),
                         WidgetToken(steps, TokenRole.NUMBER),
                         WidgetToken(" / ${numbers.format(data.goalSteps)}", TokenRole.DIM)
@@ -160,13 +163,13 @@ object WidgetContentBuilder {
             )
             if (hasGoal) {
                 // Prompt green: DESIGN.md's "emerald green represents active states".
-                add(kv("check", StepsGlyphs.goalBar(data.todaySteps, data.goalSteps, BAR_WIDTH), TokenRole.PROMPT))
+                add(kv("Check", StepsGlyphs.goalBar(data.todaySteps, data.goalSteps, BAR_WIDTH), TokenRole.PROMPT))
             }
-            add(kv("dist", UnitFormat.distance(data.distanceMeters, units), TokenRole.NUMBER))
-            add(kv("active", "${data.activeMinutes} min", TokenRole.NUMBER))
-            data.activeKcal?.let { add(kv("kcal", numbers.format(it.toInt()), TokenRole.NUMBER)) }
+            add(kv("Dist", UnitFormat.distance(data.distanceMeters, units), TokenRole.NUMBER))
+            add(kv("Active", "${data.activeMinutes} min", TokenRole.NUMBER))
+            data.activeKcal?.let { add(kv("Kcal", numbers.format(it.toInt()), TokenRole.NUMBER)) }
             if (hasGoal && data.streakDays > 0) {
-                add(kv("streak", "${data.streakDays} days", TokenRole.NUMBER))
+                add(kv("Streak", "${data.streakDays} days", TokenRole.NUMBER))
             }
             if (data.lastWalkStartMillis != null && data.lastWalkActiveMinutes != null) {
                 val start = UnitFormat.clockTime(data.lastWalkStartMillis, zone)

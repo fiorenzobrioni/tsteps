@@ -108,7 +108,7 @@
 
                 <TextView
                     style="@style/WidgetPreviewText"
-                    android:text="steps"
+                    android:text="Steps"
                     android:textColor="#79C0FF" />
 
                 <TextView
@@ -134,7 +134,7 @@
 
                 <TextView
                     style="@style/WidgetPreviewText"
-                    android:text="check"
+                    android:text="Check"
                     android:textColor="#79C0FF" />
 
                 <TextView
@@ -155,7 +155,7 @@
 
                 <TextView
                     style="@style/WidgetPreviewText"
-                    android:text="dist"
+                    android:text="Dist"
                     android:textColor="#79C0FF" />
 
                 <TextView
@@ -176,7 +176,7 @@
 
                 <TextView
                     style="@style/WidgetPreviewText"
-                    android:text="active"
+                    android:text="Active"
                     android:textColor="#79C0FF" />
 
                 <TextView

@@ -80,10 +80,10 @@ class WidgetRendererTest {
 
         assertEquals(WidgetContentBuilder.HEADER, view.text(R.id.widget_title))
         assertEquals("you@tsteps:~$ cat steps_data.json", view.text(R.id.widget_prompt))
-        assertEquals("steps: 8,432 / 10,000", view.text(R.id.widget_line1))
-        assertEquals("check: ▓▓▓▓▓▓▓▓░░ 84%", view.text(R.id.widget_line2))
-        assertEquals("dist: 6.1 km", view.text(R.id.widget_line3))
-        assertEquals("active: 74 min", view.text(R.id.widget_line4))
+        assertEquals("Steps: 8,432 / 10,000", view.text(R.id.widget_line1))
+        assertEquals("Check: ▓▓▓▓▓▓▓▓░░ 84%", view.text(R.id.widget_line2))
+        assertEquals("Dist: 6.1 km", view.text(R.id.widget_line3))
+        assertEquals("Active: 74 min", view.text(R.id.widget_line4))
         // token colors survive the RemoteViews round-trip
         assertEquals(palette.key, view.tokenColorAt(R.id.widget_line1, 0))
         assertEquals(palette.number, view.tokenColorAt(R.id.widget_line1, 7))
