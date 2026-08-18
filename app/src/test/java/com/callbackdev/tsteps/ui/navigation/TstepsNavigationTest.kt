@@ -5,7 +5,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
+import com.callbackdev.tsteps.ui.track.TrackOpenRequest
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,6 +42,32 @@ class TstepsNavigationTest {
                 TstepsApp()
             }
         }
+    }
+
+    @After
+    fun tearDown() {
+        TrackOpenRequest.consume()
+        runBlocking {
+            ServiceLocator.trackingManager(
+                ApplicationProvider.getApplicationContext()
+            ).stop(0L)
+        }
+    }
+
+    @Test
+    fun `the tracking notification deep-links into the running process`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        runBlocking { ServiceLocator.trackingManager(context).start("walk", 0L) }
+        TrackOpenRequest.request()
+        setApp()
+        compose.onNodeWithText("$ tsteps track").assertExists()
+    }
+
+    @Test
+    fun `a stale deep-link after ^C lands on the editor`() {
+        TrackOpenRequest.request() // no session running
+        setApp()
+        compose.onNodeWithText("steps_data.json").assertExists()
     }
 
     @Test

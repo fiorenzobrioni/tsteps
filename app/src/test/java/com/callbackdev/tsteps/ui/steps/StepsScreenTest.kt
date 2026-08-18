@@ -127,6 +127,22 @@ class StepsScreenTest {
     }
 
     @Test
+    fun `a running session dresses the FAB and the status bar`() {
+        compose.setContent {
+            TstepsTheme {
+                StepsScreen(
+                    state = StepsUiState(snapshot = snapshot(), status = SensorStatus.OK),
+                    trackingActive = true
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Open the running session").assertIsDisplayed()
+        compose.onNodeWithText("▶ tracking").assertIsDisplayed()
+        // the sensor chip yields to the running process
+        compose.onNodeWithText("sensor: OK").assertDoesNotExist()
+    }
+
+    @Test
     fun `imperial state renders the renamed key`() {
         setContent(
             StepsUiState(

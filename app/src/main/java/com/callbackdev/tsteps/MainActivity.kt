@@ -12,7 +12,10 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.ui.navigation.TstepsApp
+import com.callbackdev.tsteps.ui.track.TrackOpenRequest
+import android.content.Intent
 import androidx.lifecycle.lifecycleScope
+import com.callbackdev.tsteps.tracking.TrackingService
 import com.callbackdev.tsteps.ui.theme.ThemeProfile
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import com.callbackdev.tsteps.widget.TstepsWidgetUpdater
@@ -22,9 +25,26 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    /**
+     * The tracking notification deep-links here (SINGLE_TOP: a running activity
+     * gets onNewIntent instead of a rebuild — both paths must route the extra).
+     */
+    private fun routeLaunchIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(TrackingService.EXTRA_OPEN_TRACK, false) == true) {
+            TrackOpenRequest.request()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        routeLaunchIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        routeLaunchIntent(intent)
         // Single owner of background-work reconciliation (tweather's pattern):
         // arms or cancels the sampling and rollover jobs based on permission and
         // sensor availability. The permission-request UI lands in Fase 3; until

@@ -20,6 +20,7 @@
     <!-- Accessibility -->
     <string name="cd_grant_activity_recognition">Grant permission to read the step counter</string>
     <string name="cd_start_track">Start a tracked walk</string>
+    <string name="cd_open_track">Open the running session</string>
     <string name="cd_toggle_session">Expand or collapse the %1$s session</string>
     <string name="cd_pause_track">Pause the session</string>
     <string name="cd_resume_track">Resume the session</string>

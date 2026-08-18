@@ -8,6 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -71,9 +77,12 @@ fun StepsScreen(
         onPauseOrDispose { }
     }
     val activeFile by viewModel.activeFile.collectAsStateWithLifecycle()
+    val tracking by viewModel.tracking.collectAsStateWithLifecycle()
     StepsScreen(
         state = state,
         activeFile = activeFile,
+        trackingActive = tracking != null,
+        trackingPaused = tracking?.session?.paused == true,
         onSelectFile = viewModel::selectFile,
         onGrantPermission = {
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -92,6 +101,8 @@ fun StepsScreen(
 fun StepsScreen(
     state: StepsUiState,
     activeFile: MainEditorFile = MainEditorFile.JSON,
+    trackingActive: Boolean = false,
+    trackingPaused: Boolean = false,
     onSelectFile: (MainEditorFile) -> Unit = {},
     onGrantPermission: () -> Unit = {},
     onToggleSession: (Long) -> Unit = {},
@@ -160,30 +171,69 @@ fun StepsScreen(
                 )
                 // The one glowing verb, only where it can act: no sensor or no
                 // permission means no FAB — the error document explains instead.
+                // With a session running the FAB wears its state (device
+                // feedback): active-state green with a slow breathing glow —
+                // green means active in this design system, red means error —
+                // steady while ^Z-paused. Tapping it reopens the process.
                 if (state.status == SensorStatus.OK) {
-                    GlowFab(
-                        onClick = onStartTrack,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 24.dp),
-                        contentDescription = stringResource(R.string.cd_start_track)
-                    )
+                    val glowAlpha = if (trackingActive && !trackingPaused) {
+                        rememberInfiniteTransition(label = "track-pulse").animateFloat(
+                            initialValue = 0.15f,
+                            targetValue = 0.55f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1_100, easing = LinearEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "track-pulse-alpha"
+                        ).value
+                    } else {
+                        0.53f
+                    }
+                    if (trackingActive) {
+                        GlowFab(
+                            onClick = onStartTrack,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 16.dp, bottom = 24.dp),
+                            contentDescription = stringResource(R.string.cd_open_track),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            glowColor = MaterialTheme.colorScheme.secondary.copy(alpha = glowAlpha)
+                        )
+                    } else {
+                        GlowFab(
+                            onClick = onStartTrack,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 16.dp, bottom = 24.dp),
+                            contentDescription = stringResource(R.string.cd_start_track)
+                        )
+                    }
                 }
             }
-            StepsStatusBar(state)
+            StepsStatusBar(state, trackingActive)
         }
     }
 }
 
 @Composable
-private fun StepsStatusBar(state: StepsUiState) {
+private fun StepsStatusBar(state: StepsUiState, trackingActive: Boolean = false) {
     TerminalStatusBar {
         StatusBarStart {
             StatusBarText("⎇ main")
             StatusBarDivider()
             StatusBarText(state.snapshot?.date?.toString() ?: "—", shrink = true)
             StatusBarDivider()
-            when (state.status) {
+            when {
+                // The running process outranks the sensor chip — with a session
+                // live the sensor is self-evidently OK.
+                trackingActive -> StatusBarText(
+                    "▶ tracking",
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                else -> Unit
+            }
+            if (!trackingActive) when (state.status) {
                 SensorStatus.OK -> StatusBarText("sensor: OK")
                 SensorStatus.NO_PERMISSION -> StatusBarText(
                     "sensor: off",

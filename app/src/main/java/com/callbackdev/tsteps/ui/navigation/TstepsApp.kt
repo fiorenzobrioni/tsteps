@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -30,6 +31,7 @@ import com.callbackdev.tsteps.ui.log.LogScreen
 import com.callbackdev.tsteps.ui.settings.SettingsScreen
 import com.callbackdev.tsteps.ui.stats.StatsScreen
 import com.callbackdev.tsteps.ui.steps.StepsScreen
+import com.callbackdev.tsteps.ui.track.TrackOpenRequest
 import com.callbackdev.tsteps.ui.track.TrackScreen
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import kotlinx.coroutines.flow.map
@@ -60,6 +62,18 @@ fun TstepsApp() {
     val settingsStore = remember(context) { ServiceLocator.settingsStore(context) }
     val editorSettings by remember(settingsStore) { settingsStore.settings.map { it.editor } }
         .collectAsStateWithLifecycle(initialValue = EditorSettings())
+
+    // The tracking notification's deep link: open the running process's buffer.
+    // Guarded on an active session — a stale tap after ^C lands on the editor.
+    val trackOpen by TrackOpenRequest.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(trackOpen) {
+        if (trackOpen) {
+            TrackOpenRequest.consume()
+            if (ServiceLocator.trackingManager(context).isActive) {
+                navController.navigate(TrackRoute) { launchSingleTop = true }
+            }
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(

@@ -13,6 +13,8 @@ import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.StepSource
+import com.callbackdev.tsteps.data.TrackingManager
+import com.callbackdev.tsteps.data.TrackingState
 import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.WorkspaceStore
@@ -67,8 +69,13 @@ class StepsViewModel(
     private val source: StepSource,
     private val hasPermission: () -> Boolean,
     private val workspaceStore: WorkspaceStore? = null,
+    trackingManager: TrackingManager? = null,
     private val clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
+
+    /** The live session, for the FAB's running-state and the status bar chip. */
+    val tracking: StateFlow<TrackingState?> =
+        trackingManager?.state ?: MutableStateFlow(null)
 
     /**
      * The main tab bar's active file, persisted as editor workspace state
@@ -206,7 +213,8 @@ class StepsViewModel(
                     settingsStore = ServiceLocator.settingsStore(app),
                     source = ServiceLocator.stepSensorReader(app),
                     hasPermission = { SyncScheduler.hasPermission(app) },
-                    workspaceStore = ServiceLocator.workspaceStore(app)
+                    workspaceStore = ServiceLocator.workspaceStore(app),
+                    trackingManager = ServiceLocator.trackingManager(app)
                 )
             }
         }

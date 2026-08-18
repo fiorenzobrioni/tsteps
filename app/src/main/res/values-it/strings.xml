@@ -16,6 +16,7 @@
     <!-- Accessibilità -->
     <string name="cd_grant_activity_recognition">Concedi il permesso di leggere il contapassi</string>
     <string name="cd_start_track">Avvia una camminata tracciata</string>
+    <string name="cd_open_track">Apri la sessione in corso</string>
     <string name="cd_toggle_session">Espandi o comprimi la sessione delle %1$s</string>
     <string name="cd_pause_track">Metti in pausa la sessione</string>
     <string name="cd_resume_track">Riprendi la sessione</string>

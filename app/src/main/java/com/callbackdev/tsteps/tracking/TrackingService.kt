@@ -144,10 +144,18 @@ class TrackingService : Service() {
             val stateSuffix = if (session.paused) " · ^Z paused" else ""
             "$elapsed · ${session.steps} steps · $km km$stateSuffix"
         }
+        // Tapping the process's notification opens the PROCESS (device feedback).
+        // Own action + request code: extras don't count toward PendingIntent
+        // identity (filterEquals), and the widget already owns the plain
+        // open-MainActivity intent — without the distinct action this one would
+        // silently merge with it and hijack the widget's tap.
         val contentIntent = PendingIntent.getActivity(
             this,
-            0,
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            2,
+            Intent(this, MainActivity::class.java)
+                .setAction(ACTION_OPEN_TRACK)
+                .putExtra(EXTRA_OPEN_TRACK, true)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -188,6 +196,11 @@ class TrackingService : Service() {
         private const val ACTION_STOP = "com.callbackdev.tsteps.tracking.STOP"
         private const val ACTION_CYCLE_TYPE = "com.callbackdev.tsteps.tracking.CYCLE_TYPE"
         private const val EXTRA_TYPE = "type"
+
+        const val ACTION_OPEN_TRACK = "com.callbackdev.tsteps.tracking.OPEN_TRACK"
+
+        /** Launch-intent extra: MainActivity routes it to the track screen. */
+        const val EXTRA_OPEN_TRACK = "open_track"
 
         fun formatElapsed(activeMillis: Long): String {
             val totalSeconds = activeMillis / 1_000
