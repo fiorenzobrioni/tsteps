@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand logo { 👣 }: two stylized footprints mid-stride between the same curly
+     braces as tweather's { ☁️ } mark, syntax-color accent ticks on the brace stems.
+     The footprints use the cloud's exact fill/stroke treatment (#2B4D73 fill,
+     #79C0FF 2px stroke) so the two apps read as one series. Everything sits
+     inside the adaptive-icon safe zone (66dp circle of the 108dp canvas). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- right footprint (leading step, top-right) -->
+    <group
+        android:rotation="14"
+        android:translateX="63"
+        android:translateY="52">
+        <!-- sole: egg shape, ball of the foot wider than the heel -->
+        <path
+            android:fillColor="#2B4D73"
+            android:strokeColor="#79C0FF"
+            android:strokeWidth="2"
+            android:pathData="M-5.5,-3 C-5.5,-7.5 -3,-10 0,-10 C3,-10 5.5,-7.5 5.5,-3 C5.5,2 4,8 0,8 C-4,8 -5.5,2 -5.5,-3 Z" />
+        <!-- toe pad -->
+        <path
+            android:fillColor="#2B4D73"
+            android:strokeColor="#79C0FF"
+            android:strokeWidth="2"
+            android:pathData="M0,-18.5 A3,3 0 1 1 0,-12.5 A3,3 0 1 1 0,-18.5 Z" />
+    </group>
+
+    <!-- left footprint (trailing step, bottom-left) -->
+    <group
+        android:rotation="-14"
+        android:translateX="45"
+        android:translateY="63">
+        <path
+            android:fillColor="#2B4D73"
+            android:strokeColor="#79C0FF"
+            android:strokeWidth="2"
+            android:pathData="M-5.5,-3 C-5.5,-7.5 -3,-10 0,-10 C3,-10 5.5,-7.5 5.5,-3 C5.5,2 4,8 0,8 C-4,8 -5.5,2 -5.5,-3 Z" />
+        <path
+            android:fillColor="#2B4D73"
+            android:strokeColor="#79C0FF"
+            android:strokeWidth="2"
+            android:pathData="M0,-18.5 A3,3 0 1 1 0,-12.5 A3,3 0 1 1 0,-18.5 Z" />
+    </group>
+
+    <!-- left brace { -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#79C0FF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M34,34 C30,34 29,36 29,40 L29,48 C29,52 27,53 25,54 C27,55 29,56 29,60 L29,68 C29,72 30,74 34,74" />
+
+    <!-- right brace } -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#79C0FF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M74,34 C78,34 79,36 79,40 L79,48 C79,52 81,53 83,54 C81,55 79,56 79,60 L79,68 C79,72 78,74 74,74" />
+
+    <!-- syntax-color accent ticks on the brace stems (orange/purple/green) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFA657"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M29,41 L29,46" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#BC8CFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M29,62 L29,67" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#BC8CFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M79,41 L79,46" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#3FB950"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M79,62 L79,67" />
+</vector>

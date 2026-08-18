@@ -1,0 +1,74 @@
+name: Android CI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Before the APKs on purpose: a red suite must not produce an artifact
+      # someone could install and trust.
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Lint
+        run: ./gradlew :app:lintDebug
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug
+
+      # Minified and shrunk, so it is the only build where R8 problems can show
+      # up at all. Signed with the committed debug key purely so it is
+      # installable for testing — NOT a store artifact (see app/build.gradle.kts).
+      - name: Build release APK (debug-signed, for testing only)
+        run: ./gradlew :app:assembleRelease -PsignReleaseWithDebugKey
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsteps-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsteps-release-apk-testing-only
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # The R8 map is what makes a release-build stack trace readable; without the
+      # run that produced the APK it is gone.
+      - name: Upload R8 mapping
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsteps-release-mapping
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsteps-reports
+          path: app/build/reports/
+          if-no-files-found: ignore
+          retention-days: 7

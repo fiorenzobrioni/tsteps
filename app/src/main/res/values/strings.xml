@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default locale = English: automatic fallback for unsupported device languages.
+     Rule of the fake-editor design (inherited from tweather): "code" (JSON keys,
+     filenames, terminal errors, // comments) stays English everywhere; only chrome,
+     accessibility text and user-facing DATA values are localized. -->
+<resources>
+    <string name="app_name" translatable="false">tsteps</string>
+</resources>

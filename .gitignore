@@ -1,0 +1,41 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+.navigation/
+output.json
+
+# Local configuration (SDK path, API keys)
+local.properties
+
+# Compiled / generated
+*.apk
+*.aab
+*.dex
+*.class
+gen/
+out/
+
+# Signing (shared debug keystore is intentionally committed)
+*.jks
+*.keystore
+!keystore/debug.keystore
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Kotlin
+.kotlin/
+
+# Profiling
+*.hprof
