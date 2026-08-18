@@ -37,9 +37,13 @@ class SettingsScreenTest {
         var theme: String? = null
         var resetCalled = false
 
+        var dailyCommit: Boolean? = null
+
         fun actions() = SettingsActions(
             onLineNumbers = { lineNumbers = it },
             onWordWrap = {},
+            onDailyCommit = { dailyCommit = it },
+            onGoalCheck = {},
             onDailyGoal = { goal = it },
             onWeight = { weight = it },
             onHeight = {},
@@ -156,8 +160,27 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun `notifications section is an honest placeholder`() {
-        setContent()
-        line("// nothing to configure yet").assertIsDisplayed()
+    fun `notification toggles flip and the armed status line rides along`() {
+        val recorded = setContent()
+        line("// rides the midnight rollover and the step sync").assertIsDisplayed()
+        line("\"daily_commit\": true").performClick()
+        assertEquals(false, recorded.dailyCommit)
+    }
+
+    @Test
+    fun `a missing permission is a red tappable error line`() {
+        var tapped = false
+        compose.setContent {
+            TstepsTheme {
+                SettingsScreen(
+                    settings = AppSettings(),
+                    actions = RecordedActions().actions(),
+                    notifState = NotifLineState.MissingPermission,
+                    onNotifLine = { tapped = true }
+                )
+            }
+        }
+        line("// ERROR: notifications permission missing — tap to grant").performClick()
+        assertTrue(tapped)
     }
 }

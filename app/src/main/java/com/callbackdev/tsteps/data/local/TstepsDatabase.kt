@@ -105,9 +105,13 @@ interface DaySummaryDao {
     @Query("SELECT * FROM day_summary ORDER BY date DESC")
     suspend fun all(): List<DaySummaryEntity>
 
-    /** Insert-only on purpose: a commit is written once (see [DaySummaryEntity]). */
+    /**
+     * Insert-only on purpose: a commit is written once (see [DaySummaryEntity]).
+     * Returns -1 when the day was already committed — how callers tell a fresh
+     * commit (worth a notification) from a no-op safety-net pass.
+     */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertIfAbsent(day: DaySummaryEntity)
+    suspend fun insertIfAbsent(day: DaySummaryEntity): Long
 }
 
 @Dao

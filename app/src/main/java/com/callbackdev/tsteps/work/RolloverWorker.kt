@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.callbackdev.tsteps.data.ServiceLocator
+import com.callbackdev.tsteps.notifications.StepsNotifications
+import com.callbackdev.tsteps.notifications.StepsNotifier
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 
 /**
  * The midnight commit (`midnight-rollover`): samples the counter one last time so
@@ -24,7 +27,18 @@ class RolloverWorker(
         val repository = ServiceLocator.stepRepository(applicationContext)
         ServiceLocator.stepSensorReader(applicationContext).readCurrent()
             ?.let { repository.ingest(it) }
-        repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
+        val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
+        committed.maxByOrNull { it.date }?.let { newest ->
+            val settings = ServiceLocator.settingsStore(applicationContext).read()
+            if (settings.notifications.dailyCommit) {
+                StepsNotifier.postDailyCommit(
+                    applicationContext,
+                    StepsNotifications.dailyCommit(
+                        newest, settings.units, Locale.getDefault(), applicationContext.resources
+                    )
+                )
+            }
+        }
         SyncScheduler.scheduleNextRollover(applicationContext)
         return Result.success()
     }

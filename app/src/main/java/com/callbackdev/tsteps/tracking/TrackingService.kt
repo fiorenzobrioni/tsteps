@@ -15,6 +15,7 @@ import com.callbackdev.tsteps.MainActivity
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.TrackingState
+import com.callbackdev.tsteps.notifications.GoalWatcher
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,11 +95,14 @@ class TrackingService : Service() {
             }
         }
         // Minute marks for the transcript + a notification refresh even when idle.
+        // The goal watcher rides the tick: a walk with the screen off is exactly
+        // where today's check tends to go green.
         scope.launch {
             while (true) {
                 delay(60_000L)
                 manager.onMinuteTick(System.currentTimeMillis())
                 updateNotification(manager.state.value)
+                GoalWatcher.evaluate(this@TrackingService)
             }
         }
     }

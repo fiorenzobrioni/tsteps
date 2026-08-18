@@ -37,6 +37,18 @@ data class EditorSettings(
 )
 
 /**
+ * Notification toggles — both default ON but inert until the user grants the
+ * permission (the grant is the real opt-in on minSdk 33). Never promotional,
+ * never motivational: one notification per event, at most two a day.
+ */
+data class NotificationSettings(
+    /** The closed day's commit message, posted by whoever commits it (silent). */
+    val dailyCommit: Boolean = true,
+    /** One notification when today's check passes; re-arms at midnight. */
+    val goalCheck: Boolean = true
+)
+
+/**
  * Everything `settings.config` edits.
  *
  * Defaults are deliberate: `dailyGoalSteps = 0` means **no goal and no CI check**
@@ -48,6 +60,7 @@ data class EditorSettings(
  */
 data class AppSettings(
     val editor: EditorSettings = EditorSettings(),
+    val notifications: NotificationSettings = NotificationSettings(),
     val dailyGoalSteps: Int = 0,
     val weightKg: Double? = null,
     val heightCm: Int? = null,
@@ -74,6 +87,10 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
                     lineNumbers = prefs[LineNumbers] ?: false,
                     wordWrap = prefs[WordWrap] ?: false
                 ),
+                notifications = NotificationSettings(
+                    dailyCommit = prefs[NotifDailyCommit] ?: true,
+                    goalCheck = prefs[NotifGoalCheck] ?: true
+                ),
                 dailyGoalSteps = prefs[DailyGoalSteps] ?: 0,
                 weightKg = prefs[WeightKg],
                 heightCm = prefs[HeightCm],
@@ -94,6 +111,10 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setLineNumbers(enabled: Boolean) = set(LineNumbers, enabled)
 
     suspend fun setWordWrap(enabled: Boolean) = set(WordWrap, enabled)
+
+    suspend fun setNotifDailyCommit(enabled: Boolean) = set(NotifDailyCommit, enabled)
+
+    suspend fun setNotifGoalCheck(enabled: Boolean) = set(NotifGoalCheck, enabled)
 
     suspend fun setDailyGoalSteps(steps: Int) =
         set(DailyGoalSteps, steps.coerceIn(SettingsRanges.GOAL_STEPS))
@@ -135,6 +156,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     companion object {
         private val LineNumbers = booleanPreferencesKey("editor_line_numbers")
         private val WordWrap = booleanPreferencesKey("editor_word_wrap")
+        private val NotifDailyCommit = booleanPreferencesKey("notif_daily_commit")
+        private val NotifGoalCheck = booleanPreferencesKey("notif_goal_check")
         private val DailyGoalSteps = intPreferencesKey("daily_goal_steps")
         private val WeightKg = doublePreferencesKey("weight_kg")
         private val HeightCm = intPreferencesKey("height_cm")

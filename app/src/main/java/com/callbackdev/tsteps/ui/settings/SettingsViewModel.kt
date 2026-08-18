@@ -24,6 +24,8 @@ class SettingsViewModel(
 
     fun setLineNumbers(enabled: Boolean) = save { setLineNumbers(enabled) }
     fun setWordWrap(enabled: Boolean) = save { setWordWrap(enabled) }
+    fun setNotifDailyCommit(enabled: Boolean) = save { setNotifDailyCommit(enabled) }
+    fun setNotifGoalCheck(enabled: Boolean) = save { setNotifGoalCheck(enabled) }
     fun setDailyGoalSteps(steps: Int) = save { setDailyGoalSteps(steps) }
     fun setWeightKg(weightKg: Double?) = save { setWeightKg(weightKg) }
     fun setHeightCm(heightCm: Int?) = save { setHeightCm(heightCm) }

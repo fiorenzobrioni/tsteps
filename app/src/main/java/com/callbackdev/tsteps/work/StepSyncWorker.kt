@@ -4,8 +4,12 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.callbackdev.tsteps.data.ServiceLocator
+import com.callbackdev.tsteps.notifications.GoalWatcher
+import com.callbackdev.tsteps.notifications.StepsNotifications
+import com.callbackdev.tsteps.notifications.StepsNotifier
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 
 /**
  * The periodic sampler (`step-sync`, 15 min — WorkManager's floor). Reads one
@@ -23,7 +27,28 @@ class StepSyncWorker(
         val repository = ServiceLocator.stepRepository(applicationContext)
         val reading = reader.readCurrent() ?: return Result.success()
         repository.ingest(reading)
-        repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
+        val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
+        notifyDailyCommit(committed)
+        GoalWatcher.evaluate(applicationContext)
         return Result.success()
+    }
+
+    /**
+     * The safety net commits too, so it notifies too (PLANNING: "al rollover di
+     * mezzanotte o alla prima apertura successiva"). Only the newest day of a
+     * multi-day backlog: a phone off for a week deserves one summary, not seven.
+     */
+    private suspend fun notifyDailyCommit(
+        committed: List<com.callbackdev.tsteps.data.local.DaySummaryEntity>
+    ) {
+        val newest = committed.maxByOrNull { it.date } ?: return
+        val settings = ServiceLocator.settingsStore(applicationContext).read()
+        if (!settings.notifications.dailyCommit) return
+        StepsNotifier.postDailyCommit(
+            applicationContext,
+            StepsNotifications.dailyCommit(
+                newest, settings.units, Locale.getDefault(), applicationContext.resources
+            )
+        )
     }
 }

@@ -33,6 +33,9 @@ object ServiceLocator {
     @Volatile
     private var workspaceStore: WorkspaceStore? = null
 
+    @Volatile
+    private var notificationStateStore: NotificationStateStore? = null
+
     fun database(context: Context): TstepsDatabase =
         database ?: synchronized(this) {
             database ?: Room.databaseBuilder(
@@ -71,6 +74,12 @@ object ServiceLocator {
         stepSensorReader ?: synchronized(this) {
             stepSensorReader ?: StepSensorReader(context.applicationContext)
                 .also { stepSensorReader = it }
+        }
+
+    fun notificationStateStore(context: Context): NotificationStateStore =
+        notificationStateStore ?: synchronized(this) {
+            notificationStateStore ?: NotificationStateStore.create(context.applicationContext)
+                .also { notificationStateStore = it }
         }
 
     fun workspaceStore(context: Context): WorkspaceStore =

@@ -1,5 +1,13 @@
 package com.callbackdev.tsteps.ui.settings
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +24,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,6 +47,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.callbackdev.tsteps.BuildConfig
@@ -70,6 +83,8 @@ import kotlinx.coroutines.delay
 class SettingsActions(
     val onLineNumbers: (Boolean) -> Unit,
     val onWordWrap: (Boolean) -> Unit,
+    val onDailyCommit: (Boolean) -> Unit,
+    val onGoalCheck: (Boolean) -> Unit,
     val onDailyGoal: (Int) -> Unit,
     val onWeight: (Double?) -> Unit,
     val onHeight: (Int?) -> Unit,
@@ -83,6 +98,21 @@ class SettingsActions(
 /** The three numbers edited through a terminal input instead of cycling. */
 internal enum class NumericField { GOAL, WEIGHT, HEIGHT }
 
+/** Status of the `notifications` block's dynamic `//` line (tweather's states). */
+enum class NotifLineState {
+    /** Both toggles off — nothing will ever post. */
+    Disabled,
+
+    /** At least one toggle on and the permission granted. */
+    Armed,
+
+    /** Toggles on but no permission; tap requests it. */
+    MissingPermission,
+
+    /** Permission permanently denied; tap opens the system app settings. */
+    DeniedPermanently
+}
+
 /**
  * Settings screen: the fake file `settings.config` (tweather's format — a JSON
  * body with `//` comments). Booleans flip on tap, the units and theme strings
@@ -95,11 +125,91 @@ internal enum class NumericField { GOAL, WEIGHT, HEIGHT }
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+
+    // POST_NOTIFICATIONS — tweather's state machine, verbatim in spirit.
+    // Re-check on every resume so a grant or a revocation made in the system
+    // settings is reflected as soon as we're back.
+    var permissionEpoch by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionEpoch++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val hasNotifPermission = remember(permissionEpoch) {
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    var notifDeniedPermanently by remember { mutableStateOf(false) }
+    // A toggle the user flipped on before granting: applied right after the grant
+    var pendingNotifToggle by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val notifLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        permissionEpoch++
+        if (granted) {
+            notifDeniedPermanently = false
+            pendingNotifToggle?.invoke()
+            pendingNotifToggle = null
+        } else {
+            pendingNotifToggle = null
+            if (activity?.shouldShowRequestPermissionRationale(
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == false
+            ) {
+                notifDeniedPermanently = true
+            }
+        }
+    }
+    // The system-settings detour has no result callback: every resume is the
+    // return path. A grant applies the toggle the user had flipped; any other
+    // return clears the pending, so a stale toggle can never fire much later.
+    LaunchedEffect(permissionEpoch) {
+        if (hasNotifPermission) pendingNotifToggle?.invoke()
+        pendingNotifToggle = null
+    }
+    val anyNotifOn = settings.notifications.dailyCommit || settings.notifications.goalCheck
+    val notifState = when {
+        !anyNotifOn -> NotifLineState.Disabled
+        hasNotifPermission -> NotifLineState.Armed
+        notifDeniedPermanently -> NotifLineState.DeniedPermanently
+        else -> NotifLineState.MissingPermission
+    }
+
+    /** Turning a notification toggle ON without the permission asks for it first. */
+    fun gated(setter: (Boolean) -> Unit): (Boolean) -> Unit = { enabled ->
+        if (enabled && !hasNotifPermission) {
+            pendingNotifToggle = { setter(true) }
+            if (notifDeniedPermanently) {
+                context.openAppSystemSettings()
+            } else {
+                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            setter(enabled)
+        }
+    }
+
     SettingsScreen(
         settings = settings,
+        notifState = notifState,
+        onNotifLine = {
+            when (notifState) {
+                NotifLineState.MissingPermission ->
+                    notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                NotifLineState.DeniedPermanently -> context.openAppSystemSettings()
+                else -> Unit
+            }
+        },
         actions = SettingsActions(
             onLineNumbers = viewModel::setLineNumbers,
             onWordWrap = viewModel::setWordWrap,
+            onDailyCommit = gated(viewModel::setNotifDailyCommit),
+            onGoalCheck = gated(viewModel::setNotifGoalCheck),
             onDailyGoal = viewModel::setDailyGoalSteps,
             onWeight = viewModel::setWeightKg,
             onHeight = viewModel::setHeightCm,
@@ -116,6 +226,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
 fun SettingsScreen(
     settings: AppSettings,
     actions: SettingsActions,
+    notifState: NotifLineState = NotifLineState.Armed,
+    onNotifLine: () -> Unit = {},
     canvasState: LazyListState = rememberLazyListState()
 ) {
     val syntax = TstepsTheme.syntax
@@ -180,6 +292,9 @@ fun SettingsScreen(
         settings = settings,
         syntax = syntax,
         actions = actions,
+        notifState = notifState,
+        notifLabel = resources.getString(R.string.cd_grant_notifications),
+        onNotifLine = onNotifLine,
         changeLabel = { key -> resources.getString(R.string.cd_change_setting, key) },
         openLabel = { name -> resources.getString(R.string.cd_open_link, name) },
         editing = editing,
@@ -279,6 +394,9 @@ private fun buildSettingsLines(
     settings: AppSettings,
     syntax: SyntaxColors,
     actions: SettingsActions,
+    notifState: NotifLineState,
+    notifLabel: String,
+    onNotifLine: () -> Unit,
     changeLabel: (String) -> String,
     openLabel: (String) -> String,
     editing: NumericField?,
@@ -433,7 +551,17 @@ private fun buildSettingsLines(
     add(punctLine("},", 1, syntax))
 
     add(keyOpenLine("notifications", 1, syntax))
-    add(commentLine("// nothing to configure yet — ships with the notifications phase", syntax, indent = 2))
+    add(notifStatusLine(notifState, syntax, notifLabel, onNotifLine))
+    add(boolLine("daily_commit", settings.notifications.dailyCommit, comma = true,
+        hint = "// the closed day's commit message", syntax = syntax,
+        onClickLabel = changeLabel("daily_commit")) {
+        actions.onDailyCommit(!settings.notifications.dailyCommit)
+    })
+    add(boolLine("goal_check", settings.notifications.goalCheck, comma = false,
+        hint = "// once per day, when the check passes", syntax = syntax,
+        onClickLabel = changeLabel("goal_check")) {
+        actions.onGoalCheck(!settings.notifications.goalCheck)
+    })
     add(punctLine("},", 1, syntax))
 
     // Read-only About block; the license/credit lines open the related site.
@@ -584,6 +712,47 @@ private fun MutableList<CanvasLine>.addNumericLine(
 }
 
 /**
+ * The notifications block's dynamic status line (tweather's pattern). Error
+ * states are tappable: grant, or the system app settings permanently denied.
+ */
+private fun notifStatusLine(
+    state: NotifLineState,
+    syntax: SyntaxColors,
+    onClickLabel: String,
+    onClick: () -> Unit
+): CodeLine {
+    val (text, color) = when (state) {
+        NotifLineState.Disabled ->
+            "// notifications disabled" to syntax.comment.copy(alpha = 0.6f)
+        NotifLineState.Armed ->
+            "// rides the midnight rollover and the step sync" to
+                syntax.comment.copy(alpha = 0.6f)
+        NotifLineState.MissingPermission ->
+            "// ERROR: notifications permission missing — tap to grant" to syntax.diffDel
+        NotifLineState.DeniedPermanently ->
+            "// ERROR: denied — open system settings" to syntax.diffDel
+    }
+    val clickable = state == NotifLineState.MissingPermission ||
+        state == NotifLineState.DeniedPermanently
+    return CodeLine(
+        text = AnnotatedString(text, SpanStyle(color = color)),
+        indent = 2,
+        onClick = onClick.takeIf { clickable },
+        onClickLabel = onClickLabel.takeIf { clickable }
+    )
+}
+
+/** Permanently denied permissions can only be granted back from the app's page. */
+private fun android.content.Context.openAppSystemSettings() {
+    startActivity(
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+    )
+}
+
+/**
  * `"word_wrap": false,  // hint` — a plain [CodeLine] (so it word-wraps like any
  * other line) whose whole line toggles the boolean on tap.
  */
@@ -618,7 +787,7 @@ private fun SettingsScreenPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }
@@ -629,7 +798,7 @@ private fun SettingsScreenDefaultsPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }

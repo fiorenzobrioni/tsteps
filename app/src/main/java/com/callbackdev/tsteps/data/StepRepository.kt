@@ -60,34 +60,41 @@ class StepRepository(
         }
     }
 
-    /** Commits every day strictly before [today] that has data and no commit yet. */
-    suspend fun commitDaysBefore(today: LocalDate) {
+    /**
+     * Commits every day strictly before [today] that has data and no commit yet.
+     * Returns the days committed by THIS pass (a no-op safety-net run returns
+     * empty) — the daily-commit notification hangs off that distinction.
+     */
+    suspend fun commitDaysBefore(today: LocalDate): List<DaySummaryEntity> {
         val settings = settingsStore.read()
-        hourlyDao.datesBefore(today.toString()).forEach { date ->
-            if (dayDao.byDate(date) != null) return@forEach
+        return hourlyDao.datesBefore(today.toString()).mapNotNull { date ->
+            if (dayDao.byDate(date) != null) return@mapNotNull null
             val hours = hourlyDao.day(date)
             val steps = hours.sumOf { it.steps }
-            if (steps <= 0L) return@forEach
+            if (steps <= 0L) return@mapNotNull null
             val activeMinutes = Estimates.activeMinutes(hours.map { it.steps })
             val check = GoalCheck.run(steps, settings.dailyGoalSteps)
-            dayDao.insertIfAbsent(
-                DaySummaryEntity(
-                    date = date,
-                    steps = steps,
-                    activeMinutes = activeMinutes,
-                    // Frozen with today's profile: history must not follow the scale.
-                    distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
-                    activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
-                    goalSteps = settings.dailyGoalSteps,
-                    goalMet = when (check) {
-                        GoalCheckResult.SKIPPED -> null
-                        GoalCheckResult.PASSED -> true
-                        GoalCheckResult.FAILED -> false
-                    }
-                )
+            val day = DaySummaryEntity(
+                date = date,
+                steps = steps,
+                activeMinutes = activeMinutes,
+                // Frozen with today's profile: history must not follow the scale.
+                distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
+                activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
+                goalSteps = settings.dailyGoalSteps,
+                goalMet = when (check) {
+                    GoalCheckResult.SKIPPED -> null
+                    GoalCheckResult.PASSED -> true
+                    GoalCheckResult.FAILED -> false
+                }
             )
+            day.takeIf { dayDao.insertIfAbsent(it) != -1L }
         }
     }
+
+    /** Today's live total, for the goal watcher. */
+    suspend fun stepsOfDay(date: LocalDate): Long =
+        hourlyDao.day(date.toString()).sumOf { it.steps }
 
     fun observeDay(date: LocalDate): Flow<List<HourlyStepsEntity>> =
         hourlyDao.observeDay(date.toString())

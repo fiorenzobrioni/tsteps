@@ -159,6 +159,16 @@ class StepRepositoryTest {
     }
 
     @Test
+    fun `commit returns only the days THIS pass committed`() = runBlocking {
+        repository.ingest(reading(0L, "2026-08-18T09:00:00"))
+        repository.ingest(reading(500L, "2026-08-18T09:30:00"))
+        val first = repository.commitDaysBefore(LocalDate.parse("2026-08-19"))
+        assertEquals(listOf("2026-08-18"), first.map { it.date })
+        // The safety-net second pass finds nothing new to announce.
+        assertTrue(repository.commitDaysBefore(LocalDate.parse("2026-08-19")).isEmpty())
+    }
+
+    @Test
     fun `a reboot between readings does not double or drop steps`() = runBlocking {
         repository.ingest(reading(9_000L, "2026-08-18T09:00:00", boot = 3))
         repository.ingest(reading(9_500L, "2026-08-18T10:00:00", boot = 3))

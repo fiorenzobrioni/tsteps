@@ -22,6 +22,11 @@
     <string name="cd_stop_track">Ferma la sessione</string>
     <string name="cd_confirm_stop_track">Conferma lo stop della sessione</string>
     <string name="notif_channel_tracking">Tracciamento live</string>
+    <string name="notif_channel_daily">Commit giornaliero</string>
+    <string name="notif_channel_goal">Obiettivo raggiunto</string>
+    <string name="notif_title_daily_commit">%1$s Giorno committato \u2014 %2$s passi</string>
+    <string name="notif_title_goal">%1$s Obiettivo raggiunto \u2014 %2$s passi</string>
+    <string name="cd_grant_notifications">Concedi il permesso per le notifiche</string>
     <string name="cd_change_setting">Modifica %1$s</string>
     <string name="cd_open_link">Apri il sito di %1$s</string>
     <string name="cd_reset_settings">Ripristina tutte le impostazioni</string>

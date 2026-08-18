@@ -129,11 +129,12 @@ Fatta prima della Fase 7 su scelta del committente (le due fasi sono indipendent
 
 ## Fase 9 — Notifiche
 
-- [ ] Permission `POST_NOTIFICATIONS` runtime (path unico, minSdk 33) + `ic_stat_tsteps` (già in repo)
-- [ ] `daily_commit`: al rollover di mezzanotte (o prima apertura successiva), corpo in stile terminale: il messaggio di commit del giorno chiuso
-- [ ] `goal_check`: una sola notifica al passaggio del check, mai ripetuta (edge-triggered come le regole di tweather)
-- [ ] Tutte disattivabili singolarmente in `settings.config`; nessuna notifica motivazionale/promozionale, mai
-- [ ] Valutare (non promesso): "Weather CI" di tweather come modello per regole utente future — solo se emergerà una domanda reale
+- [x] Permission `POST_NOTIFICATIONS` runtime col pattern completo di tweather nella sezione `notifications` di settings.config: riga di stato dinamica (`// rides the midnight rollover and the step sync` armata / `// notifications disabled` / errori rossi tappabili per permesso mancante o negato-per-sempre → dialog o detour alle impostazioni di sistema con ritorno gestito al resume), toggle **gated** (accendere senza permesso chiede prima il permesso e applica il toggle solo al grant, pending azzerato su ogni altro ritorno). Il grant rende visibile anche la notifica del tracking (Fase 6, già gated su `notify()`)
+- [x] `daily_commit` (default on): il messaggio di commit del giorno chiuso, postato **da chi committa** — rollover di mezzanotte o safety-net del primo sync del mattino (`commitDaysBefore` ora ritorna i giorni committati DA QUEL passaggio: il no-op non notifica). Titolo = chrome localizzato (`👣 Giorno committato — 11.204 passi`), corpo = output terminale inglese (hash, riga metriche, check line colata dal commit). Canale IMPORTANCE_LOW **silenzioso**: spesso posta a mezzanotte, e un riepilogo che sveglia è esattamente il rumore che la VISION vieta. Backlog multi-giorno (telefono spento una settimana) → solo il giorno più recente: un riepilogo, non sette
+- [x] `goal_check` (default on): **edge-triggered, una volta al giorno** — `GoalWatcher` valuta nei due punti dove i passi arrivano in background (sync periodico e minute-tick del tracking service; mai dal foreground: l'utente sta guardando il numero), dedup per data in un DataStore dedicato `notif_state` (stato macchina, non settings: `git restore` non ri-spara nulla), marcato PRIMA del post (un crash costa una notifica, mai un doppione), si riarma a mezzanotte col cambio data. Corpo: check line + streak (se >1) + `$ tsteps log --today`. Canale IMPORTANCE_DEFAULT: un evento al giorno vale un ping
+- [x] Tutte disattivabili singolarmente; canali separati così le impostazioni di sistema possono zittirne uno senza l'altro; nessuna notifica motivazionale/promozionale, mai
+- [x] "Weather CI" come modello per regole utente: valutato e **rinviato** — con due soli eventi possibili (commit e check) un motore di regole sarebbe struttura senza domanda; si riapre solo se emergerà un bisogno reale
+- [x] Test (10 nuovi, 222 totali): `StepsNotificationsTest` (contenuti puri: titolo localizzato, corpo terminale con hash/check, omissioni oneste, streak solo >1), `GoalWatcherTest` (attraversamento → un post solo, ri-valutazione silenziosa, sotto soglia armato, goal 0/toggle off inerti), `NotificationStateStoreTest`, `StepRepositoryTest` esteso (ritorno solo-nuovi-commit), `SettingsScreenTest` esteso (toggle notifiche, riga di stato armata, errore rosso tappabile)
 
 ## Fase 10 — Widget home screen (`tsteps --today`)
 
