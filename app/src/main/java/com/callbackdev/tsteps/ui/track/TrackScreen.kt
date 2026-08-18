@@ -1,12 +1,16 @@
 package com.callbackdev.tsteps.ui.track
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -16,8 +20,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -32,12 +37,13 @@ import com.callbackdev.tsteps.data.TrackingState
 import com.callbackdev.tsteps.domain.LiveSessionTracker
 import com.callbackdev.tsteps.tracking.TrackingService
 import com.callbackdev.tsteps.ui.components.CodeCanvas
+import com.callbackdev.tsteps.ui.components.EditorTabs
 import com.callbackdev.tsteps.ui.components.StatusBarDivider
 import com.callbackdev.tsteps.ui.components.StatusBarStart
 import com.callbackdev.tsteps.ui.components.StatusBarText
 import com.callbackdev.tsteps.ui.components.TerminalStatusBar
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
-import com.callbackdev.tsteps.ui.theme.editorBorder
+import com.callbackdev.tsteps.ui.theme.fabGlow
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -45,10 +51,14 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 
 /**
- * `$ tsteps track` — a running process, not a file. Transcript lines accrue per
- * active minute; pause/resume are the shell's `^Z`/`fg`, stop is `^C` with a
- * two-tap confirm. When the process ends the session is committed as a hunk and
- * the screen exits back to the editor.
+ * `$ tsteps track` — a running process, not a file, shown the way an editor
+ * shows one: as a terminal tab (VS Code labels integrated terminals by their
+ * process; the `$` prefix marks the tab as a terminal, not a file). Transcript
+ * lines accrue per active minute; pause/resume are the shell's `^Z`/`fg`, stop
+ * is `^C` with a two-tap confirm. The controls carry glyph AND word
+ * (`[ ^Z pause ]`) at FAB-sized targets — device feedback: the bare glyphs
+ * didn't explain themselves — and the armed stop takes the screen's one glow.
+ * When the process ends the session commits as a hunk and the screen exits.
  */
 @Composable
 fun TrackScreen(
@@ -106,6 +116,12 @@ fun TrackScreen(
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
+            // Same chrome as every screen; the label is a terminal tab, not a file.
+            EditorTabs(
+                fileNames = listOf("$ tsteps track"),
+                activeIndex = 0,
+                onSelect = {}
+            )
             if (state != null) {
                 val lines = remember(state, nowMillis, settings, syntax, stopArmed) {
                     TrackDocument.build(
@@ -164,7 +180,13 @@ fun TrackScreen(
     }
 }
 
-/** `[ ^Z ]` / `[ fg ]` and `[ ^C ]` — controls rendered as text, editor rule. */
+/**
+ * The process controls: glyph AND word (`[ ^Z pause ]`) so the buttons explain
+ * themselves — the shell glyphs stay for coherence, the word does the talking
+ * (device feedback, recorded in PLANNING). FAB-sized targets; stop is the
+ * screen's primary verb and, when armed, takes its one sanctioned glow in
+ * diff-deletion red.
+ */
 @Composable
 private fun ProcessControls(
     paused: Boolean,
@@ -177,19 +199,23 @@ private fun ProcessControls(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        BracketButton(
-            text = if (paused) "[ fg ]" else "[ ^Z ]",
-            color = syntax.number,
+        ProcessButton(
+            text = if (paused) "[ fg resume ]" else "[ ^Z pause ]",
+            modifier = Modifier.weight(1f),
+            textColor = syntax.number,
             onClickLabel = stringResource(
                 if (paused) R.string.cd_resume_track else R.string.cd_pause_track
             ),
             onClick = onPauseResume
         )
-        BracketButton(
-            text = "[ ^C ]",
-            color = if (stopArmed) syntax.diffDel else MaterialTheme.colorScheme.onSurface,
+        ProcessButton(
+            text = "[ ^C stop ]",
+            modifier = Modifier.weight(1.3f),
+            textColor = if (stopArmed) syntax.diffDel else MaterialTheme.colorScheme.onSurface,
+            borderColor = if (stopArmed) syntax.diffDel else syntax.border,
+            glowColor = if (stopArmed) syntax.diffDel.copy(alpha = 0.53f) else null,
             onClickLabel = stringResource(
                 if (stopArmed) R.string.cd_confirm_stop_track else R.string.cd_stop_track
             ),
@@ -198,22 +224,33 @@ private fun ProcessControls(
     }
 }
 
+/** A 56dp editor-shaped button: 1px border, 4px radius, monospace label. */
 @Composable
-private fun BracketButton(
+private fun ProcessButton(
     text: String,
-    color: Color,
+    modifier: Modifier,
+    textColor: androidx.compose.ui.graphics.Color,
     onClickLabel: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    borderColor: androidx.compose.ui.graphics.Color = TstepsTheme.syntax.border,
+    glowColor: androidx.compose.ui.graphics.Color? = null
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = color,
-        modifier = Modifier
-            .editorBorder()
-            .clickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-    )
+    Box(
+        modifier = modifier
+            .heightIn(min = 56.dp)
+            .then(if (glowColor != null) Modifier.fabGlow(glowColor) else Modifier)
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, borderColor, MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor
+        )
+    }
 }
 
 private val StartClock = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
