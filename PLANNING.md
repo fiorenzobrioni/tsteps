@@ -60,11 +60,15 @@ Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test tot
 
 ## Fase 3 — Schermata principale (`steps_data.json`)
 
-- [ ] Rendering JSON live con i componenti Fase 1: `date`, `steps.count` che ticka in tempo reale, `goal` + barra `▓░` come stringa, `movement.*`, `hourly` sparkline, `sessions` (vuoto per ora), `streak_days`
-- [ ] Chiavi oneste con le unità: `distance_km` ↔ `distance_mi` al cambio unità (regola tweather)
-- [ ] Canale `//`: stato sensore, hint estimate (`// estimated from stride length`), errori come messaggi da compiler
-- [ ] Status bar: `⎇ main`, data, `Last commit: ieri 23:59`
-- [ ] FAB `▶` presente ma disabilitato con `// coming soon` finché la Fase 6 non arriva (o nascosto — decidere)
+- [x] Rendering live con i componenti Fase 1: `date`, `steps.count` che ticka in tempo reale, `goal` + barra `▓░` come stringa (`StepsGlyphs.goalBar`: barra al massimo piena, la percentuale dice la verità oltre il 100), `movement.*`, `hourly` sparkline (`▁▂▃▄▅▆▇█`, finestra 06..20, scala relativa all'ora più attiva del giorno), `sessions: []`, `streak_days`
+- [x] **Ticking live**: il listener del sensore vive esattamente quanto la subscription della UI (`channelFlow` + `WhileSubscribed`): schermo visibile = stream attivo con ingest conflated ogni 2s; schermo via = listener deregistrato in secondi. Interfaccia `StepSource` estratta dal reader per testare il flusso con letture sintetiche
+- [x] Chiavi oneste con le unità: `distance_km` ↔ `distance_mi` (valore convertito E chiave rinominata, regola tweather)
+- [x] Documento costruito a mano (`StepsDocument`, non `buildJsonLines`): serve ciò che il builder generico volutamente non fa — hint `//` in coda alle righe valore, comando `$` tappabile nello stato d'errore, chiavi che appaiono/spariscono col dato. Senza goal: né `goal`, né `check`, né `streak_days`. Senza peso: `// active_kcal: set profile.weight_kg to enable` al posto del numero (nascosto, non inventato)
+- [x] Canale `//`: stato sensore ed errori da compiler (`// E: no step sensor on this device`); **richiesta permesso in-file** (chiude la deviazione della Fase 2): `// E: ACTIVITY_RECOGNITION permission not granted` + riga tappabile `$ tsteps grant activity-recognition` → dialog di sistema → `reconcile()` arma i job; ricontrollo del permesso a ogni resume (concessioni/revoche da impostazioni di sistema, in entrambe le direzioni). Negli stati d'errore il file mostra `"steps": null` — un null onesto, mai uno zero finto
+- [x] Status bar: `⎇ main | <data> | sensor: OK/off/ERR` (off = permesso mancante, ERR = sensore assente, in rosso) a sinistra; `Last commit: <data>` a destra (localizzata, "commit" resta gergo git)
+- [x] FAB `▶` **presente ma disabilitato** (deciso col committente): grigio comment, senza glow; al tap risponde con un commento transiente in testa al file (`// $ tsteps track — coming soon`, 4s) — il modo dell'editor di dire "non ancora", niente toast
+- [x] Mezzanotte con app aperta: la data del working tree si ri-valuta ogni 30s (`Clock` iniettabile nei test)
+- [x] Test (24 nuovi, 96 totali): `StepsGlyphsTest` (scala sparkline, rumore notturno fuori finestra, barra goal 0/50/100/128%), `StepsDocumentTest` (colori token, hint, rinomina imperiale, omissioni oneste, comando grant cliccabile), `StepsViewModelTest` (Robolectric: tick live end-to-end su Room reale, transizioni permesso, NO_SENSOR > NO_PERMISSION, streak/last-commit dalla storia), `StepsScreenTest` (Compose: rendering, grant tappabile, commento del FAB, chiave imperiale)
 
 ## Fase 4 — Navigazione e Impostazioni (`settings.config`)
 

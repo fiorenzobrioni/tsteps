@@ -17,7 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.callbackdev.tsteps.ui.SkeletonScreen
+import com.callbackdev.tsteps.ui.steps.StepsScreen
 import com.callbackdev.tsteps.ui.components.EditorNavBar
 import com.callbackdev.tsteps.ui.components.EditorNavItems
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
@@ -41,7 +41,7 @@ fun TstepsApp() {
         ) {
             Box(Modifier.weight(1f)) {
                 when (route) {
-                    EditorNavItems.Editor.route -> SkeletonScreen()
+                    EditorNavItems.Editor.route -> StepsScreen()
                     EditorNavItems.Log.route -> PlaceholderFile("steps_history.diff")
                     EditorNavItems.Stats.route -> PlaceholderFile("stats.md")
                     EditorNavItems.Settings.route -> PlaceholderFile("settings.config")

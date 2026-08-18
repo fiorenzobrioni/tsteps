@@ -7,4 +7,11 @@
     <string name="nav_log">Log</string>
     <string name="nav_stats">Stats</string>
     <string name="nav_settings">Impostazioni</string>
+
+    <!-- Chrome / status bars: "commit" resta inglese, è gergo git (regola l10n) -->
+    <string name="status_last_commit">Ultimo commit: %1$s</string>
+
+    <!-- Accessibilità -->
+    <string name="cd_grant_activity_recognition">Concedi il permesso di leggere il contapassi</string>
+    <string name="cd_track_coming_soon">Avvia una camminata tracciata (in arrivo)</string>
 </resources>
