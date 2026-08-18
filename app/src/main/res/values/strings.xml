@@ -15,6 +15,7 @@
     <!-- Chrome / status bars -->
     <string name="status_last_commit">Last commit: %1$s</string>
     <string name="status_commits">%1$d commits</string>
+    <string name="status_days">%1$d days</string>
 
     <!-- Accessibility -->
     <string name="cd_grant_activity_recognition">Grant permission to read the step counter</string>
@@ -34,4 +35,5 @@
     <string name="cd_confirm_reset">Confirm settings reset</string>
     <string name="cd_cancel_edit">Cancel editing</string>
     <string name="cd_toggle_commit">Expand or collapse the %1$s commit</string>
+    <string name="cd_open_commit">Open the %1$s commit in the log</string>
 </resources>

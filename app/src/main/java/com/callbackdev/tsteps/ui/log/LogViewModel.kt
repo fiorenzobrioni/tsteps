@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class LogUiState(
     val today: UncommittedToday? = null,
@@ -41,7 +42,9 @@ data class LogUiState(
     val units: UnitsSystem = UnitsSystem.METRIC,
     val todaySessions: List<SessionItem> = emptyList(),
     val sessionsByDate: Map<LocalDate, List<SessionItem>> = emptyMap(),
-    val zone: ZoneId = ZoneId.systemDefault()
+    val zone: ZoneId = ZoneId.systemDefault(),
+    /** A pending stats.md jump: the screen scrolls this commit into view. */
+    val focusDate: LocalDate? = null
 )
 
 class LogViewModel(
@@ -56,6 +59,15 @@ class LogViewModel(
         expanded.update { if (date in it) it - date else it + date }
     }
 
+    init {
+        // A stats.md tag jump lands here: the requested day arrives expanded.
+        viewModelScope.launch {
+            LogFocus.request.collect { date ->
+                if (date != null) expanded.update { it + date }
+            }
+        }
+    }
+
     private val today: Flow<LocalDate> = flow {
         while (true) {
             emit(LocalDate.now(clock))
@@ -68,8 +80,8 @@ class LogViewModel(
         repository.observeHistory(),
         repository.observeAllSessions(),
         settingsStore.settings,
-        expanded
-    ) { (date, hourlyRows), history, sessionRows, settings, expandedDates ->
+        combine(expanded, LogFocus.request) { e, f -> e to f }
+    ) { (date, hourlyRows), history, sessionRows, settings, (expandedDates, focus) ->
         val todaySteps = hourlyRows.sumOf { it.steps }
         val days = history.map { it.toCommitDay() }
         val sessions = sessionRows.mapNotNull { it.toItem() }
@@ -87,7 +99,8 @@ class LogViewModel(
             units = settings.units,
             todaySessions = sessions[date].orEmpty(),
             sessionsByDate = sessions,
-            zone = clock.zone
+            zone = clock.zone,
+            focusDate = focus
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LogUiState())
 

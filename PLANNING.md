@@ -113,10 +113,15 @@ Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test tot
 
 ## Fase 8 — Stats (`stats.md`)
 
-- [ ] Heatmap contributi ultime 12 settimane: glifi `□ ▪ ■` su 4–5 intensità di verde, bucket **relativi alla distribuzione dell'utente** (non al 10k assoluto)
-- [ ] Streak corrente e massima (streak = giorni consecutivi col check verde; senza goal, sezione assente — niente colpevolizzazione non richiesta)
-- [ ] Medie 7/30 giorni (passi, distanza, minuti attivi) in tabella markdown
-- [ ] Tabella `tags` (best-day, longest-walk, best-week) con link al commit (tap → log posizionato sul giorno)
+Fatta prima della Fase 7 su scelta del committente (le due fasi sono indipendenti).
+
+- [x] **Heatmap contributi ultime 12 settimane** (`domain/Heatmap` puro): griglia ISO Monday-first che termina con la settimana di oggi, 7 righe × 12 colonne di celle `■` in 4 intensità di verde (alpha 0.30/0.55/0.78/1.0), `·` per i giorni a zero, **vuoto** per i giorni non ancora accaduti (non zeri finti). Bucket **relativi alla distribuzione dell'utente**: quartili dei soli giorni non-zero della finestra (upper-bound: un solo giorno attivo è il massimo di quell'utente, non un puntino spento; i mostri fuori finestra non distorcono la scala). **Oggi entra vivo nella griglia** come cella del working tree. Etichette giorno lun/mer/ven/dom localizzate, riga mesi sotto le colonne che ne iniziano uno
+- [x] Streak corrente e massima (`## streak`, da `Streaks` sui check committati) — **sezione assente senza goal**, non azzerata: niente colpevolizzazione non richiesta
+- [x] Medie 7/30 giorni (`domain/Averages`): media sui **giorni che hanno un commit** — un giorno non tracciato è dato mancante, non uno zero che annacqua la media; finestra vuota = niente riga. Tabella markdown allineata (il mono rende l'allineamento gratis), distanza nelle unità correnti
+- [x] Tabella `## tags`: `best-day`, `longest-walk` (nuovo `Records.longestWalk`, max minuti attivi) e `best-week` (nuovo `Records.bestWeek`, somma per settimana ISO) — **le righe best-day e longest-walk sono link al commit**: tap → tab Log col giorno espanso e il commit scrollato in vista (`LogFocus`, canale hand-rolled: la back-stack entry del Log viene ripristinata, non ricreata, quindi un nav-argument non la raggiungerebbe — stessa ragione del ⎇ di tweather). best-week non è cliccabile: non ha un singolo commit
+- [x] Rendering: markdown source evidenziato come ogni file della serie (`buildMarkdownLines` per headings/tabelle/footer corsivo), heatmap colorata a mano (un tokenizer markdown non ha nozione di intensità); footer onesto `*computed on read from N committed days*`; status bar `⎇ main | ro` (un file di statistiche si calcola, non si edita) + `N days`
+- [x] Empty state onesto: griglia comunque visibile (con la cella di oggi viva), poi `// nothing committed yet — records and averages appear with the first day's commit`
+- [x] Test (25 nuovi, 197 totali): `HeatmapTest` (geometria, futuri vuoti, quartili relativi, giorno solitario = max, finestra che ignora i mostri antichi, etichette mesi), `AveragesTest` (media sui giorni con dato, bordo finestra, null su vuoto), `RecordsTest` esteso (longest-walk, best-week ISO), `StatsDocumentTest` (documento riga per riga: heatmap 7 righe + mesi, cella verde a intensità giusta, streak solo con goal, tabelle, tag cliccabili coi commit giusti, imperiale, empty state, footer), `StatsViewModelTest` (Room reale: griglia con oggi vivo, record, medie, streak on/off), `StatsScreenTest`, `LogViewModelTest` esteso (jump da stats: giorno espanso + focus consumato)
 
 ## Fase 9 — Notifiche
 

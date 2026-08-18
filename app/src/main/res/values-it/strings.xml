@@ -11,6 +11,7 @@
     <!-- Chrome / status bars: "commit" resta inglese, è gergo git (regola l10n) -->
     <string name="status_last_commit">Ultimo commit: %1$s</string>
     <string name="status_commits">%1$d commit</string>
+    <string name="status_days">%1$d giorni</string>
 
     <!-- Accessibilità -->
     <string name="cd_grant_activity_recognition">Concedi il permesso di leggere il contapassi</string>
@@ -27,4 +28,5 @@
     <string name="cd_confirm_reset">Conferma il ripristino delle impostazioni</string>
     <string name="cd_cancel_edit">Annulla la modifica</string>
     <string name="cd_toggle_commit">Espandi o comprimi il commit del %1$s</string>
+    <string name="cd_open_commit">Apri il commit del %1$s nel log</string>
 </resources>

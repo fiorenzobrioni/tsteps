@@ -1,13 +1,10 @@
 package com.callbackdev.tsteps.ui.navigation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -15,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -32,6 +28,7 @@ import com.callbackdev.tsteps.ui.components.EditorOptions
 import com.callbackdev.tsteps.ui.components.LocalEditorOptions
 import com.callbackdev.tsteps.ui.log.LogScreen
 import com.callbackdev.tsteps.ui.settings.SettingsScreen
+import com.callbackdev.tsteps.ui.stats.StatsScreen
 import com.callbackdev.tsteps.ui.steps.StepsScreen
 import com.callbackdev.tsteps.ui.track.TrackScreen
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
@@ -39,9 +36,9 @@ import kotlinx.coroutines.flow.map
 
 /**
  * App shell (tweather's pattern): NavHost above the editor-style bottom bar, one
- * destination per tab, each tab's stack saved and restored on switch. Stats is a
- * placeholder file until Fase 8 writes it. `settings.config`'s editor section
- * feeds every CodeCanvas in the app via [LocalEditorOptions].
+ * destination per tab, each tab's stack saved and restored on switch.
+ * `settings.config`'s editor section feeds every CodeCanvas in the app via
+ * [LocalEditorOptions].
  */
 object Routes {
     val Editor = EditorNavItems.Editor.route
@@ -85,7 +82,9 @@ fun TstepsApp() {
                         StepsScreen(onOpenTrack = { navController.navigate(TrackRoute) })
                     }
                     composable(Routes.Log) { LogScreen() }
-                    composable(Routes.Stats) { PlaceholderFile("stats.md") }
+                    composable(Routes.Stats) {
+                        StatsScreen(onOpenLog = { navController.navigateToTab(Routes.Log) })
+                    }
                     composable(Routes.Settings) { SettingsScreen() }
                     // Not a tab: the live process opens over the editor's stack
                     // and pops back when it ends.
@@ -113,22 +112,6 @@ private fun NavHostController.navigateToTab(route: String) {
     }
 }
 
-/** A file that exists in the plan but not on disk yet. */
-@Composable
-private fun PlaceholderFile(fileName: String) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "// $fileName — not yet written",
-            style = MaterialTheme.typography.bodySmall,
-            color = TstepsTheme.syntax.comment
-        )
-    }
-}
 
 @Preview(showBackground = true, backgroundColor = 0xFF10141A)
 @Composable

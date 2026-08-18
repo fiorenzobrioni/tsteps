@@ -3,6 +3,7 @@ package com.callbackdev.tsteps.ui.log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
 import com.callbackdev.tsteps.ui.components.CodeCanvas
+import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.EditorTabs
 import com.callbackdev.tsteps.ui.components.StatusBarDivider
 import com.callbackdev.tsteps.ui.components.StatusBarStart
@@ -64,6 +66,18 @@ fun LogScreen(
             toggleLabel = { date -> resources.getString(R.string.cd_toggle_commit, date) }
         )
     }
+    val canvasState = rememberLazyListState()
+    // A stats.md tag jump: the day arrived already expanded (LogFocus →
+    // ViewModel); scroll its commit header into view, then consume the request.
+    LaunchedEffect(state.focusDate, lines) {
+        val date = state.focusDate ?: return@LaunchedEffect
+        val header = "commit " + CommitHash.of(date)
+        val index = lines.indexOfFirst { it is CodeLine && it.text.text.startsWith(header) }
+        if (index >= 0) {
+            canvasState.animateScrollToItem(index)
+            LogFocus.consume()
+        }
+    }
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             EditorTabs(
@@ -73,7 +87,7 @@ fun LogScreen(
             )
             CodeCanvas(
                 lines = lines,
-                state = rememberLazyListState(),
+                state = canvasState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxSize()

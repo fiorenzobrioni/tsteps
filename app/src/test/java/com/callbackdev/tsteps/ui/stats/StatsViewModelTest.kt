@@ -1,4 +1,4 @@
-package com.callbackdev.tsteps.ui.log
+package com.callbackdev.tsteps.ui.stats
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
@@ -8,6 +8,7 @@ import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.TrackerStateStore
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
+import com.callbackdev.tsteps.data.local.SessionEntity
 import com.callbackdev.tsteps.data.local.TstepsDatabase
 import java.time.Clock
 import java.time.LocalDate
@@ -26,6 +27,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -35,7 +37,7 @@ import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-class LogViewModelTest {
+class StatsViewModelTest {
 
     @get:Rule
     val tmp = TemporaryFolder()
@@ -48,7 +50,8 @@ class LogViewModelTest {
     )
 
     private lateinit var database: TstepsDatabase
-    private lateinit var viewModel: LogViewModel
+    private lateinit var settingsStore: SettingsStore
+    private lateinit var viewModel: StatsViewModel
 
     @Before
     fun setUp() {
@@ -57,10 +60,10 @@ class LogViewModelTest {
             ApplicationProvider.getApplicationContext(),
             TstepsDatabase::class.java
         ).allowMainThreadQueries().build()
-        val settingsStore = SettingsStore(
+        settingsStore = SettingsStore(
             PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("s.preferences_pb") }
         )
-        viewModel = LogViewModel(
+        viewModel = StatsViewModel(
             repository = StepRepository(
                 hourlyDao = database.hourlyStepsDao(),
                 dayDao = database.daySummaryDao(),
@@ -84,72 +87,66 @@ class LogViewModelTest {
     }
 
     private suspend fun waitFor(predicate: () -> Boolean) {
-        withTimeout(5_000) {
-            while (!predicate()) delay(25)
-        }
+        withTimeout(5_000) { while (!predicate()) delay(25) }
     }
 
-    @Test
-    fun `state carries uncommitted today, commits and the best-day record`() = runBlocking {
-        database.daySummaryDao().insertIfAbsent(day("2026-08-16", steps = 14_823))
-        database.daySummaryDao().insertIfAbsent(day("2026-08-17", steps = 11_204))
-        database.hourlyStepsDao().upsert(HourlyStepsEntity("2026-08-18", 9, 2_500))
-
-        val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }
-        try {
-            waitFor { viewModel.uiState.value.days.size == 2 }
-            val state = viewModel.uiState.value
-            assertEquals(LocalDate.parse("2026-08-17"), state.days.first().date) // newest first
-            assertEquals(LocalDate.parse("2026-08-16"), state.bestDay)
-            assertEquals(2_500L, state.today?.steps)
-            assertEquals(LocalDate.parse("2026-08-18"), state.today?.date)
-        } finally {
-            subscription.cancel()
-        }
-    }
-
-    @Test
-    fun `a stats tag jump arrives expanded with the focus date set`() = runBlocking {
-        database.daySummaryDao().insertIfAbsent(day("2026-08-16"))
-        val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }
-        try {
-            waitFor { viewModel.uiState.value.days.size == 1 }
-            val date = LocalDate.parse("2026-08-16")
-            LogFocus.request(date)
-            waitFor {
-                date in viewModel.uiState.value.expanded &&
-                    viewModel.uiState.value.focusDate == date
-            }
-            LogFocus.consume()
-            waitFor { viewModel.uiState.value.focusDate == null }
-        } finally {
-            subscription.cancel()
-        }
-    }
-
-    @Test
-    fun `toggle expands and collapses a day`() = runBlocking {
-        database.daySummaryDao().insertIfAbsent(day("2026-08-17"))
-        val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }
-        try {
-            waitFor { viewModel.uiState.value.days.size == 1 }
-            val date = LocalDate.parse("2026-08-17")
-            viewModel.toggle(date)
-            waitFor { date in viewModel.uiState.value.expanded }
-            viewModel.toggle(date)
-            waitFor { date !in viewModel.uiState.value.expanded }
-        } finally {
-            subscription.cancel()
-        }
-    }
-
-    private fun day(date: String, steps: Long = 9_000) = DaySummaryEntity(
+    private fun day(date: String, steps: Long, goalMet: Boolean? = true) = DaySummaryEntity(
         date = date,
         steps = steps,
         activeMinutes = 80,
-        distanceMeters = 6_000.0,
+        distanceMeters = steps * 0.7,
         activeKcal = null,
-        goalSteps = 8_000,
-        goalMet = steps >= 8_000
+        goalSteps = if (goalMet == null) 0 else 8_000,
+        goalMet = goalMet
     )
+
+    @Test
+    fun `state carries grid with live today, records and averages`() = runBlocking {
+        database.daySummaryDao().insertIfAbsent(day("2026-08-16", 14_823))
+        database.daySummaryDao().insertIfAbsent(day("2026-08-17", 11_204))
+        database.hourlyStepsDao().upsert(HourlyStepsEntity("2026-08-18", 9, 2_500))
+        database.sessionDao().insert(
+            SessionEntity(
+                startMillis = LocalDateTime.parse("2026-08-17T09:00:00")
+                    .atZone(rome).toInstant().toEpochMilli(),
+                endMillis = LocalDateTime.parse("2026-08-17T10:32:00")
+                    .atZone(rome).toInstant().toEpochMilli(),
+                type = "walk",
+                steps = 9_120,
+                distanceMeters = 6_600.0,
+                avgCadenceSpm = 99,
+                activeMillis = 92 * 60_000L
+            )
+        )
+        settingsStore.setDailyGoalSteps(8_000)
+
+        val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }
+        try {
+            waitFor { viewModel.uiState.value.committedDays == 2 && viewModel.uiState.value.streak != null }
+            val state = viewModel.uiState.value
+            // Today's live cell rides the grid even before its commit.
+            val todayCell = state.grid!!.weeks.last().cells[1] // Tuesday
+            assertEquals(2_500L, todayCell.steps)
+            assertEquals(LocalDate.parse("2026-08-16"), state.bestDay?.first)
+            assertEquals(14_823L, state.bestDay?.second)
+            assertEquals(9_120L, state.longestWalk?.steps)
+            assertEquals(2, state.streak?.current) // 16th + 17th, today uncommitted
+            assertEquals(2, state.averages.size)
+            assertEquals(13_014L, state.averages.first().avgSteps) // (14823+11204)/2 rounded
+        } finally {
+            subscription.cancel()
+        }
+    }
+
+    @Test
+    fun `no goal means no streak section`() = runBlocking {
+        database.daySummaryDao().insertIfAbsent(day("2026-08-17", 9_000, goalMet = null))
+        val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }
+        try {
+            waitFor { viewModel.uiState.value.committedDays == 1 }
+            assertNull(viewModel.uiState.value.streak)
+        } finally {
+            subscription.cancel()
+        }
+    }
 }
