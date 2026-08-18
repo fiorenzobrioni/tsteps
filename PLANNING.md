@@ -138,14 +138,17 @@ Fatta prima della Fase 7 su scelta del committente (le due fasi sono indipendent
 
 ## Fase 10 — Widget home screen (`tsteps --today`)
 
-Si eredita l'architettura completa del widget di tweather (la fase più rifinita di quel progetto — riusare anche le lezioni: breakpoint misurati non stimati, un gradino per riga, niente glifi decorativi che rubano spazio, testo 15sp).
+Architettura del widget di tweather ereditata per intero, lezioni comprese — e il piano l'aveva promesso: breakpoint misurati, un gradino per riga, niente glifi che rubano spazio, testo a 15sp.
 
-- [ ] RemoteViews con sizes-map API 31+, tier a righe: passi → barra goal → dist/attivi → streak → `# last walk`
-- [ ] Font `monospace` di sistema (stessa deviazione documentata di tweather, CVE-2021-0567)
-- [ ] Opacità sfondo configurabile, palette dal profilo tema attivo
-- [ ] Repaint su lettura passi, rollover e cambi tema/unità/goal; nessun polling proprio
-- [ ] Stato degradato: `# sensor off` se la pipeline sensore è ferma (permission revocata / sensore assente) — mai un numero congelato spacciato per vivo
-- [ ] Preview del picker + `widget_info` con `updatePeriodMillis=0`
+- [x] **Content builder puro** (`WidgetContentBuilder`): transcript ordinato per utilità — `steps: 8,432 / 10,000`, `check: ▓▓▓▓▓▓▓▓░░ 84%` (barra a 10 celle in verde-prompt, "emerald = active states" del DESIGN), `dist`, `active`, `kcal` (solo col peso), `streak` (solo con goal e >0), `# last walk: 09:32 (46 min)`, `# last_sync: HH:mm` — il tier taglia dal fondo, mai riordina. Prompt `you@tsteps:~$ cat steps_data.json`; emoji 👣 costante (è il brand, non un dato). Stati onesti: `# sensor off — open tsteps` in rosso (permesso revocato/sensore assente), `# no data yet` prima del primo campione — mai zeri finti
+- [x] **Marcatore stale** (>45 min dall'ultimo campione = 3 periodi di sync, tolleranza Doze): la riga `# last_sync` diventa rossa; sui tier troppo corti per averla, `# stale` cavalca la riga steps (la regola Temp-line di tweather). Il sync worker **ridisegna anche quando il campione fallisce** — senza, il marcatore non comparirebbe proprio nello scenario che deve segnalare
+- [x] **Renderer** con sizes-map API 31+ (l'host risceglie il tier a ogni resize, senza round-trip), un gradino per riga 4→8, colori per token via `ForegroundColorSpan` (ParcelableSpan, sopravvive all'IPC). **La scala si ferma a 8**: il transcript massimo di tsteps ha 8 righe, e il test misurato ha bocciato subito i pioli 9–11 ereditati da tweather (11 righe lì) — un gradino che niente può riempire promette solo altezza sprecata. Costanti misurate, non stimate: il test binary-search sull'altezza minima reale di ogni gradino (con margine deliberato ~2dp/riga per il monospace OEM) resta di guardia
+- [x] Tier SMALL (striscia glanceable): 👣 + conteggio grande + **la barra goal come label** (progresso a colpo d'occhio; senza goal, `steps today` in plain — il grigio comment non regge il contrasto su Dracula/Monokai, lezione tweather)
+- [x] Layout portati (FrameLayout + fill/border ImageView, title bar LinearLayout coi due box da 48dp larghi ma alti quanto la barra, `monospace` di sistema per CVE-2021-0567 — deviazione documentata ereditata); drawable con Obsidian *nel* drawable (l'initialLayout dell'host non passa dal bind) e il `<solid>` trasparente load-bearing nel bordo (il bug GradientDrawable di tweather, tenuto fixato e **testato sui pixel**: fill al 50% davvero semitrasparente, cornice cava ma presente e nel colore tema)
+- [x] Opacità sfondo `widget.bg_opacity_pct` in settings.config (100/85/70/50 ciclabili, solo sul fill, bordo sempre opaco)
+- [x] **Niente polling** (`updatePeriodMillis=0`): ridisegni da sync worker, rollover, minute-tick del tracking (una camminata a schermo spento è quando il widget serve di più), collector settings di MainActivity (tema/unità/goal/profilo/opacità), onUpdate del provider; ↻ = un campione expedited (`step-sync-manual`, KEEP anti tap-spam). Provider con goAsync **nullable** (il crash di tweather, tenuto fixato) e resize deliberatamente non gestito (la sizes-map esiste apposta)
+- [x] **Niente configurazione**: tsteps ha una sola sorgente dati — il giorno — quindi niente da pinnare, niente WidgetConfigActivity, niente stores per-instance (più semplice del genitore, di proposito); preview del picker statica con colori Obsidian hardcoded
+- [x] Test (20 nuovi, 242 totali): `WidgetContentBuilderTest` (transcript completo e ordinato, budget che taglia dal fondo, omissioni oneste, stale su entrambe le vie, sensor-off/no-data, small tier, imperiale), `WidgetRendererTest` (bind reale via `apply`, colori token attraverso l'IPC, slot nascosti, **pixel test** dei due layer di sfondo, **ogni tier sta nel proprio breakpoint**, **binary search sui gradini** — il test che ha già pagato: ha trovato i 3 pioli morti)
 
 ## Fase 11 — Rilevamento automatico sessioni
 

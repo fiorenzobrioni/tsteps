@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- updatePeriodMillis=0 on purpose: the widget never polls on its own — it is
+     re-rendered whenever new steps land (sync workers, tracking minute tick, the
+     app in foreground), keeping its battery cost at zero over what counting
+     already spends. targetCellHeight=3 so the default placement lands in the
+     medium band the picker preview advertises. No configure activity: tsteps has
+     one data source, the day — there is nothing to pin. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/widget_tsteps_medium"
+    android:minWidth="110dp"
+    android:minHeight="48dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="48dp"
+    android:previewLayout="@layout/widget_tsteps_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

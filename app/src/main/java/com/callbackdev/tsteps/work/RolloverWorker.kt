@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.notifications.StepsNotifications
 import com.callbackdev.tsteps.notifications.StepsNotifier
+import com.callbackdev.tsteps.widget.TstepsWidgetUpdater
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -40,6 +41,7 @@ class RolloverWorker(
             }
         }
         SyncScheduler.scheduleNextRollover(applicationContext)
+        TstepsWidgetUpdater.updateAll(applicationContext)
         return Result.success()
     }
 }

@@ -37,6 +37,20 @@
             android:name=".tracking.TrackingService"
             android:exported="false"
             android:foregroundServiceType="health" />
+
+        <!-- Home widget (Fase 10). exported=false: the system delivers APPWIDGET_*
+             regardless, and it keeps our refresh action private (tweather). -->
+        <receiver
+            android:name=".widget.TstepsWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_tsteps_info" />
+        </receiver>
     </application>
 
 </manifest>

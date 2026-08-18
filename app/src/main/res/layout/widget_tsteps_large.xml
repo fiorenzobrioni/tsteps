@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The tall tiers: every transcript line past the compact four. The renderer
+     fills as many slots as the picked tier has room for and hides the rest.
+     fontFamily="monospace" (not JetBrains Mono) — see @style/WidgetBodyLine. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg_fill"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg_fill" />
+
+    <ImageView
+        android:id="@+id/widget_bg_border"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg_border" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Both controls live in the title bar, in matching 48dp boxes so the title
+             sits optically centred between them and the corners mirror each other.
+             A LinearLayout, not a FrameLayout: the weighted title then shrinks
+             instead of running underneath the glyphs on a narrow widget. Height is
+             wrap_content so the bar grows with the system font scale. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="34dp"
+            android:orientation="horizontal">
+
+            <!-- 48dp WIDE but only as tall as the bar: a 48dp-high box made the
+                 title bar eat a whole line of weather, which is a bad trade for a
+                 control that is already easy to hit. -->
+            <TextView
+                android:id="@+id/widget_refresh"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:text="@string/widget_refresh_glyph"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:singleLine="true"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+            <!-- Default font family on purpose — the color-emoji font must kick in -->
+            <TextView
+                android:id="@+id/widget_emoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:minWidth="48dp"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_divider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:importantForAccessibility="no" />
+
+        <!-- One view, ellipsized: splitting the flag into its own weighted view was
+             tried and reverted — with little room left it shrank to "-…" instead of
+             disappearing, which reads worse than a truncated command. -->
+        <TextView
+            android:id="@+id/widget_prompt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="monospace"
+            android:paddingHorizontal="14dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp"
+            android:singleLine="true"
+            android:textSize="15sp" />
+
+        <!-- No overlay over the body any more, so every line runs the full width -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="12dp">
+
+                <ImageView
+                    android:id="@+id/widget_guide"
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:importantForAccessibility="no" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/widget_line1"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line2"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line3"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line4"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line5"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line6"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line7"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line8"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line9"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line10"
+                        style="@style/WidgetBodyLine" />
+
+                    <TextView
+                        android:id="@+id/widget_line11"
+                        style="@style/WidgetBodyLine" />
+                </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

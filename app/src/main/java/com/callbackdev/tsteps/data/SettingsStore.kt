@@ -67,9 +67,13 @@ data class AppSettings(
     val units: UnitsSystem = UnitsSystem.METRIC,
     val sessionMetric: SessionMetric = SessionMetric.SPEED,
     val themeProfileName: String = "Obsidian",
+    val widgetOpacityPct: Int = 100,
     /** Epoch seconds of the last edit; null until the user changes something. */
     val lastModifiedEpochSeconds: Long? = null
 )
+
+/** Home-widget background opacity: alpha on the card fill only, border stays crisp. */
+val WidgetOpacities = listOf(100, 85, 70, 50)
 
 /** Input ranges enforced by the settings file's terminal inputs. */
 object SettingsRanges {
@@ -101,6 +105,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
                     ?.let { name -> SessionMetric.entries.firstOrNull { it.name == name } }
                     ?: SessionMetric.SPEED,
                 themeProfileName = prefs[ThemeProfileName] ?: "Obsidian",
+                widgetOpacityPct = (prefs[WidgetOpacity] ?: 100)
+                    .takeIf { it in WidgetOpacities } ?: 100,
                 lastModifiedEpochSeconds = prefs[LastModified]
             )
         }
@@ -128,6 +134,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setSessionMetric(metric: SessionMetric) = set(SessionMetricKey, metric.name)
 
     suspend fun setThemeProfileName(name: String) = set(ThemeProfileName, name)
+
+    suspend fun setWidgetOpacity(pct: Int) = set(WidgetOpacity, pct)
 
     /**
      * `$ git restore settings.config` — clears every stored preference (including
@@ -164,6 +172,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         private val Units = stringPreferencesKey("units")
         private val SessionMetricKey = stringPreferencesKey("session_metric")
         private val ThemeProfileName = stringPreferencesKey("theme_profile")
+        private val WidgetOpacity = intPreferencesKey("widget_bg_opacity_pct")
         private val LastModified = longPreferencesKey("last_modified_epoch")
 
         fun create(context: Context) = SettingsStore(context.settingsDataStore)

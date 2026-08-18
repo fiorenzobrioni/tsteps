@@ -50,6 +50,7 @@ class SettingsScreenTest {
             onToggleUnits = { unitsToggled = true },
             onToggleSessionMetric = {},
             onThemeProfile = { theme = it },
+            onCycleWidgetOpacity = {},
             onOpenUrl = {},
             onReset = { resetCalled = true }
         )

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Obsidian fill baked in so the raw initialLayout — inflated by the host before
+     the first bind lands — already looks like the widget instead of a white box.
+     Re-tinted with the active theme via setColorFilter and faded via setImageAlpha
+     at render time (user-configurable widget opacity). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#10141A" />
+    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+</shape>

@@ -11,6 +11,34 @@
         <item name="android:windowLightNavigationBar">false</item>
     </style>
 
+    <!-- One body line of the home widget's terminal transcript (colors bound at
+         render time via spans). Shared by the medium/large layouts.
+
+         fontFamily is the SYSTEM monospace, not @font/jetbrains_mono_*, and this
+         is the one place in the app where that rule is broken: since the June 2021
+         patch (CVE-2021-0567) the launcher inflates widget layouts in a restricted
+         context that silently drops font resources — an @font/ reference would
+         fall back to Roboto, a proportional face (tweather's documented
+         deviation, inherited). -->
+    <style name="WidgetBodyLine" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:lineSpacingExtra">3dp</item>
+    </style>
+
+    <!-- One colored fragment of the static picker preview (colors inline there). -->
+    <style name="WidgetPreviewText" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
     <!-- Cold-start splash: Obsidian background + the { footprints } brand mark, then
          hands over to Theme.Tsteps (installSplashScreen() in MainActivity). -->
     <style name="Theme.Tsteps.Starting" parent="Theme.SplashScreen">

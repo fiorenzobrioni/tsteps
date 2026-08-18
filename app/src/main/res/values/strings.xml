@@ -35,6 +35,13 @@
     <string name="notif_title_daily_commit">%1$s Day committed \u2014 %2$s steps</string>
     <string name="notif_title_goal">%1$s Goal reached \u2014 %2$s steps</string>
     <string name="cd_grant_notifications">Grant notifications permission</string>
+
+    <!-- Home widget: label/glyphs are terminal code (untranslated); the picker
+         description and accessibility text are chrome (localized) -->
+    <string name="widget_label" translatable="false">tsteps --today</string>
+    <string name="widget_refresh_glyph" translatable="false">\u21bb</string>
+    <string name="widget_description">Today\'s steps as a terminal window</string>
+    <string name="cd_widget_refresh">Read the step counter now</string>
     <string name="cd_change_setting">Change %1$s</string>
     <string name="cd_open_link">Open %1$s website</string>
     <string name="cd_reset_settings">Reset all settings to defaults</string>

@@ -7,6 +7,7 @@ import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.notifications.GoalWatcher
 import com.callbackdev.tsteps.notifications.StepsNotifications
 import com.callbackdev.tsteps.notifications.StepsNotifier
+import com.callbackdev.tsteps.widget.TstepsWidgetUpdater
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -25,11 +26,19 @@ class StepSyncWorker(
     override suspend fun doWork(): Result {
         val reader = ServiceLocator.stepSensorReader(applicationContext)
         val repository = ServiceLocator.stepRepository(applicationContext)
-        val reading = reader.readCurrent() ?: return Result.success()
+        val reading = reader.readCurrent()
+        if (reading == null) {
+            // Redraw even when the sample fails: the stale marker exists exactly
+            // for this scenario, and without a repaint it would never appear
+            // (tweather's lesson from the network-down case).
+            TstepsWidgetUpdater.updateAll(applicationContext)
+            return Result.success()
+        }
         repository.ingest(reading)
         val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
         notifyDailyCommit(committed)
         GoalWatcher.evaluate(applicationContext)
+        TstepsWidgetUpdater.updateAll(applicationContext)
         return Result.success()
     }
 

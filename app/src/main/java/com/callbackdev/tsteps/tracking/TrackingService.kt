@@ -16,6 +16,7 @@ import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.TrackingState
 import com.callbackdev.tsteps.notifications.GoalWatcher
+import com.callbackdev.tsteps.widget.TstepsWidgetUpdater
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,6 +104,8 @@ class TrackingService : Service() {
                 manager.onMinuteTick(System.currentTimeMillis())
                 updateNotification(manager.state.value)
                 GoalWatcher.evaluate(this@TrackingService)
+                // A walk with the screen off is when the widget matters most.
+                TstepsWidgetUpdater.updateAll(this@TrackingService)
             }
         }
     }

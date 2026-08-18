@@ -10,6 +10,7 @@ import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.data.WidgetOpacities
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -49,6 +50,13 @@ class SettingsViewModel(
                 SessionMetric.SPEED
             }
         )
+    }
+
+    /** Cycles 100 → 85 → 70 → 50 → 100 percent (tweather's ladder). */
+    fun cycleWidgetOpacity() = save {
+        val current = this@SettingsViewModel.settings.value.widgetOpacityPct
+        val index = WidgetOpacities.indexOf(current)
+        setWidgetOpacity(WidgetOpacities[(index + 1) % WidgetOpacities.size])
     }
 
     /** `$ git restore settings.config`. */

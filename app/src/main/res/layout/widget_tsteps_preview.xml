@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static widget-picker preview: the medium tier with sample data and Obsidian
+     colors hardcoded (the picker never runs our RemoteViews binding, so the real
+     layouts would show empty). Multicolor lines are split into TextView pairs
+     because static XML has no spans. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_preview"
+    android:orientation="vertical"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:text="@string/widget_refresh_glyph"
+            android:textColor="#DFE2EB"
+            android:textSize="20sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:singleLine="true"
+            android:text="@string/widget_label"
+            android:textColor="#DFE2EB"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:minWidth="48dp"
+            android:text="👣"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#30363D"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            style="@style/WidgetPreviewText"
+            android:text="you@tsteps"
+            android:textColor="#74DD7E" />
+
+        <TextView
+            style="@style/WidgetPreviewText"
+            android:text=":~$ "
+            android:textColor="#DFE2EB" />
+
+        <TextView
+            style="@style/WidgetPreviewText"
+            android:text="cat steps_data.json"
+            android:textColor="#8B949E" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="6dp"
+            android:background="#30363D"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="steps"
+                    android:textColor="#79C0FF" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text=": "
+                    android:textColor="#DFE2EB" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="8,432"
+                    android:textColor="#FFA657" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text=" / 10,000"
+                    android:textColor="#8B949E" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="check"
+                    android:textColor="#79C0FF" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text=": "
+                    android:textColor="#DFE2EB" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="▓▓▓▓▓▓▓▓░░ 84%"
+                    android:textColor="#74DD7E" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="dist"
+                    android:textColor="#79C0FF" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text=": "
+                    android:textColor="#DFE2EB" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="6.1 km"
+                    android:textColor="#FFA657" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="active"
+                    android:textColor="#79C0FF" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text=": "
+                    android:textColor="#DFE2EB" />
+
+                <TextView
+                    style="@style/WidgetPreviewText"
+                    android:text="74 min"
+                    android:textColor="#FFA657" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
