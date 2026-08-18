@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- No permissions yet, on purpose: ACTIVITY_RECOGNITION arrives with the step
-         sensor phase, POST_NOTIFICATIONS with the notifications phase. tsteps needs
-         no INTERNET permission at all — the data never leaves the device. -->
+    <!-- Step counter sampling (Fase 2); minSdk 33 = single runtime-request path.
+         Deliberately the ONLY permission so far — tsteps has no INTERNET
+         permission at all: the data never leaves the device. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application
         android:allowBackup="true"

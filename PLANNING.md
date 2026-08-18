@@ -42,17 +42,21 @@ I componenti riusabili di tweather sono già a tema e già testati: si importano
 
 ## Fase 2 — Layer sensore e dominio
 
-Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM.
+Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test totali a fine fase).
 
-- [ ] Permission `ACTIVITY_RECOGNITION` nel manifest + richiesta runtime contestuale (spiegazione nel canale `//` prima del prompt di sistema)
-- [ ] `StepSensorReader`: `TYPE_STEP_COUNTER` (cumulativo da boot, batched) con flush esplicito; rilevazione assenza sensore → stato d'errore leggibile (`// E: no step sensor on this device`)
-- [ ] **Anchor di continuità**: DataStore con (boot id, ultimo valore cumulativo, timestamp) per sopravvivere a riavvii e reset del contatore — il classico bug dei contapassi, con test dedicati (riavvio, riavvio doppio, valore che decresce)
-- [ ] **Rollover di mezzanotte**: job WorkManager che chiude il giorno → riga Room `day_summary`, esegue il goal check, aggiorna streak/tag; test per DST e cambio timezone
-- [ ] Room: tabelle `day_summary` e `session` (nessun pruning: anni di giorni pesano nulla)
-- [ ] Stima distanza: passi × falcata (falcata da `height_cm` × 0.415, override manuale); stima kcal: MET camminata × peso × ore attive, **nascosta senza peso**
-- [ ] Minuti attivi: finestre con cadenza significativa (soglia da tarare su device); niente doppio conteggio con le sessioni
-- [ ] Aggregato orario per la sparkline (14 bucket 06→20, configurabile poi)
-- [ ] `ServiceLocator` a mano (come tweather: Hilt costerebbe più di quel che rende)
+- [x] Permission `ACTIVITY_RECOGNITION` nel manifest (unica permission dell'app — niente INTERNET, mai). **Deviazione registrata**: la richiesta runtime con spiegazione nel canale `//` è UI e slitta alla Fase 3; fino ad allora `SyncScheduler.reconcile` è un no-op senza permesso (zero job = zero batteria)
+- [x] `StepSensorReader`: campiona `TYPE_STEP_COUNTER` (register → flush → un valore → unregister, mai listener permanenti in background); `isAvailable` per il canale d'errore; conversione timestamp elapsed→wall clock; `BOOT_COUNT` catturato con ogni lettura
+- [x] **Anchor di continuità** (`TrackerState` in DataStore `tracker_state`, store dedicato — `git restore settings.config` non deve toccare la continuità dei passi): transizioni pure in `StepTracker.advance` con test per riavvio, doppio riavvio, contatore che decresce senza riavvio (reset HAL), orologio spostato indietro, primissima lettura (àncora senza inventare un giorno di passi)
+- [x] **Attribuzione temporale** `StepAttribution`: il delta si spalma sui bucket (data, ora) locali in proporzione al tempo — un batch letto alle 00:10 accredita due date. Zone come parametro puro: DST 23h/25h e cambio timezone sono unit test, non sorprese da device. Clamp a 48h sugli intervalli enormi (spalmare una settimana sarebbe falsa precisione)
+- [x] **Rollover di mezzanotte**: `RolloverWorker` one-shot auto-rischedulante su `Rollover.nextMidnightMillis` (DST-safe, testato su Europe/Rome 23h/25h) + **rete di sicurezza**: ogni `step-sync` committa i giorni finiti, così un telefono che dorme oltre mezzanotte committa alla prima lettura del mattino. Commit insert-only e idempotente: i due chiamanti possono correre liberamente
+- [x] Room `TstepsDatabase` v1: `hourly_steps` (bucket orari, la materia prima del giorno vivo), `day_summary` (il commit: **scritto una volta, mai aggiornato** — distanza/kcal congelate col profilo del giorno, `goalSteps`/`goalMet` snapshot del check; il peso cambiato dopo non riscrive la storia), `session` (schema pronto, logica in Fase 6/11)
+- [x] Stime in `domain/Estimates`: falcata = altezza × 0.415 (default 0.72 m dichiarato), distanza = passi × falcata, kcal = MET 3.3 × peso × ore attive, **null senza peso** (nascosta, non inventata)
+- [x] Minuti attivi **derivati** dai bucket orari (`min(60, passi_ora/100)`) — **deviazione registrata**: le "finestre di cadenza" per-minuto richiederebbero un listener permanente (foreground service), vietato dalla filosofia batteria; il campionamento non le può osservare. I minuti veri arrivano con le sessioni tracciate (Fase 6). Niente doppio storage: derivato = mai incoerente
+- [x] Aggregato orario per la sparkline: i bucket sono tutte le 24 ore; la finestra 06→20 è una scelta di rendering della Fase 3
+- [x] Goal check (`PASSED`/`FAILED`/`SKIPPED` — senza goal il check non gira, non fallisce) e streak (`Streaks.current`/`longest`) puri, **calcolati in lettura, mai persistiti**: nessuno stato di streak da corrompere
+- [x] `SettingsStore` minimale (goal default **0 = off**, niente meccaniche di colpa senza opt-in; peso/altezza null; unità; profilo tema) — la UI e le sezioni restanti sono Fase 4
+- [x] `ServiceLocator` a mano (pattern tweather) con `overrideForTests`; `SyncScheduler.reconcile` chiamato da `MainActivity` (unico owner della riconciliazione job)
+- [x] Test: `StepTrackerTest` (6), `StepAttributionTest` (9, incluse DST), `EstimatesTest` (5), `GoalStreaksTest` (6), `RolloverTest` (5), `TrackerStateStoreTest` (3), `SettingsStoreTest` (4), `StepRepositoryTest` (9, Robolectric + Room in-memory: ancoraggio, accumulo, mezzanotte, commit congelato/idempotente/mai-oggi, riavvio) — worker lasciati sottili apposta (colla su repository già testato)
 
 ## Fase 3 — Schermata principale (`steps_data.json`)
 

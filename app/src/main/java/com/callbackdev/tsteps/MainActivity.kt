@@ -9,11 +9,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.callbackdev.tsteps.ui.navigation.TstepsApp
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
+import com.callbackdev.tsteps.work.SyncScheduler
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Single owner of background-work reconciliation (tweather's pattern):
+        // arms or cancels the sampling and rollover jobs based on permission and
+        // sensor availability. The permission-request UI lands in Fase 3; until
+        // it is granted this is a no-op that keeps zero jobs alive.
+        SyncScheduler.reconcile(this)
         // The app is dark-only (see TstepsTheme), so the system bars must always
         // draw their icons light. enableEdgeToEdge()'s default is SystemBarStyle.auto,
         // which picks the appearance from the *system* dark-mode setting: on a phone
