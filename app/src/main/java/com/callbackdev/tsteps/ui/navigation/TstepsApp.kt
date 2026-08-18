@@ -1,7 +1,6 @@
 package com.callbackdev.tsteps.ui.navigation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -10,28 +9,56 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.callbackdev.tsteps.ui.steps.StepsScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.callbackdev.tsteps.data.EditorSettings
+import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.ui.components.EditorNavBar
 import com.callbackdev.tsteps.ui.components.EditorNavItems
+import com.callbackdev.tsteps.ui.components.EditorOptions
+import com.callbackdev.tsteps.ui.components.LocalEditorOptions
+import com.callbackdev.tsteps.ui.settings.SettingsScreen
+import com.callbackdev.tsteps.ui.steps.StepsScreen
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
+import kotlinx.coroutines.flow.map
 
 /**
- * App shell, Fase 1 edition: the editor-style bottom bar over one placeholder per
- * tab. Deliberately NOT Navigation Compose yet — the real NavHost (with per-tab
- * saved stacks, tweather's pattern) is Fase 4 work; this shell exists so the kit
- * components are exercised on device from day one. Selection is a plain saveable
- * route string, which Fase 4 will replace wholesale.
+ * App shell (tweather's pattern): NavHost above the editor-style bottom bar, one
+ * destination per tab, each tab's stack saved and restored on switch. The Log and
+ * Stats destinations are placeholder files until their phases (5 and 8) write
+ * them. `settings.config`'s editor section feeds every CodeCanvas in the app via
+ * [LocalEditorOptions].
  */
+object Routes {
+    val Editor = EditorNavItems.Editor.route
+    val Log = EditorNavItems.Log.route
+    val Stats = EditorNavItems.Stats.route
+    val Settings = EditorNavItems.Settings.route
+}
+
 @Composable
 fun TstepsApp() {
-    var route by rememberSaveable { mutableStateOf(EditorNavItems.Editor.route) }
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = backStackEntry?.destination
+
+    val context = LocalContext.current
+    val settingsStore = remember(context) { ServiceLocator.settingsStore(context) }
+    val editorSettings by remember(settingsStore) { settingsStore.settings.map { it.editor } }
+        .collectAsStateWithLifecycle(initialValue = EditorSettings())
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -39,20 +66,39 @@ fun TstepsApp() {
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            Box(Modifier.weight(1f)) {
-                when (route) {
-                    EditorNavItems.Editor.route -> StepsScreen()
-                    EditorNavItems.Log.route -> PlaceholderFile("steps_history.diff")
-                    EditorNavItems.Stats.route -> PlaceholderFile("stats.md")
-                    EditorNavItems.Settings.route -> PlaceholderFile("settings.config")
+            CompositionLocalProvider(
+                LocalEditorOptions provides EditorOptions(
+                    showLineNumbers = editorSettings.lineNumbers,
+                    wordWrap = editorSettings.wordWrap
+                )
+            ) {
+                NavHost(
+                    navController = navController,
+                    startDestination = Routes.Editor,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    composable(Routes.Editor) { StepsScreen() }
+                    composable(Routes.Log) { PlaceholderFile("steps_history.diff") }
+                    composable(Routes.Stats) { PlaceholderFile("stats.md") }
+                    composable(Routes.Settings) { SettingsScreen() }
                 }
             }
             EditorNavBar(
                 items = EditorNavItems.All,
-                isSelected = { it.route == route },
-                onSelect = { route = it.route }
+                isSelected = { item ->
+                    currentDestination?.hierarchy?.any { it.route == item.route } == true
+                },
+                onSelect = { navController.navigateToTab(it.route) }
             )
         }
+    }
+}
+
+private fun NavHostController.navigateToTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 

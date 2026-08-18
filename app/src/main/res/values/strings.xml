@@ -18,4 +18,9 @@
     <!-- Accessibility -->
     <string name="cd_grant_activity_recognition">Grant permission to read the step counter</string>
     <string name="cd_track_coming_soon">Start a tracked walk (coming soon)</string>
+    <string name="cd_change_setting">Change %1$s</string>
+    <string name="cd_open_link">Open %1$s website</string>
+    <string name="cd_reset_settings">Reset all settings to defaults</string>
+    <string name="cd_confirm_reset">Confirm settings reset</string>
+    <string name="cd_cancel_edit">Cancel editing</string>
 </resources>

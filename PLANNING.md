@@ -72,11 +72,13 @@ Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test tot
 
 ## Fase 4 — Navigazione e Impostazioni (`settings.config`)
 
-- [ ] Navigation Compose con le 4 route; stato workspace (tab attiva) in DataStore come tweather
-- [ ] `settings.config` con i pattern di tweather: boolean flip al tap, valori che ciclano, input terminale per i numeri, hint `//` col range
-- [ ] Sezioni: `[goal]` (daily_steps, 0 = check disattivo), `[profile]` (weight_kg, height_cm — opzionali, con effetto dichiarato), `[units]`, `[theme]` (3 profili runtime), `[notifications]` (placeholder per Fase 8)
-- [ ] `$ git restore settings.config` con conferma two-tap
-- [ ] SettingsStore DataStore + test
+- [x] Navigation Compose con le 4 route (pattern tweather: NavHost + `navigateToTab` con `saveState`/`restoreState` per stack per-tab); Log e Stats restano placeholder finché le Fasi 5 e 8 non li scrivono. **Chiarimento**: il "workspace DataStore" di tweather persiste la tab file dell'editor (JSON vs README), che qui non esiste ancora — arriva con la Fase 7, non serviva ora
+- [x] `settings.config` nel formato serie (corpo JSON con commenti `//`, come tweather — la bozza INI a sezioni della VISION è superata: componenti riusati e coerenza di serie valgono più della variazione): boolean flip al tap, `units.system` e `theme.active_profile` ciclano, `available_profiles` con `// active` e attivazione diretta al tap
+- [x] **Input terminale per i numeri liberi** (goal, peso, altezza): al tap la riga valore diventa un prompt (`TerminalInput` con focus automatico) con `[esc]` per annullare; Done valida con range espliciti (`SettingsRanges`: goal 0..100000, peso 20..300, altezza 100..250), errore transiente `// ERROR: expected …` in rosso; **submit vuoto = clear** (stato di prima classe: è ciò che nasconde le kcal e torna alla falcata 0.72 m); i valori assenti si leggono `null` JSON in grigio comment
+- [x] Sezioni: `editor` (line_numbers/word_wrap → `LocalEditorOptions` per tutti i CodeCanvas via shell), `goal`, `profile`, `units`, `theme`, `notifications` (placeholder onesto `// nothing to configure yet`), `about` (versione, licenza e credits tappabili verso i siti)
+- [x] `// Last modified:` timestamp ISO che appare alla prima modifica (pattern tweather); `$ git restore settings.config` con conferma two-tap (arma per 4s, hint rosso) — **non tocca l'anchor del contapassi**: il reset della config non deve mai perdere la continuità dei passi
+- [x] `SettingsStore` esteso (sezione editor, stamp last-modified su ogni edit, `resetToDefaults`) + tema runtime in `MainActivity` (il profilo cambia live da settings, pattern tweather)
+- [x] Test (21 nuovi, 117 totali): `SettingsInputTest` (parse puro: vuoto=clear, virgola decimale, range, interi obbligatori), `SettingsStoreTest` esteso (editor, stamping, reset totale), `SettingsScreenTest` (flip, cicli, input end-to-end con errore/esc/clear, reset two-tap, placeholder), `TstepsNavigationTest` (shell reale con WorkManager di test)
 
 ## Fase 5 — Storico (`steps_history.diff`)
 

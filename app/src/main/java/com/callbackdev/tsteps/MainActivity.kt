@@ -7,9 +7,15 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.ui.navigation.TstepsApp
+import com.callbackdev.tsteps.ui.theme.ThemeProfile
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import com.callbackdev.tsteps.work.SyncScheduler
+import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,8 +35,13 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
+        val settingsStore = ServiceLocator.settingsStore(this)
         setContent {
-            TstepsTheme {
+            // Theme switches at runtime with settings.config's "active_profile"
+            val profile by remember {
+                settingsStore.settings.map { ThemeProfile.fromName(it.themeProfileName) }
+            }.collectAsStateWithLifecycle(initialValue = ThemeProfile.Obsidian)
+            TstepsTheme(profile = profile) {
                 TstepsApp()
             }
         }

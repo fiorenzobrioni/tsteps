@@ -9,6 +9,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -68,5 +69,33 @@ class SettingsStoreTest {
         val store = store(tmp.newFile("s.preferences_pb"))
         store.setDailyGoalSteps(-100)
         assertEquals(0, store.read().dailyGoalSteps)
+    }
+
+    @Test
+    fun `editor toggles round-trip and default off`() = runBlocking {
+        val store = store(tmp.newFile("s.preferences_pb"))
+        assertEquals(EditorSettings(), store.read().editor)
+        store.setLineNumbers(true)
+        store.setWordWrap(true)
+        assertEquals(EditorSettings(lineNumbers = true, wordWrap = true), store.read().editor)
+    }
+
+    @Test
+    fun `every edit stamps last modified, pristine store has none`() = runBlocking {
+        val store = store(tmp.newFile("s.preferences_pb"))
+        assertNull(store.read().lastModifiedEpochSeconds)
+        store.setDailyGoalSteps(8_000)
+        assertNotNull(store.read().lastModifiedEpochSeconds)
+    }
+
+    @Test
+    fun `git restore clears everything back to defaults`() = runBlocking {
+        val store = store(tmp.newFile("s.preferences_pb"))
+        store.setDailyGoalSteps(8_000)
+        store.setWeightKg(78.0)
+        store.setLineNumbers(true)
+        store.setThemeProfileName("Dracula")
+        store.resetToDefaults()
+        assertEquals(AppSettings(), store.read())
     }
 }
