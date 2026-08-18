@@ -9,18 +9,22 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.callbackdev.tsteps.data.AppSettings
 import com.callbackdev.tsteps.data.ServiceLocator
+import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.StepSource
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
+import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
+import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.domain.Streaks
 import com.callbackdev.tsteps.work.SyncScheduler
 import java.time.Clock
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +39,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** State of the main screen — the working tree of the day. */
@@ -42,6 +47,11 @@ data class StepsUiState(
     val snapshot: TodaySnapshot? = null,
     val status: SensorStatus = SensorStatus.OK,
     val units: UnitsSystem = UnitsSystem.METRIC,
+    val sessionMetric: SessionMetric = SessionMetric.SPEED,
+    /** Today's completed walks — the `sessions` array of the JSON. */
+    val sessions: List<SessionItem> = emptyList(),
+    val expandedSessions: Set<Long> = emptySet(),
+    val zone: ZoneId = ZoneId.systemDefault(),
     /** Date of the newest committed day, for the status bar's `Last commit:`. */
     val lastCommitDate: LocalDate? = null
 )
@@ -55,6 +65,13 @@ class StepsViewModel(
 ) : ViewModel() {
 
     private val permissionGranted = MutableStateFlow(hasPermission())
+
+    private val expandedSessions = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** Expands/collapses one session's in-file detail object. */
+    fun toggleSession(id: Long) {
+        expandedSessions.update { if (id in it) it - id else it + id }
+    }
 
     /**
      * Re-checked on every resume (the user may grant or revoke from system
@@ -97,11 +114,17 @@ class StepsViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StepsUiState())
 
     private fun dataFlow(): Flow<StepsUiState> = combine(
-        today.flatMapLatest { date -> repository.observeDay(date).map { date to it } },
+        today.flatMapLatest { date ->
+            combine(
+                repository.observeDay(date),
+                repository.observeSessionsOfDay(date)
+            ) { rows, sessions -> Triple(date, rows, sessions) }
+        },
         repository.observeHistory(),
         settingsStore.settings,
-        permissionGranted
-    ) { (date, hourlyRows), history, settings, granted ->
+        permissionGranted,
+        expandedSessions
+    ) { (date, hourlyRows, sessionRows), history, settings, granted, expandedIds ->
         StepsUiState(
             snapshot = snapshot(date, hourlyRows, history, settings),
             status = when {
@@ -110,6 +133,10 @@ class StepsViewModel(
                 else -> SensorStatus.OK
             },
             units = settings.units,
+            sessionMetric = settings.sessionMetric,
+            sessions = sessionRows.mapNotNull { it.toItem() },
+            expandedSessions = expandedIds,
+            zone = clock.zone,
             lastCommitDate = history.firstOrNull()?.let { LocalDate.parse(it.date) }
         )
     }

@@ -4,6 +4,8 @@ import com.callbackdev.tsteps.data.local.DaySummaryDao
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.HourlyStepsDao
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
+import com.callbackdev.tsteps.data.local.SessionDao
+import com.callbackdev.tsteps.data.local.SessionEntity
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheck
 import com.callbackdev.tsteps.domain.GoalCheckResult
@@ -30,6 +32,7 @@ import kotlinx.coroutines.sync.withLock
 class StepRepository(
     private val hourlyDao: HourlyStepsDao,
     private val dayDao: DaySummaryDao,
+    private val sessionDao: SessionDao,
     private val trackerStateStore: TrackerStateStore,
     private val settingsStore: SettingsStore,
     private val zone: () -> ZoneId = { ZoneId.systemDefault() }
@@ -90,4 +93,15 @@ class StepRepository(
         hourlyDao.observeDay(date.toString())
 
     fun observeHistory(): Flow<List<DaySummaryEntity>> = dayDao.observeAll()
+
+    /** Completed sessions whose start falls on [date] (local calendar). */
+    fun observeSessionsOfDay(date: LocalDate): Flow<List<SessionEntity>> {
+        val from = date.atStartOfDay(zone()).toInstant().toEpochMilli()
+        val to = date.plusDays(1).atStartOfDay(zone()).toInstant().toEpochMilli()
+        return sessionDao.observeBetween(from, to)
+    }
+
+    fun observeAllSessions(): Flow<List<SessionEntity>> = sessionDao.observeAll()
+
+    suspend fun insertSession(session: SessionEntity): Long = sessionDao.insert(session)
 }

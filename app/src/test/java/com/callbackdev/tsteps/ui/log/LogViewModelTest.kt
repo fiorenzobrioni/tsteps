@@ -64,6 +64,7 @@ class LogViewModelTest {
             repository = StepRepository(
                 hourlyDao = database.hourlyStepsDao(),
                 dayDao = database.daySummaryDao(),
+                sessionDao = database.sessionDao(),
                 trackerStateStore = TrackerStateStore(
                     PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("t.preferences_pb") }
                 ),

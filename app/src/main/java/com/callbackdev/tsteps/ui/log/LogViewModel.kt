@@ -12,10 +12,14 @@ import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
+import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.Records
+import com.callbackdev.tsteps.domain.SessionItem
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +38,10 @@ data class LogUiState(
     val days: List<CommitDay> = emptyList(),
     val expanded: Set<LocalDate> = emptySet(),
     val bestDay: LocalDate? = null,
-    val units: UnitsSystem = UnitsSystem.METRIC
+    val units: UnitsSystem = UnitsSystem.METRIC,
+    val todaySessions: List<SessionItem> = emptyList(),
+    val sessionsByDate: Map<LocalDate, List<SessionItem>> = emptyMap(),
+    val zone: ZoneId = ZoneId.systemDefault()
 )
 
 class LogViewModel(
@@ -59,11 +66,14 @@ class LogViewModel(
     val uiState: StateFlow<LogUiState> = combine(
         today.flatMapLatest { date -> repository.observeDay(date).map { date to it } },
         repository.observeHistory(),
+        repository.observeAllSessions(),
         settingsStore.settings,
         expanded
-    ) { (date, hourlyRows), history, settings, expandedDates ->
+    ) { (date, hourlyRows), history, sessionRows, settings, expandedDates ->
         val todaySteps = hourlyRows.sumOf { it.steps }
         val days = history.map { it.toCommitDay() }
+        val sessions = sessionRows.mapNotNull { it.toItem() }
+            .groupBy { Instant.ofEpochMilli(it.startMillis).atZone(clock.zone).toLocalDate() }
         LogUiState(
             today = UncommittedToday(
                 date = date,
@@ -74,7 +84,10 @@ class LogViewModel(
             days = days,
             expanded = expandedDates,
             bestDay = Records.bestDay(days.map { it.date to it.steps }),
-            units = settings.units
+            units = settings.units,
+            todaySessions = sessions[date].orEmpty(),
+            sessionsByDate = sessions,
+            zone = clock.zone
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LogUiState())
 

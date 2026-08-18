@@ -21,6 +21,12 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 enum class UnitsSystem { METRIC, IMPERIAL }
 
 /**
+ * Speed and pace are the same fact in two shapes; sessions render one of them,
+ * never both (VISION §5). `settings.config`: `units.session_metric`.
+ */
+enum class SessionMetric { SPEED, PACE }
+
+/**
  * Editor behavior toggles from `settings.config`. Defaults follow tweather's
  * decisions: line numbers off (reclaims horizontal space on phones), word wrap
  * off (VS Code's default).
@@ -46,6 +52,7 @@ data class AppSettings(
     val weightKg: Double? = null,
     val heightCm: Int? = null,
     val units: UnitsSystem = UnitsSystem.METRIC,
+    val sessionMetric: SessionMetric = SessionMetric.SPEED,
     val themeProfileName: String = "Obsidian",
     /** Epoch seconds of the last edit; null until the user changes something. */
     val lastModifiedEpochSeconds: Long? = null
@@ -73,6 +80,9 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
                 units = prefs[Units]
                     ?.let { name -> UnitsSystem.entries.firstOrNull { it.name == name } }
                     ?: UnitsSystem.METRIC,
+                sessionMetric = prefs[SessionMetricKey]
+                    ?.let { name -> SessionMetric.entries.firstOrNull { it.name == name } }
+                    ?: SessionMetric.SPEED,
                 themeProfileName = prefs[ThemeProfileName] ?: "Obsidian",
                 lastModifiedEpochSeconds = prefs[LastModified]
             )
@@ -93,6 +103,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setHeightCm(heightCm: Int?) = setOrRemove(HeightCm, heightCm)
 
     suspend fun setUnits(units: UnitsSystem) = set(Units, units.name)
+
+    suspend fun setSessionMetric(metric: SessionMetric) = set(SessionMetricKey, metric.name)
 
     suspend fun setThemeProfileName(name: String) = set(ThemeProfileName, name)
 
@@ -127,6 +139,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         private val WeightKg = doublePreferencesKey("weight_kg")
         private val HeightCm = intPreferencesKey("height_cm")
         private val Units = stringPreferencesKey("units")
+        private val SessionMetricKey = stringPreferencesKey("session_metric")
         private val ThemeProfileName = stringPreferencesKey("theme_profile")
         private val LastModified = longPreferencesKey("last_modified_epoch")
 

@@ -74,11 +74,24 @@ class StepsScreenTest {
     }
 
     @Test
-    fun `the disabled FAB answers with the coming-soon comment`() {
-        setContent(StepsUiState(snapshot = snapshot(), status = SensorStatus.OK))
-        compose.onNodeWithContentDescription("Start a tracked walk (coming soon)")
-            .performClick()
-        compose.onNodeWithText("// $ tsteps track — coming soon").assertIsDisplayed()
+    fun `the FAB starts a tracked walk`() {
+        var started = false
+        compose.setContent {
+            TstepsTheme {
+                StepsScreen(
+                    state = StepsUiState(snapshot = snapshot(), status = SensorStatus.OK),
+                    onStartTrack = { started = true }
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Start a tracked walk").performClick()
+        assertTrue(started)
+    }
+
+    @Test
+    fun `no FAB without the permission - the error document explains instead`() {
+        setContent(StepsUiState(snapshot = snapshot(), status = SensorStatus.NO_PERMISSION))
+        compose.onNodeWithContentDescription("Start a tracked walk").assertDoesNotExist()
     }
 
     @Test

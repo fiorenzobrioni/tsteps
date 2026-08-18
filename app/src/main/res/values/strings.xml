@@ -18,7 +18,16 @@
 
     <!-- Accessibility -->
     <string name="cd_grant_activity_recognition">Grant permission to read the step counter</string>
-    <string name="cd_track_coming_soon">Start a tracked walk (coming soon)</string>
+    <string name="cd_start_track">Start a tracked walk</string>
+    <string name="cd_toggle_session">Expand or collapse the %1$s session</string>
+    <string name="cd_pause_track">Pause the session</string>
+    <string name="cd_resume_track">Resume the session</string>
+    <string name="cd_stop_track">Stop the session</string>
+    <string name="cd_confirm_stop_track">Confirm stopping the session</string>
+
+    <!-- Live tracking: channel name is chrome (localized); the notification body
+         is terminal output built in code (English by design) -->
+    <string name="notif_channel_tracking">Live tracking</string>
     <string name="cd_change_setting">Change %1$s</string>
     <string name="cd_open_link">Open %1$s website</string>
     <string name="cd_reset_settings">Reset all settings to defaults</string>

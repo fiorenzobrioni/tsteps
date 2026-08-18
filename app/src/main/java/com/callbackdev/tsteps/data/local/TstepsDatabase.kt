@@ -9,6 +9,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -46,9 +48,8 @@ data class DaySummaryEntity(
 )
 
 /**
- * An activity session — a diff hunk in the day. Schema lands in Fase 2 with the
- * rest of the database; the logic that writes it is Fase 6 (manual tracking) and
- * Fase 11 (auto detection).
+ * An activity session — a diff hunk in the day, written once at ^C. Manual
+ * tracking writes these (Fase 6); auto detection will too (Fase 11).
  */
 @Entity(tableName = "session")
 data class SessionEntity(
@@ -61,7 +62,9 @@ data class SessionEntity(
     val steps: Long,
     val distanceMeters: Double?,
     val avgCadenceSpm: Int?,
-    val auto: Boolean = false
+    val auto: Boolean = false,
+    /** Wall time minus pauses — what duration/speed/pace/cadence divide by (v2). */
+    val activeMillis: Long = 0
 )
 
 @Dao
@@ -113,17 +116,34 @@ interface SessionDao {
     @Query("SELECT * FROM session ORDER BY startMillis DESC")
     fun observeAll(): Flow<List<SessionEntity>>
 
+    @Query(
+        "SELECT * FROM session WHERE startMillis >= :fromMillis AND startMillis < :toMillis " +
+            "ORDER BY startMillis"
+    )
+    fun observeBetween(fromMillis: Long, toMillis: Long): Flow<List<SessionEntity>>
+
     @Insert
     suspend fun insert(session: SessionEntity): Long
 }
 
 @Database(
     entities = [HourlyStepsEntity::class, DaySummaryEntity::class, SessionEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class TstepsDatabase : RoomDatabase() {
     abstract fun hourlyStepsDao(): HourlyStepsDao
     abstract fun daySummaryDao(): DaySummaryDao
     abstract fun sessionDao(): SessionDao
+
+    companion object {
+        /** v2 (Fase 6): sessions learn their active (pause-free) duration. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE session ADD COLUMN activeMillis INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+    }
 }

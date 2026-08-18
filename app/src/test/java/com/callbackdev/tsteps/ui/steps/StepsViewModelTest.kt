@@ -90,6 +90,7 @@ class StepsViewModelTest {
         repository = StepRepository(
             hourlyDao = database.hourlyStepsDao(),
             dayDao = database.daySummaryDao(),
+            sessionDao = database.sessionDao(),
             trackerStateStore = trackerStore,
             settingsStore = settingsStore,
             zone = { rome }

@@ -44,6 +44,7 @@ class SettingsScreenTest {
             onWeight = { weight = it },
             onHeight = {},
             onToggleUnits = { unitsToggled = true },
+            onToggleSessionMetric = {},
             onThemeProfile = { theme = it },
             onOpenUrl = {},
             onReset = { resetCalled = true }

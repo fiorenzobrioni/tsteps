@@ -33,6 +33,7 @@ import com.callbackdev.tsteps.ui.components.LocalEditorOptions
 import com.callbackdev.tsteps.ui.log.LogScreen
 import com.callbackdev.tsteps.ui.settings.SettingsScreen
 import com.callbackdev.tsteps.ui.steps.StepsScreen
+import com.callbackdev.tsteps.ui.track.TrackScreen
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import kotlinx.coroutines.flow.map
 
@@ -48,6 +49,9 @@ object Routes {
     val Stats = EditorNavItems.Stats.route
     val Settings = EditorNavItems.Settings.route
 }
+
+/** The live-session process; navigated to, never a bottom-bar destination. */
+private const val TrackRoute = "track"
 
 @Composable
 fun TstepsApp() {
@@ -77,10 +81,17 @@ fun TstepsApp() {
                     startDestination = Routes.Editor,
                     modifier = Modifier.weight(1f)
                 ) {
-                    composable(Routes.Editor) { StepsScreen() }
+                    composable(Routes.Editor) {
+                        StepsScreen(onOpenTrack = { navController.navigate(TrackRoute) })
+                    }
                     composable(Routes.Log) { LogScreen() }
                     composable(Routes.Stats) { PlaceholderFile("stats.md") }
                     composable(Routes.Settings) { SettingsScreen() }
+                    // Not a tab: the live process opens over the editor's stack
+                    // and pops back when it ends.
+                    composable(TrackRoute) {
+                        TrackScreen(onExit = { navController.popBackStack() })
+                    }
                 }
             }
             EditorNavBar(

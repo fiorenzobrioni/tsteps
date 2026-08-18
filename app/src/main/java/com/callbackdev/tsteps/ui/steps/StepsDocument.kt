@@ -3,12 +3,17 @@ package com.callbackdev.tsteps.ui.steps
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.domain.SessionItem
+import com.callbackdev.tsteps.domain.SessionMetrics
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.commentLine
 import com.callbackdev.tsteps.ui.components.punctLine
+import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.ui.theme.SyntaxColors
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 
 /**
@@ -45,8 +50,9 @@ enum class SensorStatus {
 /**
  * The `steps_data.json` document. Hand-built lines (not [buildJsonLines]) because
  * this file carries what generic JSON can't: trailing `//` hints on value lines,
- * a tappable `$` command in the error state, and keys that appear or vanish with
- * the data they describe.
+ * a tappable `$` command in the error state, keys that appear or vanish with the
+ * data they describe, and session entries that expand in place into their detail
+ * object (tap to toggle — the editor's way of opening a collapsed node).
  */
 object StepsDocument {
 
@@ -55,9 +61,14 @@ object StepsDocument {
         status: SensorStatus,
         units: UnitsSystem,
         syntax: SyntaxColors,
-        trackComingSoon: Boolean = false,
+        sessions: List<SessionItem> = emptyList(),
+        expandedSessionIds: Set<Long> = emptySet(),
+        sessionMetric: SessionMetric = SessionMetric.SPEED,
+        zone: ZoneId = ZoneId.systemDefault(),
         onGrantPermission: (() -> Unit)? = null,
-        grantClickLabel: String? = null
+        grantClickLabel: String? = null,
+        onToggleSession: (Long) -> Unit = {},
+        sessionToggleLabel: (String) -> String = { it }
     ): List<CodeLine> = buildList {
         when (status) {
             SensorStatus.NO_SENSOR -> {
@@ -75,20 +86,25 @@ object StepsDocument {
                 addAll(emptyDocument(snapshot?.date, syntax))
             }
 
-            SensorStatus.OK -> {
-                if (trackComingSoon) {
-                    add(commentLine("// $ tsteps track — coming soon", syntax))
-                    add(blank())
-                }
-                addAll(dataDocument(snapshot ?: return@buildList, units, syntax))
-            }
+            SensorStatus.OK -> addAll(
+                dataDocument(
+                    snapshot ?: return@buildList, units, syntax, sessions,
+                    expandedSessionIds, sessionMetric, zone, onToggleSession, sessionToggleLabel
+                )
+            )
         }
     }
 
     private fun dataDocument(
         snapshot: TodaySnapshot,
         units: UnitsSystem,
-        syntax: SyntaxColors
+        syntax: SyntaxColors,
+        sessions: List<SessionItem>,
+        expandedSessionIds: Set<Long>,
+        sessionMetric: SessionMetric,
+        zone: ZoneId,
+        onToggleSession: (Long) -> Unit,
+        sessionToggleLabel: (String) -> String
     ): List<CodeLine> = buildList {
         add(punctLine("{", 0, syntax))
         add(stringLine("date", snapshot.date.toString(), comma = true, syntax, indent = 1))
@@ -109,13 +125,11 @@ object StepsDocument {
         add(punctLine("},", 1, syntax))
 
         add(keyOpen("movement", syntax, indent = 1))
-        val (distanceKey, distanceValue) = when (units) {
-            UnitsSystem.METRIC -> "distance_km" to snapshot.distanceMeters / 1_000.0
-            UnitsSystem.IMPERIAL -> "distance_mi" to snapshot.distanceMeters / 1_609.344
-        }
         add(
             numberLine(
-                distanceKey, decimal(distanceValue), comma = true, syntax, indent = 2,
+                UnitFormat.distanceKey(units),
+                UnitFormat.distanceValue(snapshot.distanceMeters, units),
+                comma = true, syntax, indent = 2,
                 hint = "// estimated from stride length"
             )
         )
@@ -149,11 +163,125 @@ object StepsDocument {
             )
         )
 
-        add(rawValueLine("sessions", "[]", comma = hasGoal, syntax, indent = 1))
+        addSessions(
+            sessions, expandedSessionIds, hasGoal, units, sessionMetric, zone, syntax,
+            onToggleSession, sessionToggleLabel
+        )
         if (hasGoal) {
             add(numberLine("streak_days", snapshot.streakDays.toString(), comma = false, syntax, indent = 1))
         }
         add(punctLine("}", 0, syntax))
+    }
+
+    /**
+     * The day's walks. Collapsed: one inline object per session, tweather's small-
+     * object style. Expanded (tap): the full detail in place — duration, distance,
+     * speed OR pace (the settings decide which), cadence; a metric too short to
+     * compute is absent, not invented.
+     */
+    private fun MutableList<CodeLine>.addSessions(
+        sessions: List<SessionItem>,
+        expandedIds: Set<Long>,
+        trailingComma: Boolean,
+        units: UnitsSystem,
+        sessionMetric: SessionMetric,
+        zone: ZoneId,
+        syntax: SyntaxColors,
+        onToggle: (Long) -> Unit,
+        toggleLabel: (String) -> String
+    ) {
+        if (sessions.isEmpty()) {
+            add(rawValueLine("sessions", "[]", comma = trailingComma, syntax, indent = 1))
+            return
+        }
+        add(keyOpen("sessions", syntax, indent = 1, bracket = "["))
+        sessions.forEachIndexed { index, session ->
+            val comma = index != sessions.lastIndex
+            val start = UnitFormat.clockTime(session.startMillis, zone)
+            val label = toggleLabel(start)
+            if (session.id !in expandedIds) {
+                add(
+                    CodeLine(
+                        text = buildAnnotatedString {
+                            appendPunct("{ ", syntax)
+                            appendPair("time", quoted = start, syntax = syntax); appendPunct(", ", syntax)
+                            appendPair("type", quoted = session.type, syntax = syntax); appendPunct(", ", syntax)
+                            appendPair("min", number = session.activeMinutes.toString(), syntax = syntax)
+                            appendPunct(", ", syntax)
+                            appendPair("steps", number = session.steps.toString(), syntax = syntax)
+                            appendPunct(", ", syntax)
+                            appendPair(
+                                UnitFormat.distanceLabel(units),
+                                number = UnitFormat.distanceValue(session.distanceMeters, units),
+                                syntax = syntax
+                            )
+                            appendPunct(" }", syntax)
+                            if (comma) appendPunct(",", syntax)
+                        },
+                        indent = 2,
+                        onClick = { onToggle(session.id) },
+                        onClickLabel = label
+                    )
+                )
+                return@forEachIndexed
+            }
+            add(
+                CodeLine(
+                    text = buildAnnotatedString { appendPunct("{", syntax) },
+                    indent = 2,
+                    onClick = { onToggle(session.id) },
+                    onClickLabel = label
+                )
+            )
+            add(stringLine("start", start, comma = true, syntax, indent = 3))
+            add(stringLine("end", UnitFormat.clockTime(session.endMillis, zone), comma = true, syntax, indent = 3))
+            add(stringLine("type", session.type, comma = true, syntax, indent = 3))
+            add(numberLine("active_min", session.activeMinutes.toString(), comma = true, syntax, indent = 3))
+            add(numberLine("steps", session.steps.toString(), comma = true, syntax, indent = 3))
+            val metricLine = metricLine(session, units, sessionMetric, syntax)
+            val hasCadence = session.avgCadenceSpm != null
+            add(
+                numberLine(
+                    UnitFormat.distanceKey(units),
+                    UnitFormat.distanceValue(session.distanceMeters, units),
+                    comma = metricLine != null || hasCadence, syntax, indent = 3
+                )
+            )
+            metricLine?.let { add(it.first(comma = hasCadence, syntax = syntax)) }
+            session.avgCadenceSpm?.let {
+                add(numberLine("avg_cadence_spm", it.toString(), comma = false, syntax, indent = 3))
+            }
+            add(punctLine(if (comma) "}," else "}", 2, syntax))
+        }
+        add(punctLine(if (trailingComma) "]," else "]", 1, syntax))
+    }
+
+    /** Deferred line so the comma can depend on what follows it. */
+    private class PendingLine(private val build: (Boolean, SyntaxColors) -> CodeLine) {
+        fun first(comma: Boolean, syntax: SyntaxColors) = build(comma, syntax)
+    }
+
+    /** Speed or pace, one of the two (VISION §5); null when too short to compute. */
+    private fun metricLine(
+        session: SessionItem,
+        units: UnitsSystem,
+        metric: SessionMetric,
+        syntax: SyntaxColors
+    ): PendingLine? = when (metric) {
+        SessionMetric.SPEED ->
+            SessionMetrics.avgSpeedKmh(session.distanceMeters, session.activeMillis)?.let { kmh ->
+                val key = if (units == UnitsSystem.METRIC) "avg_speed_kmh" else "avg_speed_mph"
+                PendingLine { comma, s ->
+                    numberLine(key, UnitFormat.speedValue(kmh, units), comma, s, indent = 3)
+                }
+            }
+        SessionMetric.PACE ->
+            SessionMetrics.pacePerUnit(
+                session.distanceMeters, session.activeMillis, UnitFormat.unitMeters(units)
+            )?.let { pace ->
+                val key = if (units == UnitsSystem.METRIC) "avg_pace_min_km" else "avg_pace_min_mi"
+                PendingLine { comma, s -> stringLine(key, pace, comma, s, indent = 3) }
+            }
     }
 
     /** The honest empty file: a date and an explicit null, never a fake zero. */
@@ -185,13 +313,14 @@ object StepsDocument {
     // Local, not in JsonSyntax: this document mixes value colors and hints in
     // ways the generic builder deliberately doesn't support.
 
-    private fun keyOpen(key: String, syntax: SyntaxColors, indent: Int) = CodeLine(
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = syntax.key)) { append("\"$key\"") }
-            withStyle(SpanStyle(color = syntax.comment)) { append(": {") }
-        },
-        indent
-    )
+    private fun keyOpen(key: String, syntax: SyntaxColors, indent: Int, bracket: String = "{") =
+        CodeLine(
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = syntax.key)) { append("\"$key\"") }
+                withStyle(SpanStyle(color = syntax.comment)) { append(": $bracket") }
+            },
+            indent
+        )
 
     private fun stringLine(
         key: String,
@@ -243,5 +372,25 @@ object StepsDocument {
         indent
     )
 
-    private fun decimal(value: Double): String = "%.1f".format(Locale.ROOT, value)
+    private fun androidx.compose.ui.text.AnnotatedString.Builder.appendPair(
+        key: String,
+        quoted: String? = null,
+        number: String? = null,
+        syntax: SyntaxColors
+    ) {
+        withStyle(SpanStyle(color = syntax.key)) { append("\"$key\"") }
+        appendPunct(": ", syntax)
+        if (quoted != null) {
+            withStyle(SpanStyle(color = syntax.string)) { append("\"$quoted\"") }
+        } else if (number != null) {
+            withStyle(SpanStyle(color = syntax.number)) { append(number) }
+        }
+    }
+
+    private fun androidx.compose.ui.text.AnnotatedString.Builder.appendPunct(
+        text: String,
+        syntax: SyntaxColors
+    ) {
+        withStyle(SpanStyle(color = syntax.comment)) { append(text) }
+    }
 }

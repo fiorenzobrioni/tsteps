@@ -6,12 +6,15 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
+import com.callbackdev.tsteps.domain.SessionItem
+import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.commentLine
 import com.callbackdev.tsteps.ui.theme.SyntaxColors
 import java.text.NumberFormat
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.Locale
@@ -54,6 +57,9 @@ object LogDocument {
         units: UnitsSystem,
         locale: Locale,
         syntax: SyntaxColors,
+        todaySessions: List<SessionItem> = emptyList(),
+        sessionsByDate: Map<LocalDate, List<SessionItem>> = emptyMap(),
+        zone: ZoneId = ZoneId.systemDefault(),
         onToggle: (LocalDate) -> Unit = {},
         toggleLabel: (String) -> String = { it }
     ): List<CanvasLine> = buildList {
@@ -70,6 +76,10 @@ object LogDocument {
                     syntax
                 )
             )
+            // Today's walks: hunks the midnight commit will absorb.
+            todaySessions.forEach { session ->
+                addSessionHunk(session, units, numbers, zone, syntax)
+            }
         }
 
         if (days.isEmpty()) {
@@ -98,11 +108,13 @@ object LogDocument {
             add(blank())
             addCommit(
                 day = day,
+                sessions = sessionsByDate[day.date].orEmpty(),
                 isBestDay = day.date == bestDay,
                 isExpanded = day.date in expanded,
                 units = units,
                 numbers = numbers,
                 dayName = dayName,
+                zone = zone,
                 syntax = syntax,
                 onToggle = onToggle,
                 toggleLabel = toggleLabel
@@ -143,11 +155,13 @@ object LogDocument {
 
     private fun MutableList<CanvasLine>.addCommit(
         day: CommitDay,
+        sessions: List<SessionItem>,
         isBestDay: Boolean,
         isExpanded: Boolean,
         units: UnitsSystem,
         numbers: NumberFormat,
         dayName: DateTimeFormatter,
+        zone: ZoneId,
         syntax: SyntaxColors,
         onToggle: (LocalDate) -> Unit,
         toggleLabel: (String) -> String
@@ -199,13 +213,35 @@ object LogDocument {
         add(blank())
         add(commentLine("--- a/steps_data.json", syntax))
         add(commentLine("+++ b/steps_data.json", syntax))
-        // Hunk header in key-blue, like git's cyan. Sessions become their own
-        // @@ hh:mm..hh:mm @@ hunks in Fase 6.
+        // Hunk header in key-blue, like git's cyan.
         add(CodeLine(AnnotatedString("@@ ${day.date} @@", SpanStyle(color = syntax.key))))
         add(addedLine("\"steps\": ${day.steps}", syntax))
         add(addedLine("\"${distanceKey(units)}\": ${distanceValue(day.distanceMeters, units)}", syntax))
         add(addedLine("\"active_min\": ${day.activeMinutes}", syntax))
         day.activeKcal?.let { add(addedLine("\"active_kcal\": ${it.toInt()}", syntax)) }
+        // The day's walks, each its own hunk with the time range as header.
+        sessions.forEach { session -> addSessionHunk(session, units, numbers, zone, syntax) }
+    }
+
+    /** `@@ 09:32..10:18 @@ walk` + one green line — a walk as a diff hunk. */
+    private fun MutableList<CanvasLine>.addSessionHunk(
+        session: SessionItem,
+        units: UnitsSystem,
+        numbers: NumberFormat,
+        zone: ZoneId,
+        syntax: SyntaxColors
+    ) {
+        val range = UnitFormat.clockTime(session.startMillis, zone) + ".." +
+            UnitFormat.clockTime(session.endMillis, zone)
+        add(CodeLine(AnnotatedString("@@ $range @@ ${session.type}", SpanStyle(color = syntax.key))))
+        add(
+            addedLine(
+                "${numbers.format(session.steps)} steps · " +
+                    "${UnitFormat.distance(session.distanceMeters, units)} · " +
+                    "${session.activeMinutes} min",
+                syntax
+            )
+        )
     }
 
     /** Whole `+` line in diff green over a faint tint; the gutter matches (tweather). */

@@ -27,13 +27,18 @@ object ServiceLocator {
     @Volatile
     private var stepSensorReader: StepSensorReader? = null
 
+    @Volatile
+    private var trackingManager: TrackingManager? = null
+
     fun database(context: Context): TstepsDatabase =
         database ?: synchronized(this) {
             database ?: Room.databaseBuilder(
                 context.applicationContext,
                 TstepsDatabase::class.java,
                 "tsteps.db"
-            ).build().also { database = it }
+            )
+                .addMigrations(TstepsDatabase.MIGRATION_1_2)
+                .build().also { database = it }
         }
 
     fun settingsStore(context: Context): SettingsStore =
@@ -53,6 +58,7 @@ object ServiceLocator {
             stepRepository ?: StepRepository(
                 hourlyDao = database(context).hourlyStepsDao(),
                 dayDao = database(context).daySummaryDao(),
+                sessionDao = database(context).sessionDao(),
                 trackerStateStore = trackerStateStore(context),
                 settingsStore = settingsStore(context)
             ).also { stepRepository = it }
@@ -62,6 +68,14 @@ object ServiceLocator {
         stepSensorReader ?: synchronized(this) {
             stepSensorReader ?: StepSensorReader(context.applicationContext)
                 .also { stepSensorReader = it }
+        }
+
+    fun trackingManager(context: Context): TrackingManager =
+        trackingManager ?: synchronized(this) {
+            trackingManager ?: TrackingManager(
+                repository = stepRepository(context),
+                settingsStore = settingsStore(context)
+            ).also { trackingManager = it }
         }
 
     /**

@@ -50,6 +50,7 @@ class StepRepositoryTest {
         repository = StepRepository(
             hourlyDao = database.hourlyStepsDao(),
             dayDao = database.daySummaryDao(),
+            sessionDao = database.sessionDao(),
             trackerStateStore = TrackerStateStore(
                 PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("t.preferences_pb") }
             ),

@@ -57,6 +57,9 @@ fun LogScreen(
             units = state.units,
             locale = locale,
             syntax = syntax,
+            todaySessions = state.todaySessions,
+            sessionsByDate = state.sessionsByDate,
+            zone = state.zone,
             onToggle = onToggle,
             toggleLabel = { date -> resources.getString(R.string.cd_toggle_commit, date) }
         )

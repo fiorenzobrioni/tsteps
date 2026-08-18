@@ -93,12 +93,16 @@ Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test tot
 
 ## Fase 6 — Sessioni manuali (`$ tsteps track`)
 
-- [ ] FAB `▶` → schermata processo: transcript che appende una riga al minuto (tempo, passi, km, velocità), `^C` stop con conferma, `^Z`/`fg` pausa/riprendi
-- [ ] Foreground service **solo durante il tracking** (unica eccezione alla regola no-servizi), notifica = la riga di comando del processo
-- [ ] Persistenza `session` in Room; la sessione chiusa appare come hunk `@@ HH:MM–HH:MM @@ walk` nel diff di oggi e nell'array `sessions` del JSON
-- [ ] Dettaglio sessione: durata, passi, distanza, velocità media **o** passo medio (preferenza in settings), cadenza media
-- [ ] Tipi: `walk` e `other` — stop (running/cycling parcheggiati, VISION §6.7)
-- [ ] Niente doppio conteggio: i passi della sessione sono un sottoinsieme del totale giornaliero, mai una somma
+- [x] FAB `▶` (attivo, col glow, solo con sensore+permesso OK — negli stati d'errore niente FAB, spiega il documento) → avvia il service e apre la **schermata processo**: transcript con una riga per minuto attivo (`05:00  512 steps  0.4 km`), pausa/riprendi come `^Z`/`fg` del terminale (marcati nel transcript), `^C` con conferma two-tap (status line rossa `// tap ^C again to stop`), riga live `24:18  2,431 steps · 1.8 km · 4.3 km/h` con tick a 1s; il tipo (`walk`/`other`) è il token editabile della riga comando, cicla al tap
+- [x] **Foreground service solo durante il tracking** (`TrackingService`, type `health`, l'unica eccezione sanzionata alla regola no-servizi): tiene il listener del sensore vivo a schermo spento, alimenta il `TrackingManager` (singleton, stato osservato dalla UI) e **ingesta le stesse letture nella pipeline giornaliera** — uno stream, due viste, niente doppio conteggio per costruzione. Notifica = la riga di comando del processo (titolo `$ tsteps track walk`, corpo = riga live, canale IMPORTANCE_LOW silenzioso); permessi `FOREGROUND_SERVICE_HEALTH` + `POST_NOTIFICATIONS` dichiarati (la **richiesta** runtime della notifica resta in Fase 9: senza grant il transcript non va nella tendina, il service gira comunque — gate esplicito su `notify()`)
+- [x] Dominio puro `LiveSessionTracker`: passi in pausa scartati (appartengono al giorno, non alla sessione), reboot mid-session gestito con la regola dello StepTracker, durata attiva = wall time meno pause (anche quella in corso); `SessionMetrics`: velocità/passo/cadenza **null sotto soglia** (30s / 50m — nascosto, non inventato)
+- [x] Persistenza: **Room v2** con migrazione 1→2 (`session.activeMillis`, test in stile tweather: DB v1 costruito a mano con la DDL esatta, aperto con Room v2 — le righe del device del committente sopravvivono); a `^C` la sessione si scrive una volta con cadenza media e distanza dalla falcata **snapshot all'avvio** (il profilo di quel momento, onestà del commit)
+- [x] La sessione chiusa appare: come **hunk `@@ 09:32..10:18 @@ walk`** con riga `+` verde nella sezione uncommitted del log (e nei giorni committati espansi), e nell'array `sessions` di `steps_data.json` come oggetto inline che **si espande in place** al tap nel dettaglio completo
+- [x] Dettaglio sessione in-file: start/end/type/active_min/steps/distanza + **velocità media O passo medio** (`units.session_metric = "speed" | "pace"` in settings.config, cicla al tap; chiavi oneste `avg_speed_kmh`↔`avg_speed_mph`, `avg_pace_min_km`↔`avg_pace_min_mi`) + cadenza media
+- [x] Tipi: `walk` e `other` — confermato stop a due (running/cycling parcheggiati, VISION §6.7)
+- [x] Niente doppio conteggio: strutturale — i passi sessione sono una finestra etichettata sullo stesso contatore cumulativo del giorno, mai sommati a nulla
+- [x] `UnitFormat` condiviso (km/mi, velocità, pace label, orari) per i renderer nuovi
+- [x] Test (28 nuovi, 167 totali): `LiveSessionTrackerTest` (pause, reboot, durate, idempotenza), `SessionMetricsTest` (soglie null-over-invented, pace per km e per miglio), `TrackingManagerTest` (start→stop persistito con stride snapshot, pause escluse, transcript, doppio start no-op), `TrackDocumentTest` (buffer completo, ^Z/fg colorati, riga live speed/pace, conferma ^C), `TstepsDatabaseMigrationTest`, più estensioni a StepsDocument/LogDocument/StepsScreen test (sessioni inline/espanse, hunk, FAB nuovo)
 
 ## Fase 7 — README.md del giorno (seconda tab dell'editor)
 

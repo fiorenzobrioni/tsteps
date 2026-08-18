@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.callbackdev.tsteps.data.AppSettings
 import com.callbackdev.tsteps.data.ServiceLocator
+import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.UnitsSystem
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +35,16 @@ class SettingsViewModel(
                 UnitsSystem.IMPERIAL
             } else {
                 UnitsSystem.METRIC
+            }
+        )
+    }
+
+    fun toggleSessionMetric() = save {
+        setSessionMetric(
+            if (this@SettingsViewModel.settings.value.sessionMetric == SessionMetric.SPEED) {
+                SessionMetric.PACE
+            } else {
+                SessionMetric.SPEED
             }
         )
     }

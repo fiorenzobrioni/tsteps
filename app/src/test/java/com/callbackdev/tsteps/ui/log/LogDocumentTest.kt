@@ -2,10 +2,13 @@ package com.callbackdev.tsteps.ui.log
 
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
+import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.theme.ObsidianSyntax
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -15,6 +18,19 @@ import org.junit.Test
 class LogDocumentTest {
 
     private val syntax = ObsidianSyntax
+    private val rome = ZoneId.of("Europe/Rome")
+
+    private fun session(start: String, activeMin: Int = 46, steps: Long = 4_820) = SessionItem(
+        id = 1L,
+        startMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli(),
+        endMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli() +
+            activeMin * 60_000L,
+        type = "walk",
+        steps = steps,
+        distanceMeters = 3_400.0,
+        activeMillis = activeMin * 60_000L,
+        avgCadenceSpm = 105
+    )
 
     private fun today() = UncommittedToday(
         date = LocalDate.parse("2026-08-18"),
@@ -45,9 +61,21 @@ class LogDocumentTest {
         expanded: Set<LocalDate> = emptySet(),
         bestDay: LocalDate? = null,
         units: UnitsSystem = UnitsSystem.METRIC,
+        todaySessions: List<SessionItem> = emptyList(),
+        sessionsByDate: Map<LocalDate, List<SessionItem>> = emptyMap(),
         onToggle: (LocalDate) -> Unit = {}
     ) = LogDocument.build(
-        today, days, expanded, bestDay, units, Locale.ENGLISH, syntax, onToggle
+        today = today,
+        days = days,
+        expanded = expanded,
+        bestDay = bestDay,
+        units = units,
+        locale = Locale.ENGLISH,
+        syntax = syntax,
+        todaySessions = todaySessions,
+        sessionsByDate = sessionsByDate,
+        zone = rome,
+        onToggle = onToggle
     )
 
     private fun List<CanvasLine>.texts() = filterIsInstance<CodeLine>().map { it.text.text }
@@ -161,6 +189,36 @@ class LogDocumentTest {
             )
         )
         lines.lineWith("--- week 34 · 3,000 steps (-6,000 vs week 33) ---")
+    }
+
+    @Test
+    fun `today's walks are hunks in the uncommitted section`() {
+        val lines = build(todaySessions = listOf(session("2026-08-18T09:32:00")))
+        lines.lineWith("@@ 09:32..10:18 @@ walk")
+        val added = lines.lineWith("+ 4,820 steps · 3.4 km · 46 min")
+        assertEquals(syntax.diffAdd, added.gutterColor)
+    }
+
+    @Test
+    fun `an expanded commit shows its walks as hunks after the metrics`() {
+        val date = LocalDate.parse("2026-08-17")
+        val lines = build(
+            days = listOf(day("2026-08-17")),
+            expanded = setOf(date),
+            sessionsByDate = mapOf(date to listOf(session("2026-08-17T09:12:00", activeMin = 51, steps = 5_120)))
+        )
+        lines.lineWith("@@ 09:12..10:03 @@ walk")
+        lines.lineWith("+ 5,120 steps · 3.4 km · 51 min")
+    }
+
+    @Test
+    fun `collapsed commits keep their session hunks hidden too`() {
+        val date = LocalDate.parse("2026-08-17")
+        val lines = build(
+            days = listOf(day("2026-08-17")),
+            sessionsByDate = mapOf(date to listOf(session("2026-08-17T09:12:00")))
+        ).texts()
+        assertTrue(lines.none { it.contains("@@ 09:12") })
     }
 
     @Test

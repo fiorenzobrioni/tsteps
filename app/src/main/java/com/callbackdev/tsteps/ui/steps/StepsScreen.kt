@@ -11,15 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -29,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.tracking.TrackingService
 import com.callbackdev.tsteps.ui.components.CodeCanvas
 import com.callbackdev.tsteps.ui.components.EditorTabs
 import com.callbackdev.tsteps.ui.components.GlowFab
@@ -39,18 +35,20 @@ import com.callbackdev.tsteps.ui.components.TerminalStatusBar
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import com.callbackdev.tsteps.work.SyncScheduler
 import java.time.LocalDate
-import kotlinx.coroutines.delay
 
 /**
  * Main screen: today as the open source file `steps_data.json` — the working
  * tree, ticking live while the user walks. Sensor state, estimates and errors
  * ride the `//` comment channel; the missing permission is fixed from inside the
- * file (`$ tsteps grant activity-recognition`). The FAB is the future `$ tsteps
- * track` verb, disabled until Fase 6: tapping it answers with a comment, the
- * editor's way of saying "not yet".
+ * file (`$ tsteps grant activity-recognition`). The FAB is the one glowing verb:
+ * `$ tsteps track` — it starts (or reopens) the live session. Completed walks
+ * are the `sessions` array; tapping one expands its detail object in place.
  */
 @Composable
-fun StepsScreen(viewModel: StepsViewModel = viewModel(factory = StepsViewModel.Factory)) {
+fun StepsScreen(
+    onOpenTrack: () -> Unit = {},
+    viewModel: StepsViewModel = viewModel(factory = StepsViewModel.Factory)
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -71,6 +69,13 @@ fun StepsScreen(viewModel: StepsViewModel = viewModel(factory = StepsViewModel.F
         state = state,
         onGrantPermission = {
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        },
+        onToggleSession = viewModel::toggleSession,
+        onStartTrack = {
+            // Idempotent when a session already runs: the manager's start no-ops
+            // and the screen simply reopens the process.
+            TrackingService.start(context, "walk")
+            onOpenTrack()
         }
     )
 }
@@ -78,29 +83,30 @@ fun StepsScreen(viewModel: StepsViewModel = viewModel(factory = StepsViewModel.F
 @Composable
 fun StepsScreen(
     state: StepsUiState,
-    onGrantPermission: () -> Unit = {}
+    onGrantPermission: () -> Unit = {},
+    onToggleSession: (Long) -> Unit = {},
+    onStartTrack: () -> Unit = {}
 ) {
     val syntax = TstepsTheme.syntax
     val grantLabel = stringResource(R.string.cd_grant_activity_recognition)
+    val resources = LocalContext.current.resources
 
-    // The disabled FAB's feedback: a transient comment at the top of the file.
-    var trackComingSoon by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(trackComingSoon) {
-        if (trackComingSoon) {
-            delay(4_000L)
-            trackComingSoon = false
-        }
-    }
-
-    val lines = remember(state, syntax, trackComingSoon) {
+    val lines = remember(state, syntax) {
         StepsDocument.build(
             snapshot = state.snapshot,
             status = state.status,
             units = state.units,
             syntax = syntax,
-            trackComingSoon = trackComingSoon,
+            sessions = state.sessions,
+            expandedSessionIds = state.expandedSessions,
+            sessionMetric = state.sessionMetric,
+            zone = state.zone,
             onGrantPermission = onGrantPermission,
-            grantClickLabel = grantLabel
+            grantClickLabel = grantLabel,
+            onToggleSession = onToggleSession,
+            sessionToggleLabel = { start ->
+                resources.getString(R.string.cd_toggle_session, start)
+            }
         )
     }
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -119,18 +125,17 @@ fun StepsScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 8.dp, bottom = FabClearance)
                 )
-                // Disabled ▶: no glow, comment-gray glyph — present so the
-                // screen's one verb has its place, inert until Fase 6 ships it.
-                GlowFab(
-                    onClick = { trackComingSoon = true },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 24.dp),
-                    contentDescription = stringResource(R.string.cd_track_coming_soon),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = syntax.comment,
-                    glowColor = Color.Transparent
-                )
+                // The one glowing verb, only where it can act: no sensor or no
+                // permission means no FAB — the error document explains instead.
+                if (state.status == SensorStatus.OK) {
+                    GlowFab(
+                        onClick = onStartTrack,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 24.dp),
+                        contentDescription = stringResource(R.string.cd_start_track)
+                    )
+                }
             }
             StepsStatusBar(state)
         }

@@ -42,6 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.callbackdev.tsteps.BuildConfig
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.AppSettings
+import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsRanges
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.ui.components.CanvasLine
@@ -73,6 +74,7 @@ class SettingsActions(
     val onWeight: (Double?) -> Unit,
     val onHeight: (Int?) -> Unit,
     val onToggleUnits: () -> Unit,
+    val onToggleSessionMetric: () -> Unit,
     val onThemeProfile: (String) -> Unit,
     val onOpenUrl: (String) -> Unit,
     val onReset: () -> Unit
@@ -102,6 +104,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
             onWeight = viewModel::setWeightKg,
             onHeight = viewModel::setHeightCm,
             onToggleUnits = viewModel::toggleUnits,
+            onToggleSessionMetric = viewModel::toggleSessionMetric,
             onThemeProfile = viewModel::setThemeProfile,
             onOpenUrl = uriHandler::openUri,
             onReset = viewModel::resetToDefaults
@@ -374,11 +377,22 @@ private fun buildSettingsLines(
         stringValueLine(
             "system",
             if (settings.units == UnitsSystem.METRIC) "metric" else "imperial",
-            comma = false,
+            comma = true,
             syntax = syntax,
             hint = "// metric | imperial",
             onClickLabel = changeLabel("system"),
             onClick = actions.onToggleUnits
+        )
+    )
+    add(
+        stringValueLine(
+            "session_metric",
+            if (settings.sessionMetric == SessionMetric.SPEED) "speed" else "pace",
+            comma = false,
+            syntax = syntax,
+            hint = "// speed | pace",
+            onClickLabel = changeLabel("session_metric"),
+            onClick = actions.onToggleSessionMetric
         )
     )
     add(punctLine("},", 1, syntax))
@@ -604,7 +618,7 @@ private fun SettingsScreenPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }
@@ -615,7 +629,7 @@ private fun SettingsScreenDefaultsPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }

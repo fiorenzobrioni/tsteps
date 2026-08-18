@@ -1,10 +1,14 @@
 package com.callbackdev.tsteps.ui.steps
 
 import androidx.compose.ui.graphics.Color
+import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.theme.ObsidianSyntax
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -13,6 +17,7 @@ import org.junit.Test
 class StepsDocumentTest {
 
     private val syntax = ObsidianSyntax
+    private val rome = ZoneId.of("Europe/Rome")
 
     private fun snapshot(
         steps: Long = 8_432,
@@ -47,9 +52,43 @@ class StepsDocumentTest {
         snapshot: TodaySnapshot? = snapshot(),
         status: SensorStatus = SensorStatus.OK,
         units: UnitsSystem = UnitsSystem.METRIC,
-        comingSoon: Boolean = false,
-        onGrant: (() -> Unit)? = null
-    ) = StepsDocument.build(snapshot, status, units, syntax, comingSoon, onGrant, "grant")
+        sessions: List<SessionItem> = emptyList(),
+        expandedIds: Set<Long> = emptySet(),
+        sessionMetric: SessionMetric = SessionMetric.SPEED,
+        onGrant: (() -> Unit)? = null,
+        onToggleSession: (Long) -> Unit = {}
+    ) = StepsDocument.build(
+        snapshot = snapshot,
+        status = status,
+        units = units,
+        syntax = syntax,
+        sessions = sessions,
+        expandedSessionIds = expandedIds,
+        sessionMetric = sessionMetric,
+        zone = rome,
+        onGrantPermission = onGrant,
+        grantClickLabel = "grant",
+        onToggleSession = onToggleSession
+    )
+
+    private fun session(
+        id: Long = 1L,
+        start: String = "2026-08-18T09:32:00",
+        activeMin: Int = 46,
+        steps: Long = 4_820,
+        meters: Double = 3_400.0,
+        cadence: Int? = 105
+    ) = SessionItem(
+        id = id,
+        startMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli(),
+        endMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli() +
+            activeMin * 60_000L,
+        type = "walk",
+        steps = steps,
+        distanceMeters = meters,
+        activeMillis = activeMin * 60_000L,
+        avgCadenceSpm = cadence
+    )
 
     @Test
     fun `the full document renders every section with token colors`() {
@@ -121,11 +160,45 @@ class StepsDocumentTest {
     }
 
     @Test
-    fun `the disabled FAB answers with a transient comment`() {
-        val lines = build(comingSoon = true)
-        assertEquals(
-            syntax.comment,
-            lines.lineWith("// $ tsteps track — coming soon").colorOf("coming soon")
+    fun `a completed walk renders as one inline session entry`() {
+        val lines = build(sessions = listOf(session()))
+        val inline = lines.lineWith("\"time\": \"09:32\"")
+        assertTrue(inline.text.text.contains("\"type\": \"walk\""))
+        assertTrue(inline.text.text.contains("\"min\": 46"))
+        assertTrue(inline.text.text.contains("\"steps\": 4820"))
+        assertTrue(inline.text.text.contains("\"km\": 3.4"))
+        assertNotNull(inline.onClick)
+    }
+
+    @Test
+    fun `an expanded session shows its detail with speed by preference`() {
+        val lines = build(sessions = listOf(session()), expandedIds = setOf(1L))
+        lines.lineWith("\"start\": \"09:32\"")
+        lines.lineWith("\"end\": \"10:18\"")
+        lines.lineWith("\"active_min\": 46")
+        // 3.4 km in 46 min = 4.4 km/h
+        lines.lineWith("\"avg_speed_kmh\": 4.4")
+        lines.lineWith("\"avg_cadence_spm\": 105")
+        assertTrue(lines.none { it.text.text.contains("avg_pace") })
+    }
+
+    @Test
+    fun `pace preference renders pace instead of speed`() {
+        val lines = build(
+            sessions = listOf(session()),
+            expandedIds = setOf(1L),
+            sessionMetric = SessionMetric.PACE
         )
+        // 46 min over 3.4 km = 13:32 min/km
+        lines.lineWith("\"avg_pace_min_km\": \"13:32\"")
+        assertTrue(lines.none { it.text.text.contains("avg_speed") })
+    }
+
+    @Test
+    fun `tapping a session entry toggles it`() {
+        var toggled: Long? = null
+        val lines = build(sessions = listOf(session()), onToggleSession = { toggled = it })
+        lines.lineWith("\"time\": \"09:32\"").onClick!!.invoke()
+        assertEquals(1L, toggled)
     }
 }
