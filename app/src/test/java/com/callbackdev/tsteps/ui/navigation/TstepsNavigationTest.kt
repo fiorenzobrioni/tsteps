@@ -51,7 +51,7 @@ class TstepsNavigationTest {
         setApp()
 
         compose.onNodeWithText("Log").performClick()
-        compose.onNodeWithText("// steps_history.diff — not yet written").assertExists()
+        compose.onNodeWithText("steps_history.diff").assertExists()
 
         compose.onNodeWithText("Stats").performClick()
         compose.onNodeWithText("// stats.md — not yet written").assertExists()

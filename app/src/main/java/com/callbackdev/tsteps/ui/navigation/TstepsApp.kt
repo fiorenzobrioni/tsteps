@@ -30,6 +30,7 @@ import com.callbackdev.tsteps.ui.components.EditorNavBar
 import com.callbackdev.tsteps.ui.components.EditorNavItems
 import com.callbackdev.tsteps.ui.components.EditorOptions
 import com.callbackdev.tsteps.ui.components.LocalEditorOptions
+import com.callbackdev.tsteps.ui.log.LogScreen
 import com.callbackdev.tsteps.ui.settings.SettingsScreen
 import com.callbackdev.tsteps.ui.steps.StepsScreen
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
@@ -37,10 +38,9 @@ import kotlinx.coroutines.flow.map
 
 /**
  * App shell (tweather's pattern): NavHost above the editor-style bottom bar, one
- * destination per tab, each tab's stack saved and restored on switch. The Log and
- * Stats destinations are placeholder files until their phases (5 and 8) write
- * them. `settings.config`'s editor section feeds every CodeCanvas in the app via
- * [LocalEditorOptions].
+ * destination per tab, each tab's stack saved and restored on switch. Stats is a
+ * placeholder file until Fase 8 writes it. `settings.config`'s editor section
+ * feeds every CodeCanvas in the app via [LocalEditorOptions].
  */
 object Routes {
     val Editor = EditorNavItems.Editor.route
@@ -78,7 +78,7 @@ fun TstepsApp() {
                     modifier = Modifier.weight(1f)
                 ) {
                     composable(Routes.Editor) { StepsScreen() }
-                    composable(Routes.Log) { PlaceholderFile("steps_history.diff") }
+                    composable(Routes.Log) { LogScreen() }
                     composable(Routes.Stats) { PlaceholderFile("stats.md") }
                     composable(Routes.Settings) { SettingsScreen() }
                 }

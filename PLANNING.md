@@ -82,12 +82,14 @@ Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test tot
 
 ## Fase 5 — Storico (`steps_history.diff`)
 
-- [ ] Vista log: oggi come "changes not yet committed" in testa, poi un commit per giorno (hash finto stabile, author `you@tsteps.app`, messaggio `N steps · X km · Y min`)
-- [ ] Goal check per giorno: `✓ goal check passed (…)` / `✗ goal check failed (…)` — solo se il goal era attivo quel giorno; tono fattuale
-- [ ] Espansione giorno → diff: righe `+` per le metriche; le sessioni arriveranno come hunk in Fase 6
-- [ ] Separatori settimana `--- week NN ---` con totale e delta vs settimana precedente
-- [ ] Tag sui record (`tag: best-day`) calcolati dal dominio
-- [ ] Riuso del pattern diff di tweather (`ForecastDiff`/`SnapshotDiff` come riferimento, non import diretto: il dominio è diverso)
+- [x] Vista log: oggi in testa come `# On branch main / # Changes not yet committed (today)` con il riassunto del working tree (`#   8,432 steps · 6.1 km · 74 min`), poi un commit per giorno: hash finto **stabile e deterministico** (`CommitHash`: SHA-1 di "tsteps:<data>" troncato a 7 hex — stessa data, stesso hash, su ogni device per sempre), `Author: you@tsteps.app`, `Date:` con giorno localizzato, messaggio `N steps · X km · Y min · Z kcal` (numeri formattati per locale, kcal solo se c'era il peso)
+- [x] Goal check per giorno, fattuale e coi numeri: `✓ goal check passed (11,204 ≥ 10,000)` verde / `✗ goal check failed (…)` rosso — **assente** se quel giorno il goal non era attivo (snapshot `goalSteps`/`goalMet` del commit, mai ricalcolato col goal di oggi)
+- [x] Espansione al tap sull'header → diff del giorno: `--- a/steps_data.json +++ b/steps_data.json`, hunk header `@@ <data> @@` in key-blue, metriche come righe `+` verdi con tinta di sfondo e gutter colorato (stile identico ai diff di tweather); le chiavi rispettano le unità (`distance_km` ↔ `distance_mi`). Le sessioni arriveranno come hunk `@@ hh:mm..hh:mm @@` in Fase 6
+- [x] Separatori settimana ISO: `--- week 34 · 52,340 steps (+2,340 vs week 33) ---`, delta colorato diff-add/del — la settimana come diff; totali dai soli giorni committati (oggi sta nella sezione uncommitted, non nei totali)
+- [x] Tag sui record: `(tag: best-day)` in arancio (il giallo-tag di git nella nostra palette) sul commit col massimo di passi, pareggi al più recente (`Records.bestDay`, calcolato in lettura — `longest-walk` arriverà con le sessioni)
+- [x] Status bar: `⎇ main | N commits` a sinistra, `HEAD → <hash>` a destra (`none` senza commit); empty state onesto `// no commits yet — the first day commits at midnight`
+- [x] Pattern diff di tweather riusato come stile (colori, tinte, gutter), non come codice: il dominio è diverso, confermato
+- [x] Test (22 nuovi, 139 totali): `CommitHashTest` (stabilità, formato, unicità), `RecordsTest`, `LogDocumentTest` (uncommitted, commit completo, check nei tre stati, espansione con chiavi imperiali, separatori con delta ±, tag, toggle), `LogViewModelTest` (Room reale: stato completo, best-day, toggle), `LogScreenTest` (rendering, tap sull'header, diff espanso, status bar)
 
 ## Fase 6 — Sessioni manuali (`$ tsteps track`)
 
