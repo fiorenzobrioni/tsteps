@@ -107,9 +107,13 @@ Il cuore tecnico. Nessuna UI in questa fase: tutto testabile su JVM (72 test tot
 
 ## Fase 7 — README.md del giorno (seconda tab dell'editor)
 
-- [ ] Tab `README.md` accanto a `steps_data.json` (workspace DataStore per la tab attiva, pattern tweather Fase 10)
-- [ ] Markdown source evidenziato, **completamente localizzato** (è prosa): `## Today`, `## Status` (goal, streak), `## Week` (tabella compatta)
-- [ ] Alimentato stateless dal dominio
+Fatta dopo la Fase 8, su scelta del committente.
+
+- [x] Tab `README.md` accanto a `steps_data.json`: `WorkspaceStore` portato da tweather (DataStore `workspace` dedicato — è stato dell'editor, non una chiave di settings: `git restore settings.config` non deve chiudere la tab), selezione persistita, scroll separato per file
+- [x] `StepsReadme`: il giorno in prosa, **completamente localizzato** (titoli inclusi — è prosa, la regola keys-stay-English non si applica). Titolo = data estesa localizzata (`# Martedì 18 agosto 2026`); `## Oggi` con i passi in grassetto e le kcal solo col peso; `## Stato` = il build badge del giorno: progresso goal in parole neutre (`8.432 passi su 10.000 · ne mancano 1.568` — mai colpevolizzazione), `✓` al raggiungimento, streak, e i problemi sensore come blockquote `>` di warning; `## Camminate` (solo se ci sono sessioni); `## Settimana` con gli ultimi 7 giorni — **oggi in grassetto e vivo dal working tree**, i giorni non tracciati come `—` (dato mancante, non zero); footer corsivo `*Calcolato sul dispositivo · N giorni committati*`
+- [x] **Tabelle incolonnate** con la convenzione fresca di tweather (Fase 11c, richiesta esplicita del committente): `MarkdownTable` portato tal quale — colonne paddate alla cella più larga, marker `---:` veri sulle colonne numeriche, emoji (se mai serviranno) sul bordo destro della cella. **Refactor anche di stats.md**: le tabelle averages e tags ora passano dallo stesso `markdownTable`, un'unica convenzione in tutta l'app
+- [x] Alimentato stateless dal dominio: `StepsUiState` estesa con `history` (giorni committati) per la tabella settimana e il footer
+- [x] Test (15 nuovi, 212 totali): `WorkspaceStoreTest` (portato), `StepsReadmeTest` (titolo localizzato, prosa con grassetti, kcal assente senza peso, stato nei quattro casi goal/no-goal/no-permission/no-sensor, tabella camminate rettangolare con `---:`, settimana a 7 righe con oggi in grassetto e `—` sui buchi, footer), `StepsScreenTest` esteso (due tab, switch, README renderizzato)
 
 ## Fase 8 — Stats (`stats.md`)
 

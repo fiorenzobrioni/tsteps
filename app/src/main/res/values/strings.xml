@@ -36,4 +36,26 @@
     <string name="cd_cancel_edit">Cancel editing</string>
     <string name="cd_toggle_commit">Expand or collapse the %1$s commit</string>
     <string name="cd_open_commit">Open the %1$s commit in the log</string>
+
+    <!-- README.md (day tab): a README is prose, so unlike JSON keys it is FULLY
+         localized, headings included. Markdown punctuation is added in code. -->
+    <string name="readme_h_today">Today</string>
+    <string name="readme_h_status">Status</string>
+    <string name="readme_h_walks">Walks</string>
+    <string name="readme_h_week">Week</string>
+    <string name="readme_summary">**%1$s steps** \u00b7 %2$s \u00b7 %3$d min</string>
+    <string name="readme_kcal">Active calories: %1$s kcal (estimate)</string>
+    <string name="readme_goal_reached">\u2713 Goal reached: %1$s of %2$s steps</string>
+    <string name="readme_goal_progress">%1$s of %2$s steps \u00b7 %3$s to go</string>
+    <string name="readme_goal_none">No goal set.</string>
+    <string name="readme_streak">Current streak: %1$d days</string>
+    <string name="readme_warn_no_sensor">\u26a0\ufe0f No step sensor on this device</string>
+    <string name="readme_warn_no_permission">\u26a0\ufe0f Missing permission to read the step counter</string>
+    <string name="readme_t_start">Start</string>
+    <string name="readme_t_min">Min</string>
+    <string name="readme_t_steps">Steps</string>
+    <string name="readme_t_distance">Distance</string>
+    <string name="readme_t_active">Active</string>
+    <string name="readme_t_day">Day</string>
+    <string name="readme_footer">Computed on device \u00b7 %1$d committed days</string>
 </resources>

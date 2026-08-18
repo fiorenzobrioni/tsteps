@@ -13,10 +13,13 @@ import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.StepSource
+import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.data.WorkspaceStore
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
 import com.callbackdev.tsteps.data.toItem
+import com.callbackdev.tsteps.domain.DayStats
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
 import com.callbackdev.tsteps.domain.SessionItem
@@ -51,6 +54,8 @@ data class StepsUiState(
     /** Today's completed walks — the `sessions` array of the JSON. */
     val sessions: List<SessionItem> = emptyList(),
     val expandedSessions: Set<Long> = emptySet(),
+    /** Committed days, for the README's week table and footer. */
+    val history: List<DayStats> = emptyList(),
     val zone: ZoneId = ZoneId.systemDefault(),
     /** Date of the newest committed day, for the status bar's `Last commit:`. */
     val lastCommitDate: LocalDate? = null
@@ -61,8 +66,23 @@ class StepsViewModel(
     private val settingsStore: SettingsStore,
     private val source: StepSource,
     private val hasPermission: () -> Boolean,
+    private val workspaceStore: WorkspaceStore? = null,
     private val clock: Clock = Clock.systemDefaultZone()
 ) : ViewModel() {
+
+    /**
+     * The main tab bar's active file, persisted as editor workspace state
+     * (tweather Fase 10): like a real editor, the app reopens on the file you
+     * left it on. Eagerly so a persisted README selection lands before the
+     * first frame.
+     */
+    val activeFile: StateFlow<MainEditorFile> =
+        (workspaceStore?.mainActiveFile ?: flow { emit(MainEditorFile.JSON) })
+            .stateIn(viewModelScope, SharingStarted.Eagerly, MainEditorFile.JSON)
+
+    fun selectFile(file: MainEditorFile) {
+        viewModelScope.launch { workspaceStore?.setMainActiveFile(file) }
+    }
 
     private val permissionGranted = MutableStateFlow(hasPermission())
 
@@ -136,6 +156,9 @@ class StepsViewModel(
             sessionMetric = settings.sessionMetric,
             sessions = sessionRows.mapNotNull { it.toItem() },
             expandedSessions = expandedIds,
+            history = history.map {
+                DayStats(LocalDate.parse(it.date), it.steps, it.distanceMeters, it.activeMinutes)
+            },
             zone = clock.zone,
             lastCommitDate = history.firstOrNull()?.let { LocalDate.parse(it.date) }
         )
@@ -182,7 +205,8 @@ class StepsViewModel(
                     repository = ServiceLocator.stepRepository(app),
                     settingsStore = ServiceLocator.settingsStore(app),
                     source = ServiceLocator.stepSensorReader(app),
-                    hasPermission = { SyncScheduler.hasPermission(app) }
+                    hasPermission = { SyncScheduler.hasPermission(app) },
+                    workspaceStore = ServiceLocator.workspaceStore(app)
                 )
             }
         }

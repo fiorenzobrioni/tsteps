@@ -15,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -23,9 +25,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.callbackdev.tsteps.R
+import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.tracking.TrackingService
 import com.callbackdev.tsteps.ui.components.CodeCanvas
+import com.callbackdev.tsteps.ui.components.buildMarkdownLines
 import com.callbackdev.tsteps.ui.components.EditorTabs
 import com.callbackdev.tsteps.ui.components.GlowFab
 import com.callbackdev.tsteps.ui.components.StatusBarDivider
@@ -35,6 +39,7 @@ import com.callbackdev.tsteps.ui.components.TerminalStatusBar
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import com.callbackdev.tsteps.work.SyncScheduler
 import java.time.LocalDate
+import java.util.Locale
 
 /**
  * Main screen: today as the open source file `steps_data.json` — the working
@@ -65,8 +70,11 @@ fun StepsScreen(
         SyncScheduler.reconcile(context)
         onPauseOrDispose { }
     }
+    val activeFile by viewModel.activeFile.collectAsStateWithLifecycle()
     StepsScreen(
         state = state,
+        activeFile = activeFile,
+        onSelectFile = viewModel::selectFile,
         onGrantPermission = {
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         },
@@ -83,6 +91,8 @@ fun StepsScreen(
 @Composable
 fun StepsScreen(
     state: StepsUiState,
+    activeFile: MainEditorFile = MainEditorFile.JSON,
+    onSelectFile: (MainEditorFile) -> Unit = {},
     onGrantPermission: () -> Unit = {},
     onToggleSession: (Long) -> Unit = {},
     onStartTrack: () -> Unit = {}
@@ -90,38 +100,61 @@ fun StepsScreen(
     val syntax = TstepsTheme.syntax
     val grantLabel = stringResource(R.string.cd_grant_activity_recognition)
     val resources = LocalContext.current.resources
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
 
-    val lines = remember(state, syntax) {
-        StepsDocument.build(
-            snapshot = state.snapshot,
-            status = state.status,
-            units = state.units,
-            syntax = syntax,
-            sessions = state.sessions,
-            expandedSessionIds = state.expandedSessions,
-            sessionMetric = state.sessionMetric,
-            zone = state.zone,
-            onGrantPermission = onGrantPermission,
-            grantClickLabel = grantLabel,
-            onToggleSession = onToggleSession,
-            sessionToggleLabel = { start ->
-                resources.getString(R.string.cd_toggle_session, start)
-            }
-        )
+    val lines = remember(state, syntax, activeFile, locale) {
+        when (activeFile) {
+            MainEditorFile.JSON -> StepsDocument.build(
+                snapshot = state.snapshot,
+                status = state.status,
+                units = state.units,
+                syntax = syntax,
+                sessions = state.sessions,
+                expandedSessionIds = state.expandedSessions,
+                sessionMetric = state.sessionMetric,
+                zone = state.zone,
+                onGrantPermission = onGrantPermission,
+                grantClickLabel = grantLabel,
+                onToggleSession = onToggleSession,
+                sessionToggleLabel = { start ->
+                    resources.getString(R.string.cd_toggle_session, start)
+                }
+            )
+            MainEditorFile.README -> buildMarkdownLines(
+                StepsReadme.build(
+                    snapshot = state.snapshot,
+                    status = state.status,
+                    sessions = state.sessions,
+                    history = state.history,
+                    units = state.units,
+                    zone = state.zone,
+                    locale = locale,
+                    resources = resources
+                ),
+                syntax
+            )
+        }
     }
+    // One scroll position per file (tweather): switching tab must not land
+    // mid-document because the OTHER file was scrolled there.
+    val jsonScroll = rememberLazyListState()
+    val readmeScroll = rememberLazyListState()
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             // One-element strip on purpose (tweather pre-v1 decision): the open
             // file keeps its indicator, and README.md lands here in Fase 7
             // without touching this layout.
             EditorTabs(
-                fileNames = listOf("steps_data.json"),
-                activeIndex = 0,
-                onSelect = {}
+                fileNames = listOf("steps_data.json", "README.md"),
+                activeIndex = if (activeFile == MainEditorFile.JSON) 0 else 1,
+                onSelect = {
+                    onSelectFile(if (it == 0) MainEditorFile.JSON else MainEditorFile.README)
+                }
             )
             Box(Modifier.weight(1f)) {
                 CodeCanvas(
                     lines = lines,
+                    state = if (activeFile == MainEditorFile.JSON) jsonScroll else readmeScroll,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 8.dp, bottom = FabClearance)
                 )

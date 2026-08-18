@@ -7,9 +7,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import java.time.LocalDate
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -33,10 +35,14 @@ class StepsScreenTest {
         streakDays = 6
     )
 
-    private fun setContent(state: StepsUiState, onGrant: () -> Unit = {}) {
+    private fun setContent(
+        state: StepsUiState,
+        onGrant: () -> Unit = {},
+        activeFile: MainEditorFile = MainEditorFile.JSON
+    ) {
         compose.setContent {
             TstepsTheme {
-                StepsScreen(state = state, onGrantPermission = onGrant)
+                StepsScreen(state = state, activeFile = activeFile, onGrantPermission = onGrant)
             }
         }
     }
@@ -92,6 +98,32 @@ class StepsScreenTest {
     fun `no FAB without the permission - the error document explains instead`() {
         setContent(StepsUiState(snapshot = snapshot(), status = SensorStatus.NO_PERMISSION))
         compose.onNodeWithContentDescription("Start a tracked walk").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the editor has two tabs and switching asks for the README`() {
+        var selected: MainEditorFile? = null
+        compose.setContent {
+            TstepsTheme {
+                StepsScreen(
+                    state = StepsUiState(snapshot = snapshot(), status = SensorStatus.OK),
+                    onSelectFile = { selected = it }
+                )
+            }
+        }
+        compose.onNodeWithText("steps_data.json").assertIsDisplayed()
+        compose.onNodeWithText("README.md").performClick()
+        assertEquals(MainEditorFile.README, selected)
+    }
+
+    @Test
+    fun `the README tab renders the day as prose`() {
+        setContent(
+            StepsUiState(snapshot = snapshot(), status = SensorStatus.OK),
+            activeFile = MainEditorFile.README
+        )
+        compose.onNodeWithText("# Tuesday 18 August 2026").assertIsDisplayed()
+        compose.onNodeWithText("## Today").assertIsDisplayed()
     }
 
     @Test

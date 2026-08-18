@@ -29,4 +29,25 @@
     <string name="cd_cancel_edit">Annulla la modifica</string>
     <string name="cd_toggle_commit">Espandi o comprimi il commit del %1$s</string>
     <string name="cd_open_commit">Apri il commit del %1$s nel log</string>
+
+    <!-- README.md: prosa, localizzato per intero (titoli inclusi) -->
+    <string name="readme_h_today">Oggi</string>
+    <string name="readme_h_status">Stato</string>
+    <string name="readme_h_walks">Camminate</string>
+    <string name="readme_h_week">Settimana</string>
+    <string name="readme_summary">**%1$s passi** \u00b7 %2$s \u00b7 %3$d min</string>
+    <string name="readme_kcal">Calorie attive: %1$s kcal (stima)</string>
+    <string name="readme_goal_reached">\u2713 Obiettivo raggiunto: %1$s passi su %2$s</string>
+    <string name="readme_goal_progress">%1$s passi su %2$s \u00b7 ne mancano %3$s</string>
+    <string name="readme_goal_none">Nessun obiettivo impostato.</string>
+    <string name="readme_streak">Streak corrente: %1$d giorni</string>
+    <string name="readme_warn_no_sensor">\u26a0\ufe0f Nessun sensore di passi su questo dispositivo</string>
+    <string name="readme_warn_no_permission">\u26a0\ufe0f Manca il permesso per leggere il contapassi</string>
+    <string name="readme_t_start">Inizio</string>
+    <string name="readme_t_min">Min</string>
+    <string name="readme_t_steps">Passi</string>
+    <string name="readme_t_distance">Distanza</string>
+    <string name="readme_t_active">Attivi</string>
+    <string name="readme_t_day">Giorno</string>
+    <string name="readme_footer">Calcolato sul dispositivo \u00b7 %1$d giorni committati</string>
 </resources>

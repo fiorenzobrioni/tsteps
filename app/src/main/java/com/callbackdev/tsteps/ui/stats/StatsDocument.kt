@@ -13,7 +13,11 @@ import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.buildMarkdownLines
 import com.callbackdev.tsteps.ui.components.commentLine
+import com.callbackdev.tsteps.ui.format.TableAlign
+import com.callbackdev.tsteps.ui.format.TableCell
+import com.callbackdev.tsteps.ui.format.TableColumn
 import com.callbackdev.tsteps.ui.format.UnitFormat
+import com.callbackdev.tsteps.ui.format.markdownTable
 import com.callbackdev.tsteps.ui.theme.SyntaxColors
 import java.text.NumberFormat
 import java.time.DayOfWeek
@@ -79,25 +83,40 @@ object StatsDocument {
         if (averages.isNotEmpty()) {
             val numbers = NumberFormat.getIntegerInstance(locale)
             addAll(md("## averages", "", syntax = syntax))
-            val header = listOf("window", "steps", "distance", "active")
-            val rows = averages.map { avg ->
-                listOf(
-                    "${avg.windowDays}d",
-                    numbers.format(avg.avgSteps),
-                    UnitFormat.distance(avg.avgDistanceMeters, units),
-                    "${avg.avgActiveMinutes} min"
-                )
-            }
-            addAll(table(header, rows, syntax).map { it.first })
+            val rows = markdownTable(
+                columns = listOf(
+                    TableColumn("window"),
+                    TableColumn("steps", TableAlign.RIGHT),
+                    TableColumn("distance", TableAlign.RIGHT),
+                    TableColumn("active", TableAlign.RIGHT)
+                ),
+                rows = averages.map { avg ->
+                    listOf(
+                        TableCell("${avg.windowDays}d"),
+                        TableCell(numbers.format(avg.avgSteps)),
+                        TableCell(UnitFormat.distance(avg.avgDistanceMeters, units)),
+                        TableCell("${avg.avgActiveMinutes} min")
+                    )
+                }
+            )
+            addAll(buildMarkdownLines(rows, syntax))
             add(blank())
         }
 
         val tags = tagRows(bestDay, longestWalk, bestWeek, units, locale, zone)
         if (tags.isNotEmpty()) {
             addAll(md("## tags", "", syntax = syntax))
-            val header = listOf("tag", "value", "date")
-            table(header, tags.map { it.cells }, syntax).forEachIndexed { index, (line, isData) ->
-                val tag = if (isData) tags.getOrNull(index - 2) else null
+            val rendered = markdownTable(
+                columns = listOf(
+                    TableColumn("tag"),
+                    TableColumn("value", TableAlign.RIGHT),
+                    TableColumn("date")
+                ),
+                rows = tags.map { it.cells.map { cell -> TableCell(cell) } }
+            )
+            buildMarkdownLines(rendered, syntax).forEachIndexed { index, line ->
+                // Header and separator first, then one line per tag row.
+                val tag = tags.getOrNull(index - 2)
                 if (tag?.commitDate != null) {
                     add(
                         line.copy(
@@ -226,36 +245,6 @@ object StatsDocument {
                     commitDate = null
                 )
             )
-        }
-    }
-
-    /**
-     * A padded markdown-source table (mono alignment is free), styled by the
-     * markdown tokenizer. Returns each line with whether it is a data row
-     * (header and separator aren't tappable).
-     */
-    private fun table(
-        header: List<String>,
-        rows: List<List<String>>,
-        syntax: SyntaxColors
-    ): List<Pair<CodeLine, Boolean>> {
-        val widths = header.indices.map { col ->
-            (rows.map { it[col].length } + header[col].length).max()
-        }
-        fun row(cells: List<String>) =
-            cells.mapIndexed { i, c -> " " + c.padEnd(widths[i]) + " " }
-                .joinToString("|", prefix = "|", postfix = "|")
-
-        val separator = widths.joinToString("|", prefix = "|", postfix = "|") { w ->
-            " " + "-".repeat(w) + " "
-        }
-        val lines = buildList {
-            add(row(header) to false)
-            add(separator to false)
-            rows.forEach { add(row(it) to true) }
-        }
-        return lines.map { (text, isData) ->
-            buildMarkdownLines(listOf(text), syntax).single() to isData
         }
     }
 
