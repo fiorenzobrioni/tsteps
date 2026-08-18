@@ -7,7 +7,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.callbackdev.tsteps.ui.SkeletonScreen
+import com.callbackdev.tsteps.ui.navigation.TstepsApp
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 
 class MainActivity : ComponentActivity() {
@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             TstepsTheme {
-                SkeletonScreen()
+                TstepsApp()
             }
         }
     }

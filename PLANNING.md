@@ -28,16 +28,17 @@ Regola del piano (ereditata da tweather): ogni decisione e ogni deviazione dalla
 
 I componenti riusabili di tweather sono già a tema e già testati: si importano, non si reinventano. Adattare package e togliere le dipendenze dal dominio meteo.
 
-- [ ] `CodeBlockContainer` (blocco con bordo 1px, header-tab col nome file, collapse `▾`/`▸`)
-- [ ] `CodeCanvas` (canvas del file: gutter numeri riga, indent 20px, guide verticali)
-- [ ] `JsonSyntax` + `MarkdownSyntax` (tokenizzazione e colori; verificare che coprano sparkline/blocchi `▓░` come stringhe)
-- [ ] `EditorTab` + `EditorNavBar` (tab file in alto, bottom bar 56dp con indicatore 2px)
-- [ ] `TerminalStatusBar` (barra 28dp, divisori `|`)
-- [ ] `TerminalInput` (prompt `>` con cursore `_` lampeggiante)
-- [ ] `GlowFab` (FAB rettangolare col glow — qui l'icona è `▶`, non refresh)
-- [ ] `TreeViewItem` se servirà (valutare: tsteps potrebbe non avere tree view)
-- [ ] Import dei test Compose corrispondenti (Robolectric) e adattamento
-- [ ] Nav bar: 4 destinazioni Editor / Log / Stats / Settings (glifi Material: data_object, history/commit, insights, terminal — decidere in fase)
+- [x] `CodeBlockContainer` (blocco con bordo 1px, header-tab col nome file, collapse `▾`/`▸`)
+- [x] `CodeCanvas` (canvas del file: gutter numeri riga, indent 20px, `EditorOptions` incluse — line numbers e word wrap arriveranno in settings alla Fase 4)
+- [x] `JsonSyntax` + `MarkdownSyntax`: verificato con un test nuovo che sparkline (`▁▂▅▇`) e barre goal (`▓░`) tokenizzano come normali stringhe JSON
+- [x] `EditorTab` + `EditorNavBar` (tab file in alto, bottom bar 56dp con indicatore 2px)
+- [x] `TerminalStatusBar` (barra 28dp, divisori `|`)
+- [x] `TerminalInput` (prompt `>` con cursore `_` lampeggiante)
+- [x] `GlowFab` — glifo di default cambiato da refresh a **`▶`** (l'unico verbo col glow di tsteps è avviare una camminata, non aggiornare)
+- [x] `TreeViewItem` **non importato** (deciso): tsteps non ha né avrà una tree view; se mai servisse si riprende da tweather
+- [x] Test Compose importati e adattati: `CodeCanvasTest`, `EditorTabsTest`, `JsonSyntaxTest` (+ test sparkline), `MarkdownSyntaxTest` — 25 test verdi
+- [x] Nav bar: 4 destinazioni con route pulite `editor`/`log`/`stats`/`settings` (niente legacy "explorer") e glifi: `data_object` (il `{}` di steps_data.json), `commit` (il log È un git log), `insights` (stats.md), `code` (settings.config). Label IT: "Stats" resta inglese — "Statistiche" non sta nella label-sm senza troncarsi
+- [x] Shell `TstepsApp` provvisoria: bottom bar + placeholder per tab (`// <file> — not yet written`), **senza** Navigation Compose — il NavHost con stack per-tab è lavoro della Fase 4; la shell serve a esercitare i componenti su device da subito
 
 ## Fase 2 — Layer sensore e dominio
 

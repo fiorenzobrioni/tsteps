@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- app_name is translatable="false"; Italian strings arrive with the first
-         localized chrome (bottom nav, accessibility). -->
+    <!-- Bottom navigation. "Editor" e "Log" anche in italiano (termini da IDE,
+         stessa scelta di tweather); "Stats" resta perché "Statistiche" non sta
+         nella label-sm della nav senza troncarsi. -->
+    <string name="nav_editor">Editor</string>
+    <string name="nav_log">Log</string>
+    <string name="nav_stats">Stats</string>
+    <string name="nav_settings">Impostazioni</string>
 </resources>

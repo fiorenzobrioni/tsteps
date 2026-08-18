@@ -5,4 +5,10 @@
      accessibility text and user-facing DATA values are localized. -->
 <resources>
     <string name="app_name" translatable="false">tsteps</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_editor">Editor</string>
+    <string name="nav_log">Log</string>
+    <string name="nav_stats">Stats</string>
+    <string name="nav_settings">Settings</string>
 </resources>
