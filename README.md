@@ -98,6 +98,13 @@ The glowing FAB starts a manual session, which runs as a terminal process: one
 transcript line per minute, pause with `^Z`, stop with `^C`. The closed session
 becomes a hunk in today's diff.
 
+Walks can also find themselves. An opt-in detector (off by default) rereads the
+counter samples the app already collects and turns sustained stretches of walking
+cadence into sessions marked `(auto)`. Their boundaries are honest approximations
+(`@@ ~09:30..~10:15 @@ walk (auto)`): you can edit them from inside the file with
+a terminal prompt, or remove the session with `[rm]`. The feature costs no extra
+sensing either way, and when it is off nothing is recorded and nothing runs.
+
 ---
 
 ## The widget
