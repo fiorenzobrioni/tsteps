@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.room.Room
 import com.callbackdev.tsteps.data.local.TstepsDatabase
+import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
+import com.callbackdev.tsteps.healthconnect.HcStateStore
+import com.callbackdev.tsteps.healthconnect.HealthConnectSync
 
 /**
  * Hand-rolled DI, tweather's pattern: the app is small enough that a lazy
@@ -35,6 +38,12 @@ object ServiceLocator {
 
     @Volatile
     private var notificationStateStore: NotificationStateStore? = null
+
+    @Volatile
+    private var hcStateStore: HcStateStore? = null
+
+    @Volatile
+    private var healthConnectSync: HealthConnectSync? = null
 
     fun database(context: Context): TstepsDatabase =
         database ?: synchronized(this) {
@@ -110,6 +119,24 @@ object ServiceLocator {
                 trackingManager(context).state.value?.session?.startMillis
             }
         )
+
+    fun hcStateStore(context: Context): HcStateStore =
+        hcStateStore ?: synchronized(this) {
+            hcStateStore ?: HcStateStore.create(context.applicationContext)
+                .also { hcStateStore = it }
+        }
+
+    /** Singleton: its mutex serializes the overlapping reconcile callers. */
+    fun healthConnectSync(context: Context): HealthConnectSync =
+        healthConnectSync ?: synchronized(this) {
+            healthConnectSync ?: HealthConnectSync(
+                gateway = AndroidHealthConnectGateway(context.applicationContext),
+                settingsStore = settingsStore(context),
+                hourlyDao = database(context).hourlyStepsDao(),
+                sessionDao = database(context).sessionDao(),
+                hcStateStore = hcStateStore(context)
+            ).also { healthConnectSync = it }
+        }
 
     /**
      * Test-only: swap dependencies for worker tests. Calling with no arguments

@@ -9,6 +9,9 @@ import com.callbackdev.tsteps.data.StepSource
 import com.callbackdev.tsteps.data.TrackerStateStore
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.TstepsDatabase
+import com.callbackdev.tsteps.healthconnect.ExternalStepsState
+import com.callbackdev.tsteps.healthconnect.HcStateStore
+import com.callbackdev.tsteps.healthconnect.OriginSteps
 import com.callbackdev.tsteps.domain.StepReading
 import java.time.Clock
 import java.time.Instant
@@ -107,12 +110,13 @@ class StepsViewModelTest {
         storeScope.cancel()
     }
 
-    private fun viewModel() = StepsViewModel(
+    private fun viewModel(hcStateStore: HcStateStore? = null) = StepsViewModel(
         repository = repository,
         settingsStore = settingsStore,
         source = source,
         hasPermission = { permissionGranted },
-        clock = clock
+        clock = clock,
+        hcStateStore = hcStateStore
     )
 
     private fun millis(dateTime: String): Long =
@@ -204,6 +208,35 @@ class StepsViewModelTest {
             waitFor { vm.uiState.value.snapshot != null }
             assertNull(vm.uiState.value.lastCommitDate)
             assertEquals(0, vm.uiState.value.snapshot?.streakDays)
+        } finally {
+            subscription.cancel()
+        }
+    }
+
+    @Test
+    fun `external steps surface only while the HC toggle is on`() = runBlocking {
+        val hcStore = HcStateStore(
+            androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(
+                scope = storeScope
+            ) { tmp.newFile("hc.preferences_pb") }
+        )
+        hcStore.write(
+            ExternalStepsState(
+                date = java.time.LocalDate.parse("2026-08-18"),
+                origins = listOf(OriginSteps("com.sec.android.app.shealth", "shealth", 5_102)),
+                readAtMillis = millis("2026-08-18T09:45:00")
+            )
+        )
+        val vm = viewModel(hcStateStore = hcStore)
+        val subscription = subscribe(vm)
+        try {
+            waitFor { vm.uiState.value.snapshot != null }
+            // Default off: the data may sit in the cache, the file ignores it.
+            assertEquals(emptyList<OriginSteps>(), vm.uiState.value.externalSteps)
+
+            settingsStore.setHealthConnectSync(true)
+            waitFor { vm.uiState.value.externalSteps.isNotEmpty() }
+            assertEquals("shealth", vm.uiState.value.externalSteps.single().label)
         } finally {
             subscription.cancel()
         }

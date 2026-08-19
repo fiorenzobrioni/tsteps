@@ -28,6 +28,7 @@ import com.callbackdev.tsteps.ui.components.EditorNavItems
 import com.callbackdev.tsteps.ui.components.EditorOptions
 import com.callbackdev.tsteps.ui.components.LocalEditorOptions
 import com.callbackdev.tsteps.ui.log.LogScreen
+import com.callbackdev.tsteps.ui.settings.SettingsOpenRequest
 import com.callbackdev.tsteps.ui.settings.SettingsScreen
 import com.callbackdev.tsteps.ui.stats.StatsScreen
 import com.callbackdev.tsteps.ui.steps.StepsScreen
@@ -72,6 +73,16 @@ fun TstepsApp() {
             if (ServiceLocator.trackingManager(context).isActive) {
                 navController.navigate(TrackRoute) { launchSingleTop = true }
             }
+        }
+    }
+
+    // Health Connect's rationale intents land on the settings tab, where the
+    // health_connect section carries the explanation (Fase 12).
+    val settingsOpen by SettingsOpenRequest.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(settingsOpen) {
+        if (settingsOpen) {
+            SettingsOpenRequest.consume()
+            navController.navigateToTab(Routes.Settings)
         }
     }
 

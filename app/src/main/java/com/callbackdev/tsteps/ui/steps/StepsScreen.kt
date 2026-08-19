@@ -214,7 +214,8 @@ fun StepsScreen(
                 sessionToggleLabel = { start ->
                     resources.getString(R.string.cd_toggle_session, start)
                 },
-                controls = controls
+                controls = controls,
+                externalSteps = state.externalSteps
             )
             MainEditorFile.README -> buildMarkdownLines(
                 StepsReadme.build(

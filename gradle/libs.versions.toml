@@ -12,6 +12,7 @@ kotlinxCoroutines = "1.10.2"
 datastore = "1.1.1"
 room = "2.8.4"
 work = "2.10.5"
+healthConnect = "1.1.0"
 ksp = "2.2.20-2.0.4"
 junit = "4.13.2"
 androidxJunit = "1.2.1"
@@ -41,6 +42,9 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "work" }
+# Health Connect client is a Jetpack (androidx) library, NOT Google Play Services:
+# it talks over local IPC to the on-device HC module. No network, no GMS.
+androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

@@ -41,6 +41,9 @@ class RolloverWorker(
             }
         }
         SyncScheduler.scheduleNextRollover(applicationContext)
+        // Fase 12: the closing day's final hours reach Health Connect with the
+        // commit. Inert while sync is off.
+        ServiceLocator.healthConnectSync(applicationContext).sync()
         TstepsWidgetUpdater.updateAll(applicationContext)
         return Result.success()
     }

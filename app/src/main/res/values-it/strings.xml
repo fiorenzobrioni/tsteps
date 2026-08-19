@@ -31,6 +31,7 @@
     <string name="notif_title_daily_commit">%1$s Giorno committato \u2014 %2$s passi</string>
     <string name="notif_title_goal">%1$s Obiettivo raggiunto \u2014 %2$s passi</string>
     <string name="cd_grant_notifications">Concedi il permesso per le notifiche</string>
+    <string name="cd_grant_health">Concedi i permessi di Health Connect</string>
     <string name="widget_description">I passi di oggi come finestra di terminale</string>
     <string name="cd_widget_refresh">Leggi il contapassi adesso</string>
     <string name="cd_change_setting">Modifica %1$s</string>

@@ -12,6 +12,13 @@
          requested at runtime in Fase 9 (until then it may stay hidden — the
          service runs regardless). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Health Connect interop (Fase 12): on-device IPC to the system's HC
+         module — a Jetpack client, no Play Services, still no INTERNET. All
+         three are inert until the user enables health_connect.sync (default
+         off) and grants them on the HC screen. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
 
     <application
         android:allowBackup="true"
@@ -29,7 +36,25 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Health Connect asks apps to explain their data use: this intent
+                 lands on the settings tab, where the health_connect section IS
+                 the explanation (tsteps has no website to point to — no network). -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!-- Android 14+ routes the HC privacy-policy link through this alias. -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- The live-tracking process (Fase 6). health type: step counting during
              an explicitly started fitness session, backed by ACTIVITY_RECOGNITION. -->

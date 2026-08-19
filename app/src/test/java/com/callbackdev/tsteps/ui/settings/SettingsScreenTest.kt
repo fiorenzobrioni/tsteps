@@ -13,6 +13,9 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import com.callbackdev.tsteps.data.AppSettings
+import com.callbackdev.tsteps.data.HealthConnectSettings
+import com.callbackdev.tsteps.healthconnect.HcAvailability
+import com.callbackdev.tsteps.healthconnect.HcSectionStatus
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +42,7 @@ class SettingsScreenTest {
 
         var dailyCommit: Boolean? = null
         var autoDetect: Boolean? = null
+        var healthConnect: Boolean? = null
 
         fun actions() = SettingsActions(
             onLineNumbers = { lineNumbers = it },
@@ -47,6 +51,7 @@ class SettingsScreenTest {
             onGoalCheck = {},
             onDailyGoal = { goal = it },
             onAutoDetect = { autoDetect = it },
+            onHealthConnect = { healthConnect = it },
             onWeight = { weight = it },
             onHeight = {},
             onToggleUnits = { unitsToggled = true },
@@ -60,11 +65,16 @@ class SettingsScreenTest {
 
     private fun setContent(
         settings: AppSettings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
-        recorded: RecordedActions = RecordedActions()
+        recorded: RecordedActions = RecordedActions(),
+        hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE)
     ): RecordedActions {
         compose.setContent {
             TstepsTheme {
-                SettingsScreen(settings = settings, actions = recorded.actions())
+                SettingsScreen(
+                    settings = settings,
+                    actions = recorded.actions(),
+                    hcStatus = hcStatus
+                )
             }
         }
         return recorded
@@ -82,6 +92,44 @@ class SettingsScreenTest {
         val recorded = setContent()
         line("\"line_numbers\": false").performClick()
         assertEquals(true, recorded.lineNumbers)
+    }
+
+    @Test
+    fun `health_connect explains itself in clear text and flips off by default`() {
+        val recorded = setContent(settings = AppSettings())
+        line("// on-device interop with other health apps").assertExists()
+        line("// external steps are shown, never added to yours").assertExists()
+        line("\"sync\": false").performClick()
+        assertEquals(true, recorded.healthConnect)
+    }
+
+    @Test
+    fun `without Health Connect on the device the section says so, no toggle`() {
+        setContent(settings = AppSettings(), hcStatus = HcSectionStatus())
+        line("// E: Health Connect is not available on this device").assertExists()
+        compose.onNodeWithText("\"sync\"", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `connected status lists exactly what was granted`() {
+        setContent(
+            settings = AppSettings(healthConnect = HealthConnectSettings(sync = true)),
+            hcStatus = HcSectionStatus(
+                availability = HcAvailability.AVAILABLE,
+                writeSteps = true,
+                readSteps = true
+            )
+        )
+        line("// connected: writes steps · reads other apps").assertExists()
+    }
+
+    @Test
+    fun `sync on with every permission revoked shows the red grant line`() {
+        setContent(
+            settings = AppSettings(healthConnect = HealthConnectSettings(sync = true)),
+            hcStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE)
+        )
+        line("// ERROR: no permission granted — tap to grant").assertExists()
     }
 
     @Test

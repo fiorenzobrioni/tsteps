@@ -39,6 +39,7 @@
     <string name="notif_title_daily_commit">%1$s Day committed \u2014 %2$s steps</string>
     <string name="notif_title_goal">%1$s Goal reached \u2014 %2$s steps</string>
     <string name="cd_grant_notifications">Grant notifications permission</string>
+    <string name="cd_grant_health">Grant the Health Connect permissions</string>
 
     <!-- Home widget: label/glyphs are terminal code (untranslated); the picker
          description and accessibility text are chrome (localized) -->

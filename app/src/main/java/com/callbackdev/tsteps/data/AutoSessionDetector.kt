@@ -47,10 +47,12 @@ class AutoSessionDetector(
         val dayStartMillis = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
             .toLocalDate().atStartOfDay(zoneId).toInstant().toEpochMilli()
 
-        // Maintenance: samples beyond retention are dead weight, and tombstones
-        // whose window ended before today can't exclude anything anymore.
+        // Maintenance: samples beyond retention are dead weight; tombstones get
+        // one extra day past their window — Health Connect's reconcile (Fase 12)
+        // deletes by tombstone, and an [rm] minutes before midnight must still
+        // be visible to the first syncs of the next day.
         sampleDao.pruneBefore(nowMillis - RETENTION_MILLIS)
-        sessionDao.pruneDismissedBefore(dayStartMillis)
+        sessionDao.pruneDismissedBefore(dayStartMillis - TOMBSTONE_KEEP_MILLIS)
 
         val samples = sampleDao.since(dayStartMillis).map {
             SampleSpan(it.fromMillis, it.toMillis, it.steps)
@@ -97,5 +99,8 @@ class AutoSessionDetector(
     companion object {
         /** Samples older than this cannot influence today's detection: pruned. */
         const val RETENTION_MILLIS = 48 * 3_600_000L
+
+        /** Tombstones outlive their day by this much, for the HC delete pass. */
+        const val TOMBSTONE_KEEP_MILLIS = 24 * 3_600_000L
     }
 }

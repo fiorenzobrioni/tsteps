@@ -49,6 +49,17 @@ data class NotificationSettings(
 )
 
 /**
+ * Health Connect interop (Fase 12). One switch, default OFF: a fresh install
+ * never talks to Health Connect — no samples written, no reads, no client
+ * created — until the user flips `health_connect.sync` AND grants the HC
+ * permissions. What actually happens then is further scoped by which of the
+ * three permissions were granted.
+ */
+data class HealthConnectSettings(
+    val sync: Boolean = false
+)
+
+/**
  * Everything `settings.config` edits.
  *
  * Defaults are deliberate: `dailyGoalSteps = 0` means **no goal and no CI check**
@@ -61,6 +72,7 @@ data class NotificationSettings(
 data class AppSettings(
     val editor: EditorSettings = EditorSettings(),
     val notifications: NotificationSettings = NotificationSettings(),
+    val healthConnect: HealthConnectSettings = HealthConnectSettings(),
     val dailyGoalSteps: Int = 0,
     val weightKg: Double? = null,
     val heightCm: Int? = null,
@@ -102,6 +114,9 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
                     dailyCommit = prefs[NotifDailyCommit] ?: true,
                     goalCheck = prefs[NotifGoalCheck] ?: true
                 ),
+                healthConnect = HealthConnectSettings(
+                    sync = prefs[HcSync] ?: false
+                ),
                 dailyGoalSteps = prefs[DailyGoalSteps] ?: 0,
                 weightKg = prefs[WeightKg],
                 heightCm = prefs[HeightCm],
@@ -129,6 +144,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setNotifDailyCommit(enabled: Boolean) = set(NotifDailyCommit, enabled)
 
     suspend fun setNotifGoalCheck(enabled: Boolean) = set(NotifGoalCheck, enabled)
+
+    suspend fun setHealthConnectSync(enabled: Boolean) = set(HcSync, enabled)
 
     suspend fun setDailyGoalSteps(steps: Int) =
         set(DailyGoalSteps, steps.coerceIn(SettingsRanges.GOAL_STEPS))
@@ -176,6 +193,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         private val WordWrap = booleanPreferencesKey("editor_word_wrap")
         private val NotifDailyCommit = booleanPreferencesKey("notif_daily_commit")
         private val NotifGoalCheck = booleanPreferencesKey("notif_goal_check")
+        private val HcSync = booleanPreferencesKey("hc_sync")
         private val DailyGoalSteps = intPreferencesKey("daily_goal_steps")
         private val WeightKg = doublePreferencesKey("weight_kg")
         private val HeightCm = intPreferencesKey("height_cm")

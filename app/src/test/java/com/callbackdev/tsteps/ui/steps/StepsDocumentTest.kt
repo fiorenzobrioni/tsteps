@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.SessionItem
+import com.callbackdev.tsteps.healthconnect.OriginSteps
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.WidgetLine
@@ -63,7 +64,8 @@ class StepsDocumentTest {
         sessionMetric: SessionMetric = SessionMetric.SPEED,
         onGrant: (() -> Unit)? = null,
         onToggleSession: (Long) -> Unit = {},
-        controls: SessionControls = SessionControls()
+        controls: SessionControls = SessionControls(),
+        externalSteps: List<OriginSteps> = emptyList()
     ) = StepsDocument.build(
         snapshot = snapshot,
         status = status,
@@ -76,7 +78,8 @@ class StepsDocumentTest {
         onGrantPermission = onGrant,
         grantClickLabel = "grant",
         onToggleSession = onToggleSession,
-        controls = controls
+        controls = controls,
+        externalSteps = externalSteps
     )
 
     private fun session(
@@ -287,6 +290,28 @@ class StepsDocumentTest {
         assertTrue(lines.texts().none { it.contains("\"end\": ") })
         assertTrue(lines.any { it is WidgetLine })
         lines.lineWith("// ERROR: expected HH:mm..HH:mm")
+    }
+
+    @Test
+    fun `external steps render per origin with the honest hint, never summed`() {
+        val lines = build(
+            externalSteps = listOf(
+                OriginSteps("com.sec.android.app.shealth", "shealth", 5_102),
+                OriginSteps("com.fitbit.FitbitMobile", "fitbit", 4_988)
+            )
+        )
+        val header = lines.lineWith("\"health_connect\"")
+        assertTrue(header.text.text.contains("// other apps' steps — shown, never added"))
+        lines.lineWith("\"shealth\": 5102,")
+        lines.lineWith("\"fitbit\": 4988")
+        // No merged total anywhere: 5102 + 4988 must not exist as a number.
+        assertTrue(lines.texts().none { it.contains("10090") })
+    }
+
+    @Test
+    fun `no external data means no health_connect block at all`() {
+        val lines = build()
+        assertTrue(lines.texts().none { it.contains("health_connect") })
     }
 
     @Test

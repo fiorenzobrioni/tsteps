@@ -68,6 +68,9 @@ class TrackingService : Service() {
             ACTION_STOP -> {
                 scope.launch {
                     manager.stop(System.currentTimeMillis())
+                    // Fase 12: the freshly closed session reaches Health Connect
+                    // now, not at the next 15-min pass. Inert while sync is off.
+                    ServiceLocator.healthConnectSync(this@TrackingService).sync()
                     ServiceCompat.stopForeground(
                         this@TrackingService, ServiceCompat.STOP_FOREGROUND_REMOVE
                     )

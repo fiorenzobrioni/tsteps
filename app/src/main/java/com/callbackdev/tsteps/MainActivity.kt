@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.ui.navigation.TstepsApp
+import com.callbackdev.tsteps.ui.settings.SettingsOpenRequest
 import com.callbackdev.tsteps.ui.track.TrackOpenRequest
 import android.content.Intent
 import androidx.lifecycle.lifecycleScope
@@ -33,6 +34,12 @@ class MainActivity : ComponentActivity() {
     private fun routeLaunchIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(TrackingService.EXTRA_OPEN_TRACK, false) == true) {
             TrackOpenRequest.request()
+        }
+        // Health Connect's rationale/privacy intents (Fase 12): the explanation
+        // lives in settings.config's health_connect section — open it there.
+        when (intent?.action) {
+            "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
+            Intent.ACTION_VIEW_PERMISSION_USAGE -> SettingsOpenRequest.request()
         }
     }
 

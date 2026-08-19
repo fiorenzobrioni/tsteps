@@ -27,6 +27,7 @@ import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.domain.SessionMetrics
+import com.callbackdev.tsteps.healthconnect.OriginSteps
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.TerminalInput
@@ -114,7 +115,8 @@ object StepsDocument {
         grantClickLabel: String? = null,
         onToggleSession: (Long) -> Unit = {},
         sessionToggleLabel: (String) -> String = { it },
-        controls: SessionControls = SessionControls()
+        controls: SessionControls = SessionControls(),
+        externalSteps: List<OriginSteps> = emptyList()
     ): List<CanvasLine> = buildList {
         when (status) {
             SensorStatus.NO_SENSOR -> {
@@ -136,7 +138,7 @@ object StepsDocument {
                 dataDocument(
                     snapshot ?: return@buildList, units, syntax, sessions,
                     expandedSessionIds, sessionMetric, zone, onToggleSession,
-                    sessionToggleLabel, controls
+                    sessionToggleLabel, controls, externalSteps
                 )
             )
         }
@@ -152,7 +154,8 @@ object StepsDocument {
         zone: ZoneId,
         onToggleSession: (Long) -> Unit,
         sessionToggleLabel: (String) -> String,
-        controls: SessionControls
+        controls: SessionControls,
+        externalSteps: List<OriginSteps>
     ): List<CanvasLine> = buildList {
         add(punctLine("{", 0, syntax))
         add(stringLine("date", snapshot.date.toString(), comma = true, syntax, indent = 1))
@@ -211,10 +214,14 @@ object StepsDocument {
             )
         )
 
+        val hasExternal = externalSteps.isNotEmpty()
         addSessions(
-            sessions, expandedSessionIds, hasGoal, units, sessionMetric, zone, syntax,
-            onToggleSession, sessionToggleLabel, controls
+            sessions, expandedSessionIds, hasGoal || hasExternal, units, sessionMetric,
+            zone, syntax, onToggleSession, sessionToggleLabel, controls
         )
+        if (hasExternal) {
+            addExternalSteps(externalSteps, trailingComma = hasGoal, syntax)
+        }
         if (hasGoal) {
             add(numberLine("streak_days", snapshot.streakDays.toString(), comma = false, syntax, indent = 1))
         }
@@ -449,6 +456,40 @@ object StepsDocument {
                 val key = if (units == UnitsSystem.METRIC) "avg_pace_min_km" else "avg_pace_min_mi"
                 PendingLine { comma, s -> stringLine(key, pace, comma, s, indent = 3) }
             }
+    }
+
+    /**
+     * Fase 12: what other apps counted today, read from Health Connect. Grouped
+     * per origin and NEVER summed — two apps may have watched the same walk, so
+     * adding them would double-count; showing them side by side cannot. The
+     * block exists only while sync is on and something external was read.
+     */
+    private fun MutableList<CanvasLine>.addExternalSteps(
+        origins: List<OriginSteps>,
+        trailingComma: Boolean,
+        syntax: SyntaxColors
+    ) {
+        add(
+            CodeLine(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = syntax.key)) { append("\"health_connect\"") }
+                    withStyle(SpanStyle(color = syntax.comment)) { append(": {") }
+                    withStyle(SpanStyle(color = syntax.comment.copy(alpha = 0.6f))) {
+                        append("  // other apps' steps — shown, never added")
+                    }
+                },
+                indent = 1
+            )
+        )
+        origins.forEachIndexed { index, origin ->
+            add(
+                numberLine(
+                    origin.label, origin.steps.toString(),
+                    comma = index != origins.lastIndex, syntax, indent = 2
+                )
+            )
+        }
+        add(punctLine(if (trailingComma) "}," else "}", 1, syntax))
     }
 
     /** The honest empty file: a date and an explicit null, never a fake zero. */

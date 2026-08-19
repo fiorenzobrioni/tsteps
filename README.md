@@ -128,8 +128,13 @@ There is no data section with API tables this time, and that is the point:
 | Active calories | MET estimate from weight and active time, clearly labeled |
 | Network | **none. The app does not request the INTERNET permission.** |
 
-Your movement history never leaves the device. Export (JSON/CSV) and Health
-Connect interop are planned phases; both stay under your control.
+Your movement history never leaves the device. Health Connect interop is opt-in
+(off by default): when you enable it, tsteps writes your hourly steps and walk
+sessions to the on-device Health Connect store and shows what other apps counted,
+each source on its own line, never summed into yours. The client is a Jetpack
+library talking local IPC: still no Play Services dependency, still no INTERNET
+permission. Export (JSON/CSV) is a planned phase; everything stays under your
+control.
 
 ---
 

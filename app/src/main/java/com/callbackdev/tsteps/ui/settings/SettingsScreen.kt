@@ -58,6 +58,10 @@ import com.callbackdev.tsteps.data.AppSettings
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsRanges
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
+import com.callbackdev.tsteps.healthconnect.HcAvailability
+import com.callbackdev.tsteps.healthconnect.HcPermissions
+import com.callbackdev.tsteps.healthconnect.HcSectionStatus
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeCanvas
 import com.callbackdev.tsteps.ui.components.CodeLine
@@ -87,6 +91,7 @@ class SettingsActions(
     val onGoalCheck: (Boolean) -> Unit,
     val onDailyGoal: (Int) -> Unit,
     val onAutoDetect: (Boolean) -> Unit,
+    val onHealthConnect: (Boolean) -> Unit,
     val onWeight: (Double?) -> Unit,
     val onHeight: (Int?) -> Unit,
     val onToggleUnits: () -> Unit,
@@ -182,6 +187,20 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
         else -> NotifLineState.MissingPermission
     }
 
+    // Health Connect (Fase 12): availability is a cheap local check, granted
+    // permissions one IPC — both refreshed on the same resume epochs (grants
+    // and revokes happen on HC's own screens while tsteps is paused).
+    var hcStatus by remember { mutableStateOf(HcSectionStatus()) }
+    LaunchedEffect(permissionEpoch) {
+        hcStatus = HcPermissions.sectionStatus(AndroidHealthConnectGateway(context))
+    }
+    val hcLauncher = rememberLauncherForActivityResult(HcPermissions.requestContract()) { granted ->
+        permissionEpoch++
+        // Whatever subset the user granted is what the sync will do; nothing
+        // granted leaves the toggle off — the default is preserved.
+        if (granted.isNotEmpty()) viewModel.setHealthConnectSync(true)
+    }
+
     /** Turning a notification toggle ON without the permission asks for it first. */
     fun gated(setter: (Boolean) -> Unit): (Boolean) -> Unit = { enabled ->
         if (enabled && !hasNotifPermission) {
@@ -199,6 +218,15 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
     SettingsScreen(
         settings = settings,
         notifState = notifState,
+        hcStatus = hcStatus,
+        onHcLine = {
+            when (hcStatus.availability) {
+                HcAvailability.UPDATE_REQUIRED -> uriHandler.openUri(
+                    "https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata"
+                )
+                else -> hcLauncher.launch(HcPermissions.ALL)
+            }
+        },
         onNotifLine = {
             when (notifState) {
                 NotifLineState.MissingPermission ->
@@ -214,6 +242,15 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
             onGoalCheck = gated(viewModel::setNotifGoalCheck),
             onDailyGoal = viewModel::setDailyGoalSteps,
             onAutoDetect = viewModel::setAutoDetectSessions,
+            onHealthConnect = { enabled ->
+                when {
+                    !enabled -> viewModel.setHealthConnectSync(false)
+                    hcStatus.anyGranted -> viewModel.setHealthConnectSync(true)
+                    // The section above the toggle IS the plain-language
+                    // explanation; the request follows it, never precedes it.
+                    else -> hcLauncher.launch(HcPermissions.ALL)
+                }
+            },
             onWeight = viewModel::setWeightKg,
             onHeight = viewModel::setHeightCm,
             onToggleUnits = viewModel::toggleUnits,
@@ -232,6 +269,8 @@ fun SettingsScreen(
     actions: SettingsActions,
     notifState: NotifLineState = NotifLineState.Armed,
     onNotifLine: () -> Unit = {},
+    hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE),
+    onHcLine: () -> Unit = {},
     canvasState: LazyListState = rememberLazyListState()
 ) {
     val syntax = TstepsTheme.syntax
@@ -299,6 +338,9 @@ fun SettingsScreen(
         notifState = notifState,
         notifLabel = resources.getString(R.string.cd_grant_notifications),
         onNotifLine = onNotifLine,
+        hcStatus = hcStatus,
+        hcGrantLabel = resources.getString(R.string.cd_grant_health),
+        onHcLine = onHcLine,
         changeLabel = { key -> resources.getString(R.string.cd_change_setting, key) },
         openLabel = { name -> resources.getString(R.string.cd_open_link, name) },
         editing = editing,
@@ -401,6 +443,9 @@ private fun buildSettingsLines(
     notifState: NotifLineState,
     notifLabel: String,
     onNotifLine: () -> Unit,
+    hcStatus: HcSectionStatus,
+    hcGrantLabel: String,
+    onHcLine: () -> Unit,
     changeLabel: (String) -> String,
     openLabel: (String) -> String,
     editing: NumericField?,
@@ -597,6 +642,74 @@ private fun buildSettingsLines(
         onClickLabel = changeLabel("goal_check")) {
         actions.onGoalCheck(!settings.notifications.goalCheck)
     })
+    add(punctLine("},", 1, syntax))
+
+    // Fase 12: Health Connect interop, opt-in and default off. These comments
+    // are the plain-language explanation required BEFORE any permission request
+    // — and where the HC rationale intents land.
+    add(keyOpenLine("health_connect", 1, syntax))
+    add(commentLine("// on-device interop with other health apps — no network", syntax, indent = 2))
+    add(commentLine("// writes: hourly steps + walk sessions · reads: their steps", syntax, indent = 2))
+    add(commentLine("// external steps are shown, never added to yours", syntax, indent = 2))
+    when (hcStatus.availability) {
+        HcAvailability.UNAVAILABLE -> add(
+            CodeLine(
+                AnnotatedString(
+                    "// E: Health Connect is not available on this device",
+                    SpanStyle(color = syntax.diffDel)
+                ),
+                indent = 2
+            )
+        )
+        HcAvailability.UPDATE_REQUIRED -> add(
+            CodeLine(
+                AnnotatedString(
+                    "// E: Health Connect needs an update — tap to open",
+                    SpanStyle(color = syntax.diffDel)
+                ),
+                indent = 2,
+                onClick = onHcLine,
+                onClickLabel = openLabel("Health Connect")
+            )
+        )
+        HcAvailability.AVAILABLE -> {
+            if (settings.healthConnect.sync) {
+                if (hcStatus.anyGranted) {
+                    val verbs = listOfNotNull(
+                        "writes steps".takeIf { hcStatus.writeSteps },
+                        "writes sessions".takeIf { hcStatus.writeSessions },
+                        "reads other apps".takeIf { hcStatus.readSteps }
+                    ).joinToString(" · ")
+                    add(
+                        CodeLine(
+                            AnnotatedString(
+                                "// connected: $verbs",
+                                SpanStyle(color = syntax.comment.copy(alpha = 0.6f))
+                            ),
+                            indent = 2
+                        )
+                    )
+                } else {
+                    add(
+                        CodeLine(
+                            AnnotatedString(
+                                "// ERROR: no permission granted — tap to grant",
+                                SpanStyle(color = syntax.diffDel)
+                            ),
+                            indent = 2,
+                            onClick = onHcLine,
+                            onClickLabel = hcGrantLabel
+                        )
+                    )
+                }
+            }
+            add(boolLine("sync", settings.healthConnect.sync, comma = false,
+                hint = "// asks Health Connect first", syntax = syntax,
+                onClickLabel = changeLabel("sync")) {
+                actions.onHealthConnect(!settings.healthConnect.sync)
+            })
+        }
+    }
     add(punctLine("},", 1, syntax))
 
     // Read-only About block; the license/credit lines open the related site.
@@ -822,7 +935,7 @@ private fun SettingsScreenPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }
@@ -833,7 +946,7 @@ private fun SettingsScreenDefaultsPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }

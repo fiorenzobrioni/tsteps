@@ -42,6 +42,9 @@ class StepSyncWorker(
         // extra sensing, just arithmetic on data already paid for. Before the
         // widget repaint, so a fresh walk shows up in `# last walk` right away.
         ServiceLocator.autoSessionDetector(applicationContext).run()
+        // Fase 12: reconcile Health Connect after detection so a fresh auto walk
+        // ships in the same pass. Inert (one in-memory read) while sync is off.
+        ServiceLocator.healthConnectSync(applicationContext).sync()
         TstepsWidgetUpdater.updateAll(applicationContext)
         return Result.success()
     }

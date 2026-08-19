@@ -26,6 +26,9 @@ import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.domain.Streaks
+import com.callbackdev.tsteps.healthconnect.ExternalStepsState
+import com.callbackdev.tsteps.healthconnect.HcStateStore
+import com.callbackdev.tsteps.healthconnect.OriginSteps
 import com.callbackdev.tsteps.work.SyncScheduler
 import java.time.Clock
 import java.time.LocalDate
@@ -42,6 +45,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -58,6 +62,8 @@ data class StepsUiState(
     val expandedSessions: Set<Long> = emptySet(),
     /** Committed days, for the README's week table and footer. */
     val history: List<DayStats> = emptyList(),
+    /** What other apps counted today (Fase 12) — shown, never added. */
+    val externalSteps: List<OriginSteps> = emptyList(),
     val zone: ZoneId = ZoneId.systemDefault(),
     /** Date of the newest committed day, for the status bar's `Last commit:`. */
     val lastCommitDate: LocalDate? = null
@@ -70,7 +76,10 @@ class StepsViewModel(
     private val hasPermission: () -> Boolean,
     private val workspaceStore: WorkspaceStore? = null,
     trackingManager: TrackingManager? = null,
-    private val clock: Clock = Clock.systemDefaultZone()
+    private val hcStateStore: HcStateStore? = null,
+    private val clock: Clock = Clock.systemDefaultZone(),
+    /** Fase 12: ships an [rm]/resize to Health Connect right away (inert when off). */
+    private val onSessionsMutated: suspend () -> Unit = {}
 ) : ViewModel() {
 
     /** The live session, for the FAB's running-state and the status bar chip. */
@@ -102,12 +111,18 @@ class StepsViewModel(
 
     /** `[rm]` (confirmed): a tombstone, so the detector never re-creates it. */
     fun removeSession(id: Long) {
-        viewModelScope.launch { repository.dismissSession(id, clock.millis()) }
+        viewModelScope.launch {
+            repository.dismissSession(id, clock.millis())
+            onSessionsMutated()
+        }
     }
 
     /** Boundary edit (auto sessions): steps and metrics follow the new range. */
     fun resizeSession(id: Long, startMillis: Long, endMillis: Long) {
-        viewModelScope.launch { repository.resizeSession(id, startMillis, endMillis) }
+        viewModelScope.launch {
+            repository.resizeSession(id, startMillis, endMillis)
+            onSessionsMutated()
+        }
     }
 
     /**
@@ -158,10 +173,17 @@ class StepsViewModel(
             ) { rows, sessions -> Triple(date, rows, sessions) }
         },
         repository.observeHistory(),
-        settingsStore.settings,
+        // Paired upstream: combine tops out at five flows and these two always
+        // travel together (the external block only exists while sync is on).
+        combine(
+            settingsStore.settings,
+            hcStateStore?.external ?: flowOf<ExternalStepsState?>(null),
+            ::Pair
+        ),
         permissionGranted,
         expandedSessions
-    ) { (date, hourlyRows, sessionRows), history, settings, granted, expandedIds ->
+    ) { (date, hourlyRows, sessionRows), history, settingsAndHc, granted, expandedIds ->
+        val (settings, hcExternal) = settingsAndHc
         StepsUiState(
             snapshot = snapshot(date, hourlyRows, history, settings),
             status = when {
@@ -173,6 +195,9 @@ class StepsViewModel(
             sessionMetric = settings.sessionMetric,
             sessions = sessionRows.mapNotNull { it.toItem() },
             expandedSessions = expandedIds,
+            externalSteps = hcExternal
+                ?.takeIf { settings.healthConnect.sync && it.date == date }
+                ?.origins.orEmpty(),
             history = history.map {
                 DayStats(LocalDate.parse(it.date), it.steps, it.distanceMeters, it.activeMinutes)
             },
@@ -224,7 +249,9 @@ class StepsViewModel(
                     source = ServiceLocator.stepSensorReader(app),
                     hasPermission = { SyncScheduler.hasPermission(app) },
                     workspaceStore = ServiceLocator.workspaceStore(app),
-                    trackingManager = ServiceLocator.trackingManager(app)
+                    trackingManager = ServiceLocator.trackingManager(app),
+                    hcStateStore = ServiceLocator.hcStateStore(app),
+                    onSessionsMutated = { ServiceLocator.healthConnectSync(app).sync() }
                 )
             }
         }
