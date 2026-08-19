@@ -15,6 +15,7 @@ import com.callbackdev.tsteps.MainActivity
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.TrackingState
+import com.callbackdev.tsteps.data.TranscriptEntry
 import com.callbackdev.tsteps.notifications.GoalWatcher
 import com.callbackdev.tsteps.widget.TstepsWidgetUpdater
 import java.util.Locale
@@ -161,10 +162,27 @@ class TrackingService : Service() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        // Expanded shade (device feedback): the tail of the transcript, exactly
+        // as the buffer prints it — expanding the notification scrolls the
+        // process. Collapsed stays the single live line.
+        val expanded = buildString {
+            state?.transcript?.takeLast(TRANSCRIPT_TAIL)?.forEach { entry ->
+                when (entry) {
+                    is TranscriptEntry.Minute -> appendLine(
+                        "${formatElapsed(entry.elapsedMillis)}  ${entry.steps} steps  " +
+                            "%.1f km".format(Locale.ROOT, entry.distanceMeters / 1_000.0)
+                    )
+                    TranscriptEntry.Paused -> appendLine("^Z  paused")
+                    TranscriptEntry.Resumed -> appendLine("fg  resumed")
+                }
+            }
+            append(text)
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_tsteps)
             .setContentTitle(title)
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(expanded))
             .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -192,6 +210,9 @@ class TrackingService : Service() {
         private const val CHANNEL_ID = "tracking"
         private const val NOTIFICATION_ID = 1
         private const val INGEST_SPACING_MS = 2_000L
+
+        /** Transcript lines mirrored into the expanded notification. */
+        private const val TRANSCRIPT_TAIL = 4
 
         private const val ACTION_START = "com.callbackdev.tsteps.tracking.START"
         private const val ACTION_PAUSE = "com.callbackdev.tsteps.tracking.PAUSE"

@@ -19,6 +19,8 @@ class StepsNotificationsTest {
     private val resources =
         ApplicationProvider.getApplicationContext<android.content.Context>().resources
 
+    private val hash = CommitHash.of(LocalDate.parse("2026-08-17"))
+
     private fun day(goalSteps: Int = 10_000, goalMet: Boolean? = true, kcal: Double? = 421.0) =
         DaySummaryEntity(
             date = "2026-08-17",
@@ -31,38 +33,67 @@ class StepsNotificationsTest {
         )
 
     @Test
-    fun `daily commit - localized title, terminal body with hash and check`() {
+    fun `daily commit - localized title, one-line summary, git-log expansion`() {
         val content = StepsNotifications.dailyCommit(
             day(), UnitsSystem.METRIC, Locale.ENGLISH, resources
         )
         assertEquals("👣 Day committed — 11,204 steps", content.title)
-        val lines = content.body.lines()
-        assertEquals("commit ${CommitHash.of(LocalDate.parse("2026-08-17"))} (Mon 2026-08-17)", lines[0])
-        assertEquals("11,204 steps · 8.3 km · 96 min · 421 kcal", lines[1])
-        assertEquals("✓ goal check passed (11,204 ≥ 10,000)", lines[2])
+        // Collapsed: what the title doesn't already say, verdict as a glyph.
+        assertEquals("commit $hash · 8.3 km · 96 min · ✓", content.summary)
+        assertFalse(content.summary.contains("\n"))
+        // Expanded: the day as `git log` prints it, one fact per line.
+        assertEquals(
+            listOf(
+                "commit $hash",
+                "Date: Mon 2026-08-17",
+                "11,204 steps · 8.3 km · 96 min · 421 kcal",
+                "✓ goal check passed (11,204 ≥ 10,000)",
+                "$ tsteps log"
+            ),
+            content.expanded.lines()
+        )
     }
 
     @Test
-    fun `daily commit without a goal has no check line, without weight no kcal`() {
+    fun `a failed check keeps the summary factual with its glyph`() {
+        val content = StepsNotifications.dailyCommit(
+            day(goalMet = false), UnitsSystem.METRIC, Locale.ENGLISH, resources
+        )
+        assertEquals("commit $hash · 8.3 km · 96 min · ✗", content.summary)
+        assertTrue(
+            content.expanded.lines().contains("✗ goal check failed (11,204 < 10,000)")
+        )
+    }
+
+    @Test
+    fun `daily commit without a goal has no check, without weight no kcal`() {
         val content = StepsNotifications.dailyCommit(
             day(goalSteps = 0, goalMet = null, kcal = null),
             UnitsSystem.METRIC, Locale.ENGLISH, resources
         )
-        assertFalse(content.body.contains("goal check"))
-        assertFalse(content.body.contains("kcal"))
+        assertEquals("commit $hash · 8.3 km · 96 min", content.summary)
+        assertFalse(content.expanded.contains("goal check"))
+        assertFalse(content.expanded.contains("kcal"))
+        assertEquals("$ tsteps log", content.expanded.lines().last())
     }
 
     @Test
-    fun `goal reached - check line, streak and the command hint`() {
+    fun `goal reached - check line collapsed, streak and hint when expanded`() {
         val content = StepsNotifications.goalReached(
             steps = 10_012, goalSteps = 10_000, streakDays = 7,
             locale = Locale.ENGLISH, resources = resources
         )
         assertEquals("✓ Goal reached — 10,012 steps", content.title)
-        val lines = content.body.lines()
-        assertEquals("✓ goal check passed (10,012 ≥ 10,000)", lines[0])
-        assertEquals("streak: 7 days", lines[1])
-        assertEquals("$ tsteps log --today", lines[2])
+        assertEquals("✓ goal check passed (10,012 ≥ 10,000)", content.summary)
+        assertFalse(content.summary.contains("\n"))
+        assertEquals(
+            listOf(
+                "✓ goal check passed (10,012 ≥ 10,000)",
+                "streak: 7 days",
+                "$ tsteps log --today"
+            ),
+            content.expanded.lines()
+        )
     }
 
     @Test
@@ -70,6 +101,6 @@ class StepsNotificationsTest {
         val content = StepsNotifications.goalReached(
             10_012, 10_000, streakDays = 1, locale = Locale.ENGLISH, resources = resources
         )
-        assertTrue(content.body.lines().none { it.startsWith("streak") })
+        assertTrue(content.expanded.lines().none { it.startsWith("streak") })
     }
 }

@@ -65,8 +65,10 @@ object StepsNotifier {
     ) = NotificationCompat.Builder(context, channel)
         .setSmallIcon(R.drawable.ic_stat_tsteps)
         .setContentTitle(content.title)
-        .setContentText(content.body.lineSequence().first())
-        .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+        // Collapsed = the one-line summary; expanded = the same facts one per
+        // line (device feedback: give the message room when the shade does).
+        .setContentText(content.summary)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(content.expanded))
         .setContentIntent(
             PendingIntent.getActivity(
                 context,

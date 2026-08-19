@@ -14,12 +14,23 @@ import java.util.Locale
 /**
  * The two notifications' content, pure and testable. Same l10n rule as every
  * screen: the TITLE is chrome (localized, emoji included tweather-style), the
- * BODY is terminal output (English by design) — the commit itself, the check
- * line, a command hint.
+ * body is terminal output (English by design).
+ *
+ * Two shapes per notification (device feedback): the collapsed shade gets ONE
+ * compact line ([Content.summary]), the expanded shade gets the same facts one
+ * per line ([Content.expanded]) — a commit reads like `git log` when you give
+ * it room, and gets out of the way when you don't.
  */
 object StepsNotifications {
 
-    data class Content(val title: String, val body: String)
+    data class Content(
+        /** Chrome, localized. */
+        val title: String,
+        /** Collapsed shade: one compact terminal line, never wraps on `\n`. */
+        val summary: String,
+        /** Expanded shade (BigTextStyle): the same facts, one per line. */
+        val expanded: String
+    )
 
     /** The closed day's commit message — what the log will show, in the shade. */
     fun dailyCommit(
@@ -30,26 +41,43 @@ object StepsNotifications {
     ): Content {
         val numbers = NumberFormat.getIntegerInstance(locale)
         val date = LocalDate.parse(day.date)
-        val body = buildString {
-            append("commit ${CommitHash.of(date)} (${DayName.format(date)} ${day.date})\n")
-            append(numbers.format(day.steps))
-            append(" steps · ${UnitFormat.distance(day.distanceMeters, units)}")
-            append(" · ${day.activeMinutes} min")
+        val hash = CommitHash.of(date)
+        val distance = UnitFormat.distance(day.distanceMeters, units)
+
+        val metrics = buildString {
+            append("${numbers.format(day.steps)} steps · $distance · ${day.activeMinutes} min")
             day.activeKcal?.let { append(" · ${numbers.format(it.toInt())} kcal") }
-            if (day.goalSteps > 0 && day.goalMet != null) {
-                val (glyph, verdict, relation) =
-                    if (day.goalMet) Triple("✓", "passed", "≥") else Triple("✗", "failed", "<")
-                append(
-                    "\n$glyph goal check $verdict " +
-                        "(${numbers.format(day.steps)} $relation ${numbers.format(day.goalSteps)})"
-                )
-            }
         }
+        val goalGlyph: String?
+        val checkLine: String?
+        if (day.goalSteps > 0 && day.goalMet != null) {
+            goalGlyph = if (day.goalMet) "✓" else "✗"
+            val verdict = if (day.goalMet) "passed" else "failed"
+            val relation = if (day.goalMet) "≥" else "<"
+            checkLine = "$goalGlyph goal check $verdict " +
+                "(${numbers.format(day.steps)} $relation ${numbers.format(day.goalSteps)})"
+        } else {
+            goalGlyph = null
+            checkLine = null
+        }
+
         return Content(
             title = resources.getString(
                 R.string.notif_title_daily_commit, "👣", numbers.format(day.steps)
             ),
-            body = body
+            // The title already carries the steps: the summary adds what it
+            // doesn't say — hash, distance, time, the verdict as a bare glyph.
+            summary = listOfNotNull(
+                "commit $hash", distance, "${day.activeMinutes} min", goalGlyph
+            ).joinToString(" · "),
+            // Expanded: the day as `git log` would print it.
+            expanded = buildString {
+                appendLine("commit $hash")
+                appendLine("Date: ${DayName.format(date)} ${day.date}")
+                appendLine(metrics)
+                checkLine?.let { appendLine(it) }
+                append("$ tsteps log")
+            }
         )
     }
 
@@ -62,16 +90,18 @@ object StepsNotifications {
         resources: Resources
     ): Content {
         val numbers = NumberFormat.getIntegerInstance(locale)
-        val body = buildString {
-            append("✓ goal check passed (${numbers.format(steps)} ≥ ${numbers.format(goalSteps)})")
-            if (streakDays > 1) append("\nstreak: $streakDays days")
-            append("\n$ tsteps log --today")
-        }
+        val checkLine =
+            "✓ goal check passed (${numbers.format(steps)} ≥ ${numbers.format(goalSteps)})"
         return Content(
             title = resources.getString(
                 R.string.notif_title_goal, "✓", numbers.format(steps)
             ),
-            body = body
+            summary = checkLine,
+            expanded = buildString {
+                appendLine(checkLine)
+                if (streakDays > 1) appendLine("streak: $streakDays days")
+                append("$ tsteps log --today")
+            }
         )
     }
 
