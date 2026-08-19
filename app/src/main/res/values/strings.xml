@@ -22,6 +22,9 @@
     <string name="cd_start_track">Start a tracked walk</string>
     <string name="cd_open_track">Open the running session</string>
     <string name="cd_toggle_session">Expand or collapse the %1$s session</string>
+    <string name="cd_remove_session">Remove the %1$s session</string>
+    <string name="cd_confirm_remove_session">Confirm removing the %1$s session</string>
+    <string name="cd_edit_session">Edit the start and end of the %1$s session</string>
     <string name="cd_pause_track">Pause the session</string>
     <string name="cd_resume_track">Resume the session</string>
     <string name="cd_stop_track">Stop the session</string>

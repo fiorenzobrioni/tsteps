@@ -108,7 +108,11 @@ object StepsReadme {
                     ),
                     rows = sessions.map { session ->
                         listOf(
-                            TableCell(UnitFormat.clockTime(session.startMillis, zone)),
+                            TableCell(
+                                UnitFormat.clockTime(
+                                    session.startMillis, zone, session.startApprox
+                                )
+                            ),
                             TableCell(session.activeMinutes.toString()),
                             TableCell(numbers.format(session.steps)),
                             TableCell(UnitFormat.distance(session.distanceMeters, units))

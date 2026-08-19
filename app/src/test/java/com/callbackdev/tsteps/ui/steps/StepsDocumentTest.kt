@@ -4,13 +4,16 @@ import androidx.compose.ui.graphics.Color
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.SessionItem
+import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
+import com.callbackdev.tsteps.ui.components.WidgetLine
 import com.callbackdev.tsteps.ui.theme.ObsidianSyntax
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,9 +38,12 @@ class StepsDocumentTest {
         streakDays = streak
     )
 
-    private fun List<CodeLine>.lineWith(sub: String): CodeLine {
-        val line = firstOrNull { it.text.text.contains(sub) }
-        assertNotNull("no line contains '$sub' in:\n${joinToString("\n") { it.text.text }}", line)
+    private fun List<CanvasLine>.texts(): List<String> =
+        filterIsInstance<CodeLine>().map { it.text.text }
+
+    private fun List<CanvasLine>.lineWith(sub: String): CodeLine {
+        val line = filterIsInstance<CodeLine>().firstOrNull { it.text.text.contains(sub) }
+        assertNotNull("no line contains '$sub' in:\n${texts().joinToString("\n")}", line)
         return line!!
     }
 
@@ -56,7 +62,8 @@ class StepsDocumentTest {
         expandedIds: Set<Long> = emptySet(),
         sessionMetric: SessionMetric = SessionMetric.SPEED,
         onGrant: (() -> Unit)? = null,
-        onToggleSession: (Long) -> Unit = {}
+        onToggleSession: (Long) -> Unit = {},
+        controls: SessionControls = SessionControls()
     ) = StepsDocument.build(
         snapshot = snapshot,
         status = status,
@@ -68,7 +75,8 @@ class StepsDocumentTest {
         zone = rome,
         onGrantPermission = onGrant,
         grantClickLabel = "grant",
-        onToggleSession = onToggleSession
+        onToggleSession = onToggleSession,
+        controls = controls
     )
 
     private fun session(
@@ -77,7 +85,10 @@ class StepsDocumentTest {
         activeMin: Int = 46,
         steps: Long = 4_820,
         meters: Double = 3_400.0,
-        cadence: Int? = 105
+        cadence: Int? = 105,
+        auto: Boolean = false,
+        startApprox: Boolean = auto,
+        endApprox: Boolean = auto
     ) = SessionItem(
         id = id,
         startMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli(),
@@ -87,7 +98,10 @@ class StepsDocumentTest {
         steps = steps,
         distanceMeters = meters,
         activeMillis = activeMin * 60_000L,
-        avgCadenceSpm = cadence
+        avgCadenceSpm = cadence,
+        auto = auto,
+        startApprox = startApprox,
+        endApprox = endApprox
     )
 
     @Test
@@ -118,22 +132,22 @@ class StepsDocumentTest {
         val lines = build(units = UnitsSystem.IMPERIAL)
         // 6123 m = 3.8 mi
         assertEquals(syntax.number, lines.lineWith("\"distance_mi\"").colorOf("3.8"))
-        assertTrue(lines.none { it.text.text.contains("distance_km") })
+        assertTrue(lines.texts().none { it.contains("distance_km") })
     }
 
     @Test
     fun `no goal means no goal, no check, no streak`() {
         val lines = build(snapshot = snapshot(goal = 0))
-        assertTrue(lines.none { it.text.text.contains("\"goal\"") })
-        assertTrue(lines.none { it.text.text.contains("\"check\"") })
-        assertTrue(lines.none { it.text.text.contains("\"streak_days\"") })
+        assertTrue(lines.texts().none { it.contains("\"goal\"") })
+        assertTrue(lines.texts().none { it.contains("\"check\"") })
+        assertTrue(lines.texts().none { it.contains("\"streak_days\"") })
         lines.lineWith("\"count\"")
     }
 
     @Test
     fun `kcal without a weight is a hint, not a number`() {
         val lines = build(snapshot = snapshot(kcal = null))
-        assertTrue(lines.none { it.text.text.contains("\"active_kcal\"") })
+        assertTrue(lines.texts().none { it.contains("\"active_kcal\"") })
         lines.lineWith("// active_kcal: set profile.weight_kg to enable")
     }
 
@@ -148,14 +162,14 @@ class StepsDocumentTest {
         assertTrue(granted)
         // The data below is an honest null, not a fake zero.
         assertEquals(syntax.comment, lines.lineWith("\"steps\"").colorOf("null"))
-        assertTrue(lines.none { it.text.text.contains("\"count\"") })
+        assertTrue(lines.texts().none { it.contains("\"count\"") })
     }
 
     @Test
     fun `missing sensor renders the compiler-style error`() {
         val lines = build(status = SensorStatus.NO_SENSOR)
         lines.lineWith("// E: no step sensor on this device")
-        assertTrue(lines.none { it.text.text.contains("grant activity-recognition") })
+        assertTrue(lines.texts().none { it.contains("grant activity-recognition") })
         assertEquals(syntax.comment, lines.lineWith("\"steps\"").colorOf("null"))
     }
 
@@ -179,7 +193,7 @@ class StepsDocumentTest {
         // 3.4 km in 46 min = 4.4 km/h
         lines.lineWith("\"avg_speed_kmh\": 4.4")
         lines.lineWith("\"avg_cadence_spm\": 105")
-        assertTrue(lines.none { it.text.text.contains("avg_pace") })
+        assertTrue(lines.texts().none { it.contains("avg_pace") })
     }
 
     @Test
@@ -191,7 +205,7 @@ class StepsDocumentTest {
         )
         // 46 min over 3.4 km = 13:32 min/km
         lines.lineWith("\"avg_pace_min_km\": \"13:32\"")
-        assertTrue(lines.none { it.text.text.contains("avg_speed") })
+        assertTrue(lines.texts().none { it.contains("avg_speed") })
     }
 
     @Test
@@ -200,5 +214,89 @@ class StepsDocumentTest {
         val lines = build(sessions = listOf(session()), onToggleSession = { toggled = it })
         lines.lineWith("\"time\": \"09:32\"").onClick!!.invoke()
         assertEquals(1L, toggled)
+    }
+
+    // --- Fase 11: auto sessions, [rm], boundary editing ----------------------
+
+    @Test
+    fun `an auto session wears tildes inline and its source in the detail`() {
+        val inline = build(sessions = listOf(session(auto = true)))
+        inline.lineWith("\"time\": \"~09:32\"")
+
+        val expanded = build(sessions = listOf(session(auto = true)), expandedIds = setOf(1L))
+        expanded.lineWith("\"start\": \"~09:32\"")
+        expanded.lineWith("\"end\": \"~10:18\"")
+        assertTrue(expanded.lineWith("\"source\": \"auto\"").text.text.contains("// inferred"))
+    }
+
+    @Test
+    fun `a user-edited boundary drops its tilde, the other keeps it`() {
+        val lines = build(
+            sessions = listOf(session(auto = true, startApprox = false)),
+            expandedIds = setOf(1L)
+        )
+        lines.lineWith("\"start\": \"09:32\"")
+        lines.lineWith("\"end\": \"~10:18\"")
+    }
+
+    @Test
+    fun `manual sessions have no source line and no editable boundaries`() {
+        val lines = build(sessions = listOf(session()), expandedIds = setOf(1L))
+        assertTrue(lines.texts().none { it.contains("\"source\"") })
+        assertNull(lines.lineWith("\"start\": \"09:32\"").onClick)
+    }
+
+    @Test
+    fun `rm arms on the first tap and removes on the second`() {
+        var removed: Long? = null
+        var armed: Long? = null
+        val controls = SessionControls(
+            onRemove = { s -> if (armed == s.id) removed = s.id else armed = s.id }
+        )
+        val lines = build(
+            sessions = listOf(session(auto = true)), expandedIds = setOf(1L),
+            controls = controls
+        )
+        lines.lineWith("[rm]").onClick!!.invoke()
+        assertEquals(1L, armed)
+        assertNull(removed)
+
+        // Re-rendered armed: deletion-red confirm hint, second tap removes.
+        val armedLines = build(
+            sessions = listOf(session(auto = true)), expandedIds = setOf(1L),
+            controls = controls.copy(armedRemoveId = 1L)
+        )
+        val rm = armedLines.lineWith("[rm]")
+        assertTrue(rm.text.text.contains("// tap again to remove"))
+        assertEquals(syntax.diffDel, rm.colorOf("[rm]"))
+        rm.onClick!!.invoke()
+        assertEquals(1L, removed)
+    }
+
+    @Test
+    fun `editing swaps start and end for one range prompt with its error line`() {
+        val lines = build(
+            sessions = listOf(session(auto = true)), expandedIds = setOf(1L),
+            controls = SessionControls(
+                editingId = 1L,
+                editValue = "09:32..10:18",
+                editError = "// ERROR: expected HH:mm..HH:mm"
+            )
+        )
+        assertTrue(lines.texts().none { it.contains("\"start\": ") })
+        assertTrue(lines.texts().none { it.contains("\"end\": ") })
+        assertTrue(lines.any { it is WidgetLine })
+        lines.lineWith("// ERROR: expected HH:mm..HH:mm")
+    }
+
+    @Test
+    fun `tapping an auto start line opens the editor`() {
+        var editing: SessionItem? = null
+        val lines = build(
+            sessions = listOf(session(auto = true)), expandedIds = setOf(1L),
+            controls = SessionControls(onStartEdit = { editing = it })
+        )
+        lines.lineWith("\"start\": \"~09:32\"").onClick!!.invoke()
+        assertEquals(1L, editing?.id)
     }
 }

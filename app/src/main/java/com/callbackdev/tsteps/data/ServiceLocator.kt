@@ -43,7 +43,7 @@ object ServiceLocator {
                 TstepsDatabase::class.java,
                 "tsteps.db"
             )
-                .addMigrations(TstepsDatabase.MIGRATION_1_2)
+                .addMigrations(TstepsDatabase.MIGRATION_1_2, TstepsDatabase.MIGRATION_2_3)
                 .build().also { database = it }
         }
 
@@ -65,6 +65,7 @@ object ServiceLocator {
                 hourlyDao = database(context).hourlyStepsDao(),
                 dayDao = database(context).daySummaryDao(),
                 sessionDao = database(context).sessionDao(),
+                sampleDao = database(context).stepSampleDao(),
                 trackerStateStore = trackerStateStore(context),
                 settingsStore = settingsStore(context)
             ).also { stepRepository = it }
@@ -95,6 +96,20 @@ object ServiceLocator {
                 settingsStore = settingsStore(context)
             ).also { trackingManager = it }
         }
+
+    /**
+     * Stateless orchestration, built fresh per call (the workers are its only
+     * clients): all state lives in the DAOs and stores it reads.
+     */
+    fun autoSessionDetector(context: Context): AutoSessionDetector =
+        AutoSessionDetector(
+            sessionDao = database(context).sessionDao(),
+            sampleDao = database(context).stepSampleDao(),
+            settingsStore = settingsStore(context),
+            trackingStartMillis = {
+                trackingManager(context).state.value?.session?.startMillis
+            }
+        )
 
     /**
      * Test-only: swap dependencies for worker tests. Calling with no arguments

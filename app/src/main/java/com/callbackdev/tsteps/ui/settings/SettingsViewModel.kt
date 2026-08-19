@@ -32,6 +32,9 @@ class SettingsViewModel(
     fun setHeightCm(heightCm: Int?) = save { setHeightCm(heightCm) }
     fun setThemeProfile(name: String) = save { setThemeProfileName(name) }
 
+    /** `sessions.auto_detect` — Fase 11's opt-in switch, default off. */
+    fun setAutoDetectSessions(enabled: Boolean) = save { setAutoDetectSessions(enabled) }
+
     fun toggleUnits() = save {
         setUnits(
             if (this@SettingsViewModel.settings.value.units == UnitsSystem.METRIC) {

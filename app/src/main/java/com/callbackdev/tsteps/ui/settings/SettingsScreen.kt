@@ -86,6 +86,7 @@ class SettingsActions(
     val onDailyCommit: (Boolean) -> Unit,
     val onGoalCheck: (Boolean) -> Unit,
     val onDailyGoal: (Int) -> Unit,
+    val onAutoDetect: (Boolean) -> Unit,
     val onWeight: (Double?) -> Unit,
     val onHeight: (Int?) -> Unit,
     val onToggleUnits: () -> Unit,
@@ -212,6 +213,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
             onDailyCommit = gated(viewModel::setNotifDailyCommit),
             onGoalCheck = gated(viewModel::setNotifGoalCheck),
             onDailyGoal = viewModel::setDailyGoalSteps,
+            onAutoDetect = viewModel::setAutoDetectSessions,
             onWeight = viewModel::setWeightKg,
             onHeight = viewModel::setHeightCm,
             onToggleUnits = viewModel::toggleUnits,
@@ -451,6 +453,17 @@ private fun buildSettingsLines(
         cancelLabel = cancelLabel,
         inputError = inputError
     )
+    add(punctLine("},", 1, syntax))
+
+    // Fase 11: opt-in inference. Off is the default and means genuinely off —
+    // no samples recorded, no detection ran. The hint says what turning it on
+    // buys and how honest it can be about boundaries.
+    add(keyOpenLine("sessions", 1, syntax))
+    add(boolLine("auto_detect", settings.autoDetectSessions, comma = false,
+        hint = "// infers walks from the counter, ~15 min grid", syntax = syntax,
+        onClickLabel = changeLabel("auto_detect")) {
+        actions.onAutoDetect(!settings.autoDetectSessions)
+    })
     add(punctLine("},", 1, syntax))
 
     add(keyOpenLine("profile", 1, syntax))
@@ -809,7 +822,7 @@ private fun SettingsScreenPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }
@@ -820,7 +833,7 @@ private fun SettingsScreenDefaultsPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }

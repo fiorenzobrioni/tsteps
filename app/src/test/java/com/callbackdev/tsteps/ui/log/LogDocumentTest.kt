@@ -20,7 +20,14 @@ class LogDocumentTest {
     private val syntax = ObsidianSyntax
     private val rome = ZoneId.of("Europe/Rome")
 
-    private fun session(start: String, activeMin: Int = 46, steps: Long = 4_820) = SessionItem(
+    private fun session(
+        start: String,
+        activeMin: Int = 46,
+        steps: Long = 4_820,
+        auto: Boolean = false,
+        startApprox: Boolean = auto,
+        endApprox: Boolean = auto
+    ) = SessionItem(
         id = 1L,
         startMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli(),
         endMillis = LocalDateTime.parse(start).atZone(rome).toInstant().toEpochMilli() +
@@ -29,7 +36,10 @@ class LogDocumentTest {
         steps = steps,
         distanceMeters = 3_400.0,
         activeMillis = activeMin * 60_000L,
-        avgCadenceSpm = 105
+        avgCadenceSpm = 105,
+        auto = auto,
+        startApprox = startApprox,
+        endApprox = endApprox
     )
 
     private fun today() = UncommittedToday(
@@ -189,6 +199,26 @@ class LogDocumentTest {
             )
         )
         lines.lineWith("--- week 34 · 3,000 steps (-6,000 vs week 33) ---")
+    }
+
+    @Test
+    fun `an auto walk marks its hunk header with tildes and (auto)`() {
+        val lines = build(
+            today = today(),
+            todaySessions = listOf(session("2026-08-18T09:30:00", auto = true))
+        )
+        lines.lineWith("@@ ~09:30..~10:16 @@ walk (auto)")
+    }
+
+    @Test
+    fun `an edited auto boundary loses only its own tilde`() {
+        val lines = build(
+            today = today(),
+            todaySessions = listOf(
+                session("2026-08-18T09:30:00", auto = true, startApprox = false)
+            )
+        )
+        lines.lineWith("@@ 09:30..~10:16 @@ walk (auto)")
     }
 
     @Test

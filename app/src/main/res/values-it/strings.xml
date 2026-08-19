@@ -18,6 +18,9 @@
     <string name="cd_start_track">Avvia una camminata tracciata</string>
     <string name="cd_open_track">Apri la sessione in corso</string>
     <string name="cd_toggle_session">Espandi o comprimi la sessione delle %1$s</string>
+    <string name="cd_remove_session">Rimuovi la sessione delle %1$s</string>
+    <string name="cd_confirm_remove_session">Conferma la rimozione della sessione delle %1$s</string>
+    <string name="cd_edit_session">Modifica inizio e fine della sessione delle %1$s</string>
     <string name="cd_pause_track">Metti in pausa la sessione</string>
     <string name="cd_resume_track">Riprendi la sessione</string>
     <string name="cd_stop_track">Ferma la sessione</string>

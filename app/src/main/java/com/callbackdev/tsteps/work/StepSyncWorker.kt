@@ -38,6 +38,10 @@ class StepSyncWorker(
         val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
         notifyDailyCommit(committed)
         GoalWatcher.evaluate(applicationContext)
+        // Fase 11: infer walks from the samples this very worker collects — no
+        // extra sensing, just arithmetic on data already paid for. Before the
+        // widget repaint, so a fresh walk shows up in `# last walk` right away.
+        ServiceLocator.autoSessionDetector(applicationContext).run()
         TstepsWidgetUpdater.updateAll(applicationContext)
         return Result.success()
     }

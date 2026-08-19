@@ -100,6 +100,16 @@ class StepsViewModel(
         expandedSessions.update { if (id in it) it - id else it + id }
     }
 
+    /** `[rm]` (confirmed): a tombstone, so the detector never re-creates it. */
+    fun removeSession(id: Long) {
+        viewModelScope.launch { repository.dismissSession(id, clock.millis()) }
+    }
+
+    /** Boundary edit (auto sessions): steps and metrics follow the new range. */
+    fun resizeSession(id: Long, startMillis: Long, endMillis: Long) {
+        viewModelScope.launch { repository.resizeSession(id, startMillis, endMillis) }
+    }
+
     /**
      * Re-checked on every resume (the user may grant or revoke from system
      * settings) and after the in-file grant command returns.

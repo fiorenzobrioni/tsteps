@@ -68,6 +68,7 @@ object TstepsWidgetUpdater {
             ),
             lastWalkStartMillis = lastWalk?.startMillis,
             lastWalkActiveMinutes = lastWalk?.activeMinutes,
+            lastWalkApprox = lastWalk?.startApprox == true,
             lastSyncMillis = anchor?.lastTimestampMillis
         )
         val palette = widgetPalette(settings.themeProfileName)

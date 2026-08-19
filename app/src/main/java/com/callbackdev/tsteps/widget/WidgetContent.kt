@@ -62,6 +62,8 @@ data class WidgetData(
     /** Today's most recent completed walk, for the `# last walk:` comment. */
     val lastWalkStartMillis: Long? = null,
     val lastWalkActiveMinutes: Int? = null,
+    /** Auto-detected start (Fase 11): the comment wears the `~` too. */
+    val lastWalkApprox: Boolean = false,
     /** The continuity anchor's timestamp — when the counter was last read. */
     val lastSyncMillis: Long? = null
 )
@@ -172,7 +174,9 @@ object WidgetContentBuilder {
                 add(kv("Streak", "${data.streakDays} days", TokenRole.NUMBER))
             }
             if (data.lastWalkStartMillis != null && data.lastWalkActiveMinutes != null) {
-                val start = UnitFormat.clockTime(data.lastWalkStartMillis, zone)
+                val start = UnitFormat.clockTime(
+                    data.lastWalkStartMillis, zone, data.lastWalkApprox
+                )
                 add(comment("# last walk: $start (${data.lastWalkActiveMinutes} min)"))
             }
             syncLine?.let { add(it) }

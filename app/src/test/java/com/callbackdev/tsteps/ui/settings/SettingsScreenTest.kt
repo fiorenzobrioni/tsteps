@@ -38,6 +38,7 @@ class SettingsScreenTest {
         var resetCalled = false
 
         var dailyCommit: Boolean? = null
+        var autoDetect: Boolean? = null
 
         fun actions() = SettingsActions(
             onLineNumbers = { lineNumbers = it },
@@ -45,6 +46,7 @@ class SettingsScreenTest {
             onDailyCommit = { dailyCommit = it },
             onGoalCheck = {},
             onDailyGoal = { goal = it },
+            onAutoDetect = { autoDetect = it },
             onWeight = { weight = it },
             onHeight = {},
             onToggleUnits = { unitsToggled = true },
@@ -80,6 +82,13 @@ class SettingsScreenTest {
         val recorded = setContent()
         line("\"line_numbers\": false").performClick()
         assertEquals(true, recorded.lineNumbers)
+    }
+
+    @Test
+    fun `auto_detect defaults to false and flips on tap`() {
+        val recorded = setContent(settings = AppSettings())
+        line("\"auto_detect\": false").performClick()
+        assertEquals(true, recorded.autoDetect)
     }
 
     @Test

@@ -91,6 +91,7 @@ class StepsViewModelTest {
             hourlyDao = database.hourlyStepsDao(),
             dayDao = database.daySummaryDao(),
             sessionDao = database.sessionDao(),
+            sampleDao = database.stepSampleDao(),
             trackerStateStore = trackerStore,
             settingsStore = settingsStore,
             zone = { rome }

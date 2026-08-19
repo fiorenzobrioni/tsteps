@@ -1,13 +1,36 @@
 package com.callbackdev.tsteps.ui.steps
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.domain.SessionMetrics
+import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeLine
+import com.callbackdev.tsteps.ui.components.TerminalInput
+import com.callbackdev.tsteps.ui.components.WidgetLine
 import com.callbackdev.tsteps.ui.components.commentLine
 import com.callbackdev.tsteps.ui.components.punctLine
 import com.callbackdev.tsteps.ui.format.UnitFormat
@@ -48,6 +71,28 @@ enum class SensorStatus {
 }
 
 /**
+ * Today's session verbs (Fase 11), bundled so [StepsDocument.build] stays
+ * readable: which session has `[rm]` armed, which one is editing its
+ * boundaries through the terminal prompt, and the callbacks each control fires.
+ * The working tree is the only place sessions are managed — committed history
+ * stays read-only, like any git history.
+ */
+data class SessionControls(
+    val armedRemoveId: Long? = null,
+    val editingId: Long? = null,
+    val editValue: String = "",
+    val editError: String? = null,
+    val onEditValue: (String) -> Unit = {},
+    val onStartEdit: (SessionItem) -> Unit = {},
+    val onSubmitEdit: () -> Unit = {},
+    val onCancelEdit: () -> Unit = {},
+    val onRemove: (SessionItem) -> Unit = {},
+    val removeLabel: (SessionItem) -> String = { "" },
+    val editLabel: (SessionItem) -> String = { "" },
+    val cancelLabel: String? = null
+)
+
+/**
  * The `steps_data.json` document. Hand-built lines (not [buildJsonLines]) because
  * this file carries what generic JSON can't: trailing `//` hints on value lines,
  * a tappable `$` command in the error state, keys that appear or vanish with the
@@ -68,8 +113,9 @@ object StepsDocument {
         onGrantPermission: (() -> Unit)? = null,
         grantClickLabel: String? = null,
         onToggleSession: (Long) -> Unit = {},
-        sessionToggleLabel: (String) -> String = { it }
-    ): List<CodeLine> = buildList {
+        sessionToggleLabel: (String) -> String = { it },
+        controls: SessionControls = SessionControls()
+    ): List<CanvasLine> = buildList {
         when (status) {
             SensorStatus.NO_SENSOR -> {
                 add(commentLine("// E: no step sensor on this device", syntax))
@@ -89,7 +135,8 @@ object StepsDocument {
             SensorStatus.OK -> addAll(
                 dataDocument(
                     snapshot ?: return@buildList, units, syntax, sessions,
-                    expandedSessionIds, sessionMetric, zone, onToggleSession, sessionToggleLabel
+                    expandedSessionIds, sessionMetric, zone, onToggleSession,
+                    sessionToggleLabel, controls
                 )
             )
         }
@@ -104,8 +151,9 @@ object StepsDocument {
         sessionMetric: SessionMetric,
         zone: ZoneId,
         onToggleSession: (Long) -> Unit,
-        sessionToggleLabel: (String) -> String
-    ): List<CodeLine> = buildList {
+        sessionToggleLabel: (String) -> String,
+        controls: SessionControls
+    ): List<CanvasLine> = buildList {
         add(punctLine("{", 0, syntax))
         add(stringLine("date", snapshot.date.toString(), comma = true, syntax, indent = 1))
 
@@ -165,7 +213,7 @@ object StepsDocument {
 
         addSessions(
             sessions, expandedSessionIds, hasGoal, units, sessionMetric, zone, syntax,
-            onToggleSession, sessionToggleLabel
+            onToggleSession, sessionToggleLabel, controls
         )
         if (hasGoal) {
             add(numberLine("streak_days", snapshot.streakDays.toString(), comma = false, syntax, indent = 1))
@@ -177,9 +225,13 @@ object StepsDocument {
      * The day's walks. Collapsed: one inline object per session, tweather's small-
      * object style. Expanded (tap): the full detail in place — duration, distance,
      * speed OR pace (the settings decide which), cadence; a metric too short to
-     * compute is absent, not invented.
+     * compute is absent, not invented. Auto sessions (Fase 11) wear their nature:
+     * `~` on boundaries still guessed by the detector, a `"source": "auto"` line,
+     * editable start/end (a terminal prompt in hunk-range syntax). Every session
+     * of the working tree carries `[rm]` with a two-tap confirm — history is the
+     * log's business and stays read-only.
      */
-    private fun MutableList<CodeLine>.addSessions(
+    private fun MutableList<CanvasLine>.addSessions(
         sessions: List<SessionItem>,
         expandedIds: Set<Long>,
         trailingComma: Boolean,
@@ -188,7 +240,8 @@ object StepsDocument {
         zone: ZoneId,
         syntax: SyntaxColors,
         onToggle: (Long) -> Unit,
-        toggleLabel: (String) -> String
+        toggleLabel: (String) -> String,
+        controls: SessionControls
     ) {
         if (sessions.isEmpty()) {
             add(rawValueLine("sessions", "[]", comma = trailingComma, syntax, indent = 1))
@@ -197,14 +250,15 @@ object StepsDocument {
         add(keyOpen("sessions", syntax, indent = 1, bracket = "["))
         sessions.forEachIndexed { index, session ->
             val comma = index != sessions.lastIndex
-            val start = UnitFormat.clockTime(session.startMillis, zone)
-            val label = toggleLabel(start)
+            val startShown = UnitFormat.clockTime(session.startMillis, zone, session.startApprox)
+            val endShown = UnitFormat.clockTime(session.endMillis, zone, session.endApprox)
+            val label = toggleLabel(UnitFormat.clockTime(session.startMillis, zone))
             if (session.id !in expandedIds) {
                 add(
                     CodeLine(
                         text = buildAnnotatedString {
                             appendPunct("{ ", syntax)
-                            appendPair("time", quoted = start, syntax = syntax); appendPunct(", ", syntax)
+                            appendPair("time", quoted = startShown, syntax = syntax); appendPunct(", ", syntax)
                             appendPair("type", quoted = session.type, syntax = syntax); appendPunct(", ", syntax)
                             appendPair("min", number = session.activeMinutes.toString(), syntax = syntax)
                             appendPunct(", ", syntax)
@@ -233,9 +287,34 @@ object StepsDocument {
                     onClickLabel = label
                 )
             )
-            add(stringLine("start", start, comma = true, syntax, indent = 3))
-            add(stringLine("end", UnitFormat.clockTime(session.endMillis, zone), comma = true, syntax, indent = 3))
+            if (controls.editingId == session.id) {
+                addBoundsPrompt(session, syntax, controls)
+            } else {
+                add(
+                    stringLine(
+                        "start", startShown, comma = true, syntax, indent = 3,
+                        hint = "// tap to edit".takeIf { session.auto },
+                        onClick = { controls.onStartEdit(session) }.takeIf { session.auto },
+                        onClickLabel = controls.editLabel(session).takeIf { session.auto }
+                    )
+                )
+                add(
+                    stringLine(
+                        "end", endShown, comma = true, syntax, indent = 3,
+                        onClick = { controls.onStartEdit(session) }.takeIf { session.auto },
+                        onClickLabel = controls.editLabel(session).takeIf { session.auto }
+                    )
+                )
+            }
             add(stringLine("type", session.type, comma = true, syntax, indent = 3))
+            if (session.auto) {
+                add(
+                    stringLine(
+                        "source", "auto", comma = true, syntax, indent = 3,
+                        hint = "// inferred — ~times are approximate"
+                    )
+                )
+            }
             add(numberLine("active_min", session.activeMinutes.toString(), comma = true, syntax, indent = 3))
             add(numberLine("steps", session.steps.toString(), comma = true, syntax, indent = 3))
             val metricLine = metricLine(session, units, sessionMetric, syntax)
@@ -251,9 +330,97 @@ object StepsDocument {
             session.avgCadenceSpm?.let {
                 add(numberLine("avg_cadence_spm", it.toString(), comma = false, syntax, indent = 3))
             }
+            addRemoveLine(session, syntax, controls)
             add(punctLine(if (comma) "}," else "}", 2, syntax))
         }
         add(punctLine(if (trailingComma) "]," else "]", 1, syntax))
+    }
+
+    /**
+     * `[rm]` — the working tree's delete verb, two-tap like every destructive
+     * command of the series: first tap arms it (confirm hint in deletion red),
+     * second tap removes. Rendered inside the expanded object, where the user is
+     * already looking at what they are about to remove.
+     */
+    private fun MutableList<CanvasLine>.addRemoveLine(
+        session: SessionItem,
+        syntax: SyntaxColors,
+        controls: SessionControls
+    ) {
+        val armed = controls.armedRemoveId == session.id
+        add(
+            CodeLine(
+                text = buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(color = if (armed) syntax.diffDel else syntax.comment)
+                    ) { append("[rm]") }
+                    if (armed) {
+                        withStyle(SpanStyle(color = syntax.diffDel)) {
+                            append("  // tap again to remove")
+                        }
+                    }
+                },
+                indent = 3,
+                onClick = { controls.onRemove(session) },
+                onClickLabel = controls.removeLabel(session)
+            )
+        )
+    }
+
+    /**
+     * The boundary editor: start and end collapse into one terminal prompt that
+     * speaks the hunk header's own range syntax (`> 09:32..10:18`), with `[esc]`
+     * to cancel and a transient `// ERROR:` line when the submit doesn't parse
+     * — the settings file's numeric-input pattern, retold for a time range. A
+     * bare `>` prompt instead of a key label: at this nesting depth a label
+     * would push `[esc]` off narrow screens, and the value speaks for itself.
+     */
+    private fun MutableList<CanvasLine>.addBoundsPrompt(
+        session: SessionItem,
+        syntax: SyntaxColors,
+        controls: SessionControls
+    ) {
+        add(
+            WidgetLine(
+                indent = 3,
+                measureText = "> 00:00..00:00  [esc]  slack"
+            ) {
+                val focusRequester = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(132.dp)) {
+                        TerminalInput(
+                            value = controls.editValue,
+                            onValueChange = { text ->
+                                controls.onEditValue(
+                                    text.filter { it.isDigit() || it == ':' || it == '.' }.take(12)
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(onDone = { controls.onSubmitEdit() }),
+                            modifier = Modifier.focusRequester(focusRequester)
+                        )
+                    }
+                    Text(
+                        text = "[esc]",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = syntax.comment,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = controls.cancelLabel
+                            ) { controls.onCancelEdit() }
+                    )
+                }
+            }
+        )
+        controls.editError?.let { error ->
+            add(CodeLine(AnnotatedString(error, SpanStyle(color = syntax.diffDel)), indent = 3))
+        }
     }
 
     /** Deferred line so the comma can depend on what follows it. */
@@ -328,8 +495,10 @@ object StepsDocument {
         comma: Boolean,
         syntax: SyntaxColors,
         indent: Int,
-        hint: String? = null
-    ) = valueLine(key, "\"$value\"", syntax.string, comma, syntax, indent, hint)
+        hint: String? = null,
+        onClick: (() -> Unit)? = null,
+        onClickLabel: String? = null
+    ) = valueLine(key, "\"$value\"", syntax.string, comma, syntax, indent, hint, onClick, onClickLabel)
 
     private fun numberLine(
         key: String,
@@ -356,7 +525,9 @@ object StepsDocument {
         comma: Boolean,
         syntax: SyntaxColors,
         indent: Int,
-        hint: String?
+        hint: String?,
+        onClick: (() -> Unit)? = null,
+        onClickLabel: String? = null
     ) = CodeLine(
         buildAnnotatedString {
             withStyle(SpanStyle(color = syntax.key)) { append("\"$key\"") }
@@ -369,7 +540,9 @@ object StepsDocument {
                 }
             }
         },
-        indent
+        indent,
+        onClick = onClick,
+        onClickLabel = onClickLabel
     )
 
     private fun androidx.compose.ui.text.AnnotatedString.Builder.appendPair(

@@ -43,6 +43,9 @@ class StepsReadmeTest {
         )
     }
 
+    private fun SessionItem.asAuto() =
+        copy(auto = true, startApprox = true, endApprox = true)
+
     private fun build(
         snapshot: TodaySnapshot? = snapshot(),
         status: SensorStatus = SensorStatus.OK,
@@ -116,6 +119,12 @@ class StepsReadmeTest {
         assertEquals(header.length, row.length) // padded to the same rectangle
         lines.lineWith("---:") // real right-alignment markers
         assertTrue(row.contains("4,820"))
+    }
+
+    @Test
+    fun `an auto walk's start wears its tilde in the table`() {
+        val lines = build(sessions = listOf(walk().asAuto()))
+        lines.lineWith("| ~09:32 |")
     }
 
     @Test

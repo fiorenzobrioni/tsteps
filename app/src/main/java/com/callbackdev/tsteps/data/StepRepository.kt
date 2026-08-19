@@ -6,9 +6,15 @@ import com.callbackdev.tsteps.data.local.HourlyStepsDao
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
 import com.callbackdev.tsteps.data.local.SessionDao
 import com.callbackdev.tsteps.data.local.SessionEntity
+import com.callbackdev.tsteps.data.local.StepSampleDao
+import com.callbackdev.tsteps.data.local.StepSampleEntity
+import com.callbackdev.tsteps.domain.BucketShare
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheck
 import com.callbackdev.tsteps.domain.GoalCheckResult
+import com.callbackdev.tsteps.domain.SampleSpan
+import com.callbackdev.tsteps.domain.SessionMetrics
+import com.callbackdev.tsteps.domain.SessionResize
 import com.callbackdev.tsteps.domain.StepAttribution
 import com.callbackdev.tsteps.domain.StepReading
 import com.callbackdev.tsteps.domain.StepTracker
@@ -33,6 +39,7 @@ class StepRepository(
     private val hourlyDao: HourlyStepsDao,
     private val dayDao: DaySummaryDao,
     private val sessionDao: SessionDao,
+    private val sampleDao: StepSampleDao,
     private val trackerStateStore: TrackerStateStore,
     private val settingsStore: SettingsStore,
     private val zone: () -> ZoneId = { ZoneId.systemDefault() }
@@ -57,6 +64,29 @@ class StepRepository(
             ).forEach { share ->
                 hourlyDao.increment(share.date.toString(), share.hour, share.steps)
             }
+            // Sample spans exist only for the auto detector — and only while
+            // its toggle is on. Off = this branch never runs, zero rows.
+            if (settingsStore.read().autoDetectSessions) {
+                recordSample(advance.fromMillis, advance.toMillis, advance.deltaSteps)
+            }
+        }
+    }
+
+    /**
+     * Records one counter span for the detector. Zero-delta spans matter too
+     * (they are explicit stillness, what closes a walk chain), so everything is
+     * kept — but the live listener's 2s ticks coalesce into ~1-minute rows: the
+     * detector needs minutes, not vibrations.
+     */
+    private suspend fun recordSample(fromMillis: Long, toMillis: Long, steps: Long) {
+        if (toMillis <= fromMillis && steps <= 0L) return // anchor-only advance
+        val latest = sampleDao.latest()
+        if (latest != null && latest.toMillis == fromMillis &&
+            toMillis - latest.fromMillis <= SAMPLE_COALESCE_MILLIS
+        ) {
+            sampleDao.upsert(latest.copy(toMillis = toMillis, steps = latest.steps + steps))
+        } else {
+            sampleDao.insert(StepSampleEntity(fromMillis = fromMillis, toMillis = toMillis, steps = steps))
         }
     }
 
@@ -111,4 +141,56 @@ class StepRepository(
     fun observeAllSessions(): Flow<List<SessionEntity>> = sessionDao.observeAll()
 
     suspend fun insertSession(session: SessionEntity): Long = sessionDao.insert(session)
+
+    /**
+     * `[rm]` on a session — a soft delete: the row survives as a tombstone so
+     * the auto detector never resurrects what the user removed.
+     */
+    suspend fun dismissSession(id: Long, nowMillis: Long) = sessionDao.dismiss(id, nowMillis)
+
+    /**
+     * Boundary edit, auto sessions only (a manual session is a precise record:
+     * it can be removed, never rewritten — the file must not lie). Steps are
+     * recomputed for the new range from the recorded samples (hourly buckets as
+     * the coarse fallback); distance keeps the session's own frozen stride, and
+     * duration-derived metrics follow. Returns the updated row, or null when
+     * the id is unknown or not an auto session.
+     */
+    suspend fun resizeSession(id: Long, startMillis: Long, endMillis: Long): SessionEntity? {
+        val session = sessionDao.byId(id) ?: return null
+        if (!session.auto || endMillis <= startMillis) return null
+        val zoneId = zone()
+        val samples = sampleDao.since(startMillis).map {
+            SampleSpan(it.fromMillis, it.toMillis, it.steps)
+        }
+        val hourly = datesCovered(startMillis, endMillis, zoneId).flatMap { date ->
+            hourlyDao.day(date.toString()).map { BucketShare(date, it.hour, it.steps) }
+        }
+        val steps = SessionResize.steps(samples, hourly, startMillis, endMillis, zoneId)
+        val strideMeters = session.distanceMeters
+            ?.takeIf { session.steps > 0 }?.div(session.steps)
+            ?: Estimates.strideMeters(settingsStore.read().heightCm)
+        val activeMillis = endMillis - startMillis
+        sessionDao.updateBounds(
+            id = id,
+            startMillis = startMillis,
+            endMillis = endMillis,
+            steps = steps,
+            distanceMeters = steps * strideMeters,
+            activeMillis = activeMillis,
+            avgCadenceSpm = SessionMetrics.avgCadenceSpm(steps, activeMillis)
+        )
+        return sessionDao.byId(id)
+    }
+
+    private fun datesCovered(fromMillis: Long, toMillis: Long, zoneId: ZoneId): List<LocalDate> {
+        val first = java.time.Instant.ofEpochMilli(fromMillis).atZone(zoneId).toLocalDate()
+        val last = java.time.Instant.ofEpochMilli(toMillis).atZone(zoneId).toLocalDate()
+        return generateSequence(first) { it.plusDays(1) }.takeWhile { !it.isAfter(last) }.toList()
+    }
+
+    companion object {
+        /** Live-listener ticks merge into one sample row up to this span. */
+        const val SAMPLE_COALESCE_MILLIS = 60_000L
+    }
 }

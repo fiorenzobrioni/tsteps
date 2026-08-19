@@ -47,6 +47,7 @@ class TrackingManagerTest {
                 hourlyDao = database.hourlyStepsDao(),
                 dayDao = database.daySummaryDao(),
                 sessionDao = database.sessionDao(),
+                sampleDao = database.stepSampleDao(),
                 trackerStateStore = TrackerStateStore(
                     PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("t.preferences_pb") }
                 ),

@@ -68,6 +68,7 @@ class StatsViewModelTest {
                 hourlyDao = database.hourlyStepsDao(),
                 dayDao = database.daySummaryDao(),
                 sessionDao = database.sessionDao(),
+                sampleDao = database.stepSampleDao(),
                 trackerStateStore = TrackerStateStore(
                     PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("t.preferences_pb") }
                 ),

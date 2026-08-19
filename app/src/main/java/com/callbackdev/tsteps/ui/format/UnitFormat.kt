@@ -41,4 +41,8 @@ object UnitFormat {
     /** `09:32` — the wall-clock shape used by session hunks and arrays. */
     fun clockTime(epochMillis: Long, zone: ZoneId): String =
         Instant.ofEpochMilli(epochMillis).atZone(zone).format(ClockTime)
+
+    /** `~09:30` — an auto-detected boundary wears its approximation (Fase 11). */
+    fun clockTime(epochMillis: Long, zone: ZoneId, approx: Boolean): String =
+        (if (approx) "~" else "") + clockTime(epochMillis, zone)
 }

@@ -3,12 +3,15 @@ package com.callbackdev.tsteps.data
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.callbackdev.tsteps.data.local.SessionEntity
+import com.callbackdev.tsteps.data.local.StepSampleEntity
 import com.callbackdev.tsteps.data.local.TstepsDatabase
 import com.callbackdev.tsteps.domain.StepReading
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -51,6 +54,7 @@ class StepRepositoryTest {
             hourlyDao = database.hourlyStepsDao(),
             dayDao = database.daySummaryDao(),
             sessionDao = database.sessionDao(),
+            sampleDao = database.stepSampleDao(),
             trackerStateStore = TrackerStateStore(
                 PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("t.preferences_pb") }
             ),
@@ -175,5 +179,113 @@ class StepRepositoryTest {
         // Reboot: counter restarts; 250 steps walked after boot.
         repository.ingest(reading(250L, "2026-08-18T12:00:00", boot = 4))
         assertEquals(750L, database.hourlyStepsDao().day("2026-08-18").sumOf { it.steps })
+    }
+
+    // --- Fase 11: sample spans, tombstones, boundary edits -------------------
+
+    @Test
+    fun `sample spans exist only with the auto-detect toggle on`() = runBlocking {
+        repository.ingest(reading(1_000L, "2026-08-18T09:00:00"))
+        repository.ingest(reading(1_500L, "2026-08-18T09:15:00"))
+        assertEquals(0L, database.stepSampleDao().count())
+    }
+
+    @Test
+    fun `live 30s ticks coalesce into minute rows, passive spans stay whole`() = runBlocking {
+        settingsStore.setAutoDetectSessions(true)
+        repository.ingest(reading(1_000L, "2026-08-18T09:00:00")) // anchor only
+        repository.ingest(reading(1_040L, "2026-08-18T09:00:30"))
+        repository.ingest(reading(1_080L, "2026-08-18T09:01:00")) // merges: 1-min row
+        repository.ingest(reading(1_180L, "2026-08-18T09:16:00")) // its own 15-min row
+
+        val samples = database.stepSampleDao().since(0L)
+        assertEquals(2, samples.size)
+        assertEquals(80L, samples.first().steps)
+        assertEquals(millis("2026-08-18T09:00:00"), samples.first().fromMillis)
+        assertEquals(millis("2026-08-18T09:01:00"), samples.first().toMillis)
+        assertEquals(100L, samples.last().steps)
+    }
+
+    @Test
+    fun `rm is a tombstone - hidden from screens, alive for the detector`() = runBlocking {
+        val id = repository.insertSession(
+            SessionEntity(
+                startMillis = millis("2026-08-18T09:00:00"),
+                endMillis = millis("2026-08-18T09:30:00"),
+                type = "walk", steps = 3_000, distanceMeters = 2_160.0,
+                avgCadenceSpm = 100, auto = true, activeMillis = 1_800_000L,
+                detectedStartMillis = millis("2026-08-18T09:00:00"),
+                detectedEndMillis = millis("2026-08-18T09:30:00")
+            )
+        )
+        repository.dismissSession(id, millis("2026-08-18T10:00:00"))
+
+        assertTrue(
+            repository.observeSessionsOfDay(LocalDate.parse("2026-08-18")).first().isEmpty()
+        )
+        assertEquals(
+            1,
+            database.sessionDao().overlappingIncludingDismissed(
+                millis("2026-08-18T00:00:00"), millis("2026-08-19T00:00:00")
+            ).size
+        )
+    }
+
+    @Test
+    fun `resizing an auto session recomputes steps and keeps its frozen stride`() = runBlocking {
+        database.stepSampleDao().insert(
+            StepSampleEntity(
+                fromMillis = millis("2026-08-18T09:00:00"),
+                toMillis = millis("2026-08-18T09:15:00"), steps = 1_500
+            )
+        )
+        database.stepSampleDao().insert(
+            StepSampleEntity(
+                fromMillis = millis("2026-08-18T09:15:00"),
+                toMillis = millis("2026-08-18T09:30:00"), steps = 1_500
+            )
+        )
+        val id = repository.insertSession(
+            SessionEntity(
+                startMillis = millis("2026-08-18T09:00:00"),
+                endMillis = millis("2026-08-18T09:30:00"),
+                type = "walk", steps = 3_000, distanceMeters = 2_160.0, // 0.72 m stride
+                avgCadenceSpm = 100, auto = true, activeMillis = 1_800_000L,
+                detectedStartMillis = millis("2026-08-18T09:00:00"),
+                detectedEndMillis = millis("2026-08-18T09:30:00")
+            )
+        )
+
+        val updated = repository.resizeSession(
+            id,
+            startMillis = millis("2026-08-18T09:05:00"),
+            endMillis = millis("2026-08-18T09:20:00")
+        )!!
+
+        assertEquals(1_500L, updated.steps) // 10 of 15 min + 5 of 15 min
+        assertEquals(1_080.0, updated.distanceMeters!!, 1e-6)
+        assertEquals(15 * 60_000L, updated.activeMillis)
+        assertEquals(100, updated.avgCadenceSpm)
+        // The detected window never moves: it is the dedup record.
+        assertEquals(millis("2026-08-18T09:00:00"), updated.detectedStartMillis)
+        assertEquals(millis("2026-08-18T09:30:00"), updated.detectedEndMillis)
+    }
+
+    @Test
+    fun `a manual session cannot be resized - precise records are rm-only`() = runBlocking {
+        val id = repository.insertSession(
+            SessionEntity(
+                startMillis = millis("2026-08-18T09:00:00"),
+                endMillis = millis("2026-08-18T09:30:00"),
+                type = "walk", steps = 3_000, distanceMeters = 2_160.0,
+                avgCadenceSpm = 100, auto = false, activeMillis = 1_800_000L
+            )
+        )
+        assertNull(
+            repository.resizeSession(
+                id, millis("2026-08-18T09:05:00"), millis("2026-08-18T09:20:00")
+            )
+        )
+        assertEquals(3_000L, database.sessionDao().byId(id)!!.steps)
     }
 }

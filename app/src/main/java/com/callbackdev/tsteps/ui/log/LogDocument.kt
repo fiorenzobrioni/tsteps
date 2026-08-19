@@ -223,7 +223,11 @@ object LogDocument {
         sessions.forEach { session -> addSessionHunk(session, units, numbers, zone, syntax) }
     }
 
-    /** `@@ 09:32..10:18 @@ walk` + one green line — a walk as a diff hunk. */
+    /**
+     * `@@ 09:32..10:18 @@ walk` + one green line — a walk as a diff hunk. An
+     * inferred walk says so: `@@ ~09:30..~10:15 @@ walk (auto)`, tildes on the
+     * boundaries that are still the detector's guess (Fase 11).
+     */
     private fun MutableList<CanvasLine>.addSessionHunk(
         session: SessionItem,
         units: UnitsSystem,
@@ -231,9 +235,14 @@ object LogDocument {
         zone: ZoneId,
         syntax: SyntaxColors
     ) {
-        val range = UnitFormat.clockTime(session.startMillis, zone) + ".." +
-            UnitFormat.clockTime(session.endMillis, zone)
-        add(CodeLine(AnnotatedString("@@ $range @@ ${session.type}", SpanStyle(color = syntax.key))))
+        val range = UnitFormat.clockTime(session.startMillis, zone, session.startApprox) + ".." +
+            UnitFormat.clockTime(session.endMillis, zone, session.endApprox)
+        val marker = if (session.auto) " (auto)" else ""
+        add(
+            CodeLine(
+                AnnotatedString("@@ $range @@ ${session.type}$marker", SpanStyle(color = syntax.key))
+            )
+        )
         add(
             addedLine(
                 "${numbers.format(session.steps)} steps · " +

@@ -14,6 +14,9 @@ fun SessionEntity.toItem(): SessionItem? {
         steps = steps,
         distanceMeters = distanceMeters ?: 0.0,
         activeMillis = activeMillis,
-        avgCadenceSpm = avgCadenceSpm
+        avgCadenceSpm = avgCadenceSpm,
+        auto = auto,
+        startApprox = auto && startMillis == detectedStartMillis,
+        endApprox = auto && end == detectedEndMillis
     )
 }

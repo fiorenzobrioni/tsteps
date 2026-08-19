@@ -44,6 +44,12 @@ class WidgetContentBuilderTest {
     private fun WidgetContent.texts() = bodyLines.map { it.text }
 
     @Test
+    fun `an auto-detected last walk wears its tilde`() {
+        val lines = build(data().copy(lastWalkApprox = true)).texts()
+        assertTrue(lines.contains("# last walk: ~09:32 (46 min)"))
+    }
+
+    @Test
     fun `the full transcript, most useful first`() {
         val lines = build().texts()
         assertEquals(

@@ -17,8 +17,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,10 +45,13 @@ import com.callbackdev.tsteps.ui.components.StatusBarDivider
 import com.callbackdev.tsteps.ui.components.StatusBarStart
 import com.callbackdev.tsteps.ui.components.StatusBarText
 import com.callbackdev.tsteps.ui.components.TerminalStatusBar
+import com.callbackdev.tsteps.domain.SessionItem
+import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import com.callbackdev.tsteps.work.SyncScheduler
 import java.time.LocalDate
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 /**
  * Main screen: today as the open source file `steps_data.json` — the working
@@ -93,7 +99,9 @@ fun StepsScreen(
             // and the screen simply reopens the process.
             TrackingService.start(context, "walk")
             onOpenTrack()
-        }
+        },
+        onRemoveSession = viewModel::removeSession,
+        onResizeSession = viewModel::resizeSession
     )
 }
 
@@ -106,14 +114,90 @@ fun StepsScreen(
     onSelectFile: (MainEditorFile) -> Unit = {},
     onGrantPermission: () -> Unit = {},
     onToggleSession: (Long) -> Unit = {},
-    onStartTrack: () -> Unit = {}
+    onStartTrack: () -> Unit = {},
+    onRemoveSession: (Long) -> Unit = {},
+    onResizeSession: (id: Long, startMillis: Long, endMillis: Long) -> Unit = { _, _, _ -> }
 ) {
     val syntax = TstepsTheme.syntax
     val grantLabel = stringResource(R.string.cd_grant_activity_recognition)
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
 
-    val lines = remember(state, syntax, activeFile, locale) {
+    // Fase 11 session verbs, working tree only. `[rm]` arms for a few seconds
+    // (two-tap, like every destructive command of the series); the boundary
+    // editor swaps start/end for one range prompt, errors fade on their own.
+    var armedRemoveId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(armedRemoveId) {
+        if (armedRemoveId != null) {
+            delay(4_000)
+            armedRemoveId = null
+        }
+    }
+    var editingSessionId by remember { mutableStateOf<Long?>(null) }
+    var editValue by remember { mutableStateOf("") }
+    var editError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(editError) {
+        if (editError != null) {
+            delay(4_000)
+            editError = null
+        }
+    }
+    val controls = SessionControls(
+        armedRemoveId = armedRemoveId,
+        editingId = editingSessionId,
+        editValue = editValue,
+        editError = editError,
+        onEditValue = { editValue = it },
+        onStartEdit = { session ->
+            editingSessionId = session.id
+            editError = null
+            editValue = UnitFormat.clockTime(session.startMillis, state.zone) + ".." +
+                UnitFormat.clockTime(session.endMillis, state.zone)
+        },
+        onSubmitEdit = submit@{
+            val id = editingSessionId ?: return@submit
+            val date = state.snapshot?.date ?: return@submit
+            when (
+                val parsed = SessionBoundsInput.parse(
+                    editValue, date, state.zone, System.currentTimeMillis()
+                )
+            ) {
+                is SessionBounds.Value -> {
+                    onResizeSession(id, parsed.startMillis, parsed.endMillis)
+                    editingSessionId = null
+                    editError = null
+                }
+                is SessionBounds.Invalid -> editError = parsed.error
+            }
+        },
+        onCancelEdit = { editingSessionId = null },
+        onRemove = { session ->
+            if (armedRemoveId == session.id) {
+                armedRemoveId = null
+                onRemoveSession(session.id)
+            } else {
+                armedRemoveId = session.id
+            }
+        },
+        removeLabel = { session ->
+            resources.getString(
+                if (armedRemoveId == session.id) {
+                    R.string.cd_confirm_remove_session
+                } else {
+                    R.string.cd_remove_session
+                },
+                sessionStart(session, state)
+            )
+        },
+        editLabel = { session ->
+            resources.getString(R.string.cd_edit_session, sessionStart(session, state))
+        },
+        cancelLabel = stringResource(R.string.cd_cancel_edit)
+    )
+
+    val lines = remember(
+        state, syntax, activeFile, locale, armedRemoveId, editingSessionId, editValue, editError
+    ) {
         when (activeFile) {
             MainEditorFile.JSON -> StepsDocument.build(
                 snapshot = state.snapshot,
@@ -129,7 +213,8 @@ fun StepsScreen(
                 onToggleSession = onToggleSession,
                 sessionToggleLabel = { start ->
                     resources.getString(R.string.cd_toggle_session, start)
-                }
+                },
+                controls = controls
             )
             MainEditorFile.README -> buildMarkdownLines(
                 StepsReadme.build(
@@ -260,6 +345,10 @@ private fun StepsStatusBar(state: StepsUiState, trackingActive: Boolean = false)
  * (tweather's FabClearance, same reasoning).
  */
 private val FabClearance = 96.dp
+
+/** The plain (tilde-free) start time — what accessibility labels speak. */
+private fun sessionStart(session: SessionItem, state: StepsUiState): String =
+    UnitFormat.clockTime(session.startMillis, state.zone)
 
 private fun previewSnapshot() = TodaySnapshot(
     date = LocalDate.parse("2026-08-18"),

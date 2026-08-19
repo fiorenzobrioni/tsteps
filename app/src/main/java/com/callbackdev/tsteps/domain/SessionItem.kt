@@ -13,7 +13,15 @@ data class SessionItem(
     val steps: Long,
     val distanceMeters: Double,
     val activeMillis: Long,
-    val avgCadenceSpm: Int?
+    val avgCadenceSpm: Int?,
+    /** Inferred by the detector (Fase 11) rather than tracked by hand. */
+    val auto: Boolean = false,
+    /**
+     * True while the boundary is still the detector's guess — that is what
+     * renders the `~`. A user edit makes the time a stated fact and drops it.
+     */
+    val startApprox: Boolean = false,
+    val endApprox: Boolean = false
 ) {
     val activeMinutes: Int get() = (activeMillis / 60_000L).toInt()
 }

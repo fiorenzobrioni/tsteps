@@ -8,15 +8,16 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Migration 1→2 must carry the user's real history across the update (the v1
- * schema shipped on device with Fase 2): a database is hand-built with the exact
- * v1 DDL — if it drifts from what Room generated, opening fails validation —
- * then opened with Room v2 + the migration. tweather's migration-test pattern.
+ * Migrations must carry the user's real history across updates (v1 shipped with
+ * Fase 2, v2 with Fase 6): each start schema is hand-built with the exact DDL —
+ * if it drifts from what Room generated, opening fails validation — then opened
+ * with the current version + the migration chain. tweather's pattern.
  */
 @RunWith(RobolectricTestRunner::class)
 class TstepsDatabaseMigrationTest {
@@ -67,11 +68,7 @@ class TstepsDatabaseMigrationTest {
             v1.version = 1
         }
 
-        val db = Room.databaseBuilder(context, TstepsDatabase::class.java, dbName)
-            .addMigrations(TstepsDatabase.MIGRATION_1_2)
-            .allowMainThreadQueries()
-            .build()
-            .also { database = it }
+        val db = openCurrent()
 
         runBlocking {
             assertEquals(600L, db.hourlyStepsDao().day("2026-08-18").single().steps)
@@ -81,4 +78,58 @@ class TstepsDatabaseMigrationTest {
             assertEquals(0L, session.activeMillis) // migrated rows default to 0
         }
     }
+
+    @Test
+    fun `v2 sessions survive to v3 as plain manual rows, samples start empty`() {
+        val file = context.getDatabasePath(dbName).also { it.parentFile?.mkdirs() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { v2 ->
+            v2.execSQL(
+                "CREATE TABLE IF NOT EXISTS `hourly_steps` (" +
+                    "`date` TEXT NOT NULL, `hour` INTEGER NOT NULL, " +
+                    "`steps` INTEGER NOT NULL, PRIMARY KEY(`date`, `hour`))"
+            )
+            v2.execSQL(
+                "CREATE TABLE IF NOT EXISTS `day_summary` (" +
+                    "`date` TEXT NOT NULL, `steps` INTEGER NOT NULL, " +
+                    "`activeMinutes` INTEGER NOT NULL, `distanceMeters` REAL NOT NULL, " +
+                    "`activeKcal` REAL, `goalSteps` INTEGER NOT NULL, `goalMet` INTEGER, " +
+                    "PRIMARY KEY(`date`))"
+            )
+            v2.execSQL(
+                "CREATE TABLE IF NOT EXISTS `session` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`startMillis` INTEGER NOT NULL, `endMillis` INTEGER, " +
+                    "`type` TEXT NOT NULL, `steps` INTEGER NOT NULL, " +
+                    "`distanceMeters` REAL, `avgCadenceSpm` INTEGER, " +
+                    "`auto` INTEGER NOT NULL, `activeMillis` INTEGER NOT NULL DEFAULT 0)"
+            )
+            v2.execSQL(
+                "INSERT INTO session (startMillis, endMillis, type, steps, distanceMeters, " +
+                    "avgCadenceSpm, auto, activeMillis) " +
+                    "VALUES (1000, 2000, 'walk', 500, 360.0, 100, 0, 900)"
+            )
+            v2.version = 2
+        }
+
+        val db = openCurrent()
+
+        runBlocking {
+            val session = db.sessionDao().observeAll().first().single()
+            assertEquals(500L, session.steps)
+            assertEquals(900L, session.activeMillis)
+            assertNull(session.dismissedMillis)   // no tombstone
+            assertNull(session.detectedStartMillis) // a manual row, not a detection
+            assertNull(session.detectedEndMillis)
+            assertEquals(0L, db.stepSampleDao().count())
+            db.stepSampleDao().insert(StepSampleEntity(fromMillis = 0, toMillis = 1, steps = 5))
+            assertEquals(1L, db.stepSampleDao().count())
+        }
+    }
+
+    private fun openCurrent(): TstepsDatabase =
+        Room.databaseBuilder(context, TstepsDatabase::class.java, dbName)
+            .addMigrations(TstepsDatabase.MIGRATION_1_2, TstepsDatabase.MIGRATION_2_3)
+            .allowMainThreadQueries()
+            .build()
+            .also { database = it }
 }

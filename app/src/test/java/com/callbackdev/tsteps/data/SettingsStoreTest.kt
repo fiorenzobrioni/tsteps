@@ -89,6 +89,14 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `auto-detect defaults off and round-trips`() = runBlocking {
+        val store = store(tmp.newFile("s.preferences_pb"))
+        assertEquals(false, store.read().autoDetectSessions)
+        store.setAutoDetectSessions(true)
+        assertEquals(true, store.read().autoDetectSessions)
+    }
+
+    @Test
     fun `git restore clears everything back to defaults`() = runBlocking {
         val store = store(tmp.newFile("s.preferences_pb"))
         store.setDailyGoalSteps(8_000)

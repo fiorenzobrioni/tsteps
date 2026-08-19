@@ -66,6 +66,13 @@ data class AppSettings(
     val heightCm: Int? = null,
     val units: UnitsSystem = UnitsSystem.METRIC,
     val sessionMetric: SessionMetric = SessionMetric.SPEED,
+    /**
+     * `sessions.auto_detect` — walks inferred from the sampled counter (Fase
+     * 11). Default OFF: a feature that invents entries in your log must be
+     * opted into, and off means genuinely off — no samples recorded, no
+     * detection ran, zero anything.
+     */
+    val autoDetectSessions: Boolean = false,
     val themeProfileName: String = "Obsidian",
     val widgetOpacityPct: Int = 100,
     /** Epoch seconds of the last edit; null until the user changes something. */
@@ -104,6 +111,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
                 sessionMetric = prefs[SessionMetricKey]
                     ?.let { name -> SessionMetric.entries.firstOrNull { it.name == name } }
                     ?: SessionMetric.SPEED,
+                autoDetectSessions = prefs[AutoDetectSessions] ?: false,
                 themeProfileName = prefs[ThemeProfileName] ?: "Obsidian",
                 widgetOpacityPct = (prefs[WidgetOpacity] ?: 100)
                     .takeIf { it in WidgetOpacities } ?: 100,
@@ -132,6 +140,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setUnits(units: UnitsSystem) = set(Units, units.name)
 
     suspend fun setSessionMetric(metric: SessionMetric) = set(SessionMetricKey, metric.name)
+
+    suspend fun setAutoDetectSessions(enabled: Boolean) = set(AutoDetectSessions, enabled)
 
     suspend fun setThemeProfileName(name: String) = set(ThemeProfileName, name)
 
@@ -171,6 +181,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         private val HeightCm = intPreferencesKey("height_cm")
         private val Units = stringPreferencesKey("units")
         private val SessionMetricKey = stringPreferencesKey("session_metric")
+        private val AutoDetectSessions = booleanPreferencesKey("auto_detect_sessions")
         private val ThemeProfileName = stringPreferencesKey("theme_profile")
         private val WidgetOpacity = intPreferencesKey("widget_bg_opacity_pct")
         private val LastModified = longPreferencesKey("last_modified_epoch")
