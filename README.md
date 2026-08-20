@@ -18,8 +18,9 @@ tsteps is the second app of the t-series, after
 it is a code editor"). Same fake-editor interface, same Obsidian Syntax theme, same
 JetBrains Mono everywhere: the two apps look like two files open in the same editor.
 
-> **Status: under construction.** The skeleton builds and the plan is written.
-> `VISION.md` is the product spec, `PLANNING.md` is the phased implementation log.
+| `steps_data.json` | `steps_history.diff` | `stats.md` |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/main-json.jpg" width="250" alt="Today's steps rendered as syntax-highlighted JSON"> | <img src="docs/screenshots/log.jpg" width="250" alt="The day log as git history, one commit per day"> | <img src="docs/screenshots/stats.jpg" width="250" alt="The contribution graph, streaks and averages as a markdown file"> |
 
 ---
 
@@ -42,13 +43,23 @@ estimate disclaimers and errors read like compiler messages, not toasts.
     "check": "▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84%"
   },
   "movement": {
-    "distance_km": 6.1,
-    "active_min": 74,
-    "active_kcal": 327
+    "distance_km": 6.1,   // estimated from stride length
+    "active_min": 74,     // estimated at 100 steps/min
+    "active_kcal": 327    // MET × weight × active time
   },
-  "hourly": "▁▁▂▅▇▇▃▁▁▂▅▃▁▁",
+  "hourly": "▁▁▂▅▇▇▃▁▁▂▅▃▁▁",   // 06..20
   "sessions": [
-    { "time": "09:32", "type": "walk", "min": 46, "steps": 4820, "km": 3.4 }
+    {
+      "start": "09:32",
+      "end": "10:18",
+      "type": "walk",
+      "active_min": 46,
+      "steps": 4820,
+      "distance_km": 3.4,
+      "avg_speed_kmh": 4.4,
+      "avg_cadence_spm": 92
+      [rm]
+    }
   ],
   "streak_days": 6
 }
@@ -57,6 +68,19 @@ estimate disclaimers and errors read like compiler messages, not toasts.
 Switch to imperial and the keys change too, to `distance_mi`. A JSON file should
 not lie about its units. Calories are hidden until you give the app your weight:
 an estimate without its input is not shown, it is invented.
+
+### `README.md`: the day in prose
+
+A second editor tab, in the place an editor would put it. The same day as the
+JSON, written for a human and fully localized (it is prose, so here even the
+headings translate): `## Oggi` with the totals, `## Stato` as the day's build
+badge (goal progress in neutral words, never guilt), the walks table, and
+`## Settimana` with the last seven days, today in bold and still moving, untracked
+days marked with a placeholder dash (missing data, not zero). Sensor problems show up as `>` warning
+blockquotes. The active tab survives restarts, and `$ git restore settings.config`
+does not touch it: which file is open is editor state, not a setting.
+
+<img src="docs/screenshots/main-md.jpg" width="250" alt="The day as localized markdown prose, with the walks and week tables">
 
 ### `steps_history.diff`: the log
 
@@ -94,6 +118,8 @@ the allowed values. Resetting is a command with a two-tap confirm:
 `$ tsteps export --json` and `$ tsteps export --csv`, and print what they wrote
 right under themselves (see [Export](#export)).
 
+<img src="docs/screenshots/settings.jpg" width="250" alt="Settings as an editable config file: goal, profile, units, theme profiles">
+
 ### `$ tsteps track`: a walk, live
 
 The glowing FAB starts a manual session, which runs as a terminal process: one
@@ -107,6 +133,8 @@ cadence into sessions marked `(auto)`. Their boundaries are honest approximation
 a terminal prompt, or remove the session with `[rm]`. The feature costs no extra
 sensing either way, and when it is off nothing is recorded and nothing runs.
 
+<img src="docs/screenshots/main-recording.jpg" width="250" alt="A live tracking session as a terminal process, with pause and stop as control sequences">
+
 ---
 
 ## The widget
@@ -116,6 +144,8 @@ architecture proven in tweather. It resizes one line at a time, from a glanceabl
 steps count to the full transcript with goal bar, distance, streak and last walk.
 It never polls on its own, and if the sensor pipeline stops it says `# sensor off`
 instead of presenting a frozen number as live.
+
+<img src="docs/screenshots/widget.jpg" width="420" alt="The widget on a home screen: a terminal window running tsteps --today">
 
 ---
 
@@ -198,6 +228,16 @@ makes those numbers an inference, and an archive should carry facts.
 
 ---
 
+## Install
+
+Download the APK from the [latest release](https://github.com/fiorenzobrioni/tsteps/releases/latest)
+and open it on the phone (Android 13 or newer). Android warns before installing
+anything from outside a store: expected, since this comes from GitHub. Every release
+is signed with the project's release key, so each version installs over the previous
+one without losing your history.
+
+---
+
 ## Build
 
 Requires JDK 21. No signing setup, no API key, no accounts: clone and build.
@@ -223,6 +263,10 @@ produced with it by accident.
 
 CI runs the tests and lint before the builds, so a red suite never produces an
 installable artifact.
+
+Published releases are a separate workflow: a `v*` tag builds the APK signed with
+the real release key (kept outside the repo, injected through GitHub Secrets) and
+publishes it as a GitHub Release together with the R8 mapping for that exact build.
 
 ---
 
