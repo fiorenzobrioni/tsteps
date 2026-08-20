@@ -236,6 +236,8 @@ anything from outside a store: expected, since this comes from GitHub. Every rel
 is signed with the project's release key, so each version installs over the previous
 one without losing your history.
 
+Changes per version are in the [changelog](CHANGELOG.md).
+
 ---
 
 ## Build
