@@ -306,9 +306,9 @@ fun StepsScreen(
 private fun StepsStatusBar(state: StepsUiState, trackingActive: Boolean = false) {
     TerminalStatusBar {
         StatusBarStart {
+            // No date chip: "date" is the first key of the buffer right above, and
+            // repeating it starved the sensor chip on narrow devices.
             StatusBarText("⎇ main")
-            StatusBarDivider()
-            StatusBarText(state.snapshot?.date?.toString() ?: "—", shrink = true)
             StatusBarDivider()
             when {
                 // The running process outranks the sensor chip — with a session

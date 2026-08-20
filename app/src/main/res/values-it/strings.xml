@@ -9,7 +9,6 @@
     <string name="nav_settings">Impostazioni</string>
 
     <!-- Chrome / status bars: "commit" resta inglese, è gergo git (regola l10n) -->
-    <string name="status_last_commit">Ultimo commit: %1$s</string>
     <string name="status_commits">%1$d commit</string>
     <string name="status_days">%1$d giorni</string>
 

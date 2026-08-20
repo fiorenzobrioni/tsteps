@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -84,23 +85,71 @@ fun RowScope.StatusBarStart(content: @Composable RowScope.() -> Unit) {
 /**
  * A status bar entry, always on one line. [shrink] marks the item that gives way
  * when the bar runs out of room — typically user content, whose length is not ours
- * to control; it is ellipsized like a path in an editor's status bar.
+ * to control; it is ellipsized like a path in an editor's status bar. Below
+ * [MinShrinkWidth] it stops ellipsizing and collapses to nothing: a bar has no
+ * business showing a lone "…" where content used to be. [leadingDivider] gives the
+ * entry its own `|`, which collapses with it — without it the neighbours' dividers
+ * survive as a stray `|  |`. (The 12dp slot the arrangement reserves around a
+ * collapsed entry remains as a slightly wider gap; accepted.)
  */
 @Composable
 fun RowScope.StatusBarText(
     text: String,
     modifier: Modifier = Modifier,
     color: Color = LocalContentColor.current,
-    shrink: Boolean = false
+    shrink: Boolean = false,
+    leadingDivider: Boolean = false
 ) {
-    Text(
-        text = text,
-        color = color,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = if (shrink) modifier.weight(1f, fill = false) else modifier
-    )
+    if (!shrink) {
+        if (leadingDivider) StatusBarDivider()
+        Text(
+            text = text,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = modifier
+        )
+        return
+    }
+    Layout(
+        content = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (leadingDivider) StatusBarDivider()
+                Text(
+                    text = text,
+                    color = color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
+        },
+        modifier = modifier.weight(1f, fill = false)
+    ) { measurables, constraints ->
+        val entry = measurables.single()
+        // Collapse only when the entry could not render whole anyway AND the room
+        // left is under the legibility floor — a short text that fits keeps its
+        // place even in a tight bar.
+        val wanted = entry.maxIntrinsicWidth(constraints.maxHeight)
+        val floor = minOf(wanted, MinShrinkWidth.roundToPx())
+        if (constraints.maxWidth < floor) {
+            layout(0, 0) {}
+        } else {
+            val placeable = entry.measure(constraints)
+            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }
+    }
 }
+
+/**
+ * Legibility floor for a [StatusBarText] with `shrink`: about six characters of
+ * status-bar mono. With less room, ellipsis yields noise ("2…"), so the entry
+ * collapses entirely instead.
+ */
+private val MinShrinkWidth = 48.dp
 
 /** `|` separator between status bar items. */
 @Composable
@@ -122,6 +171,22 @@ private fun TerminalStatusBarPreview() {
             Text("UTF-8")
             Spacer(Modifier.weight(1f))
             Text("Last Updated: 12:01:04")
+        }
+    }
+}
+
+// Too narrow for the shrink entry: it collapses whole (divider included) instead
+// of leaving `|  |` behind.
+@Preview(showBackground = true, backgroundColor = 0xFF10141A, widthDp = 220)
+@Composable
+private fun TerminalStatusBarCollapsedPreview() {
+    TstepsTheme {
+        TerminalStatusBar {
+            StatusBarStart {
+                StatusBarText("⎇ main")
+                StatusBarText("2026-08-20", shrink = true, leadingDivider = true)
+            }
+            StatusBarText("commit: e5e5691")
         }
     }
 }

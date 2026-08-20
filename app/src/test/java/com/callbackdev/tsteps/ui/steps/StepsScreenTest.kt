@@ -69,7 +69,7 @@ class StepsScreenTest {
         compose.onNodeWithText("steps_data.json").assertIsDisplayed()
         compose.onNodeWithText("\"count\": 8432,", substring = true).assertIsDisplayed()
         compose.onNodeWithText("⎇ main").assertIsDisplayed()
-        compose.onNodeWithText("Last commit: 2026-08-17").assertIsDisplayed()
+        compose.onNodeWithText("commit: 2026-08-17").assertIsDisplayed()
         compose.onNodeWithText("sensor: OK").assertIsDisplayed()
     }
 
