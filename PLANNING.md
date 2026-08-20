@@ -202,11 +202,11 @@ Volutamente tardi: prima il modello sessione doveva essere validato dal tracking
 
 ## Fase 14 — Restyling pre-v1 e Release
 
-- [ ] Passata di coerenza design su tutte le schermate (l'equivalente della Fase 11b di tweather): niente deriva dai vincoli, spazi, scala font di sistema, TalkBack
-- [ ] Review batteria completa su device (profilare i flush del sensore)
-- [ ] Edge case checklist verificata uno a uno: sensore assente o temporaneamente indisponibile, permission negate/revocate, riavvio (singolo e doppio), cambio timezone e DST, giorno senza dati, dati duplicati, sessioni incomplete (crash/kill durante il tracking), profilo incompleto, battery saver
+- [x] Passata di coerenza design su tutte le schermate (l'equivalente della Fase 11b di tweather): niente deriva dai vincoli, spazi, scala font di sistema, TalkBack — verificata dal committente su device (ago 2026); nessun difetto condiviso emerso da riportare su tweather
+- [x] Review batteria completa su device (profilare i flush del sensore) — completata dal committente (ago 2026)
+- [x] Edge case checklist verificata uno a uno dal committente (ago 2026): sensore assente o temporaneamente indisponibile, permission negate/revocate, riavvio (singolo e doppio), cambio timezone e DST, giorno senza dati, dati duplicati, sessioni incomplete (crash/kill durante il tracking), profilo incompleto, battery saver
 - [x] Keystore di release reale — anticipato (ago 2026), fatto in coppia con la Fase 12 di tweather: chiave RSA 4096 trentennale (alias `tsteps`) generata dal committente con `keytool`, custodita fuori dal repo in `C:\Fiorenzo\keys\` con backup nel password manager; la signingConfig `release` nasce solo se le 4 proprietà `TSTEPS_*` sono valorizzate (da `~/.gradle/gradle.properties` in locale, da `ORG_GRADLE_PROJECT_*`/GitHub Secrets in CI) e vince sempre quando c'è — il flag `-PsignReleaseWithDebugKey` resta per la CI per-push; `release.yml` su tag `v*` pubblica la GitHub Release con APK firmato e mapping R8. Restano per questa fase i secrets sul repo, versioning e tag
-- [ ] Screenshot per il README (`docs/screenshots/`)
+- [x] Screenshot per il README (`docs/screenshots/`): 7 capture reali dal device (le 4 schermate, il tab `README.md`, il tracking live, il widget) scattate dal committente; root README aggiornato — tabella di apertura come tweather, immagini nelle sezioni, sample JSON allineato alla forma reale, nuova sezione sul tab `README.md` (prima non descritto), sezione Install e paragrafo sulle release firmate; `docs/screenshots/README.md` creato sul modello di tweather. Via il banner "under construction"
 
 ---
 
