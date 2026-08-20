@@ -22,7 +22,7 @@ Stack: Kotlin 2.2 + Compose (Material 3), Gradle 9.1 / AGP 8.13, version catalog
 - Installable minified build: `./gradlew :app:assembleRelease -PsignReleaseWithDebugKey`
 - On this machine there is no system JDK: prepend `JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"` to gradlew commands.
 
-**Debug signing**: `keystore/debug.keystore` is intentionally committed (alias `tsteps-debug`, store/key password `android`) so debug APKs from CI and any machine share one signature. Do not regenerate it.
+**Debug signing**: `keystore/debug.keystore` is intentionally committed (alias `tsteps-debug`, store/key password `android`) so debug APKs from CI and any machine share one signature. Do not regenerate it. Debug builds carry `applicationIdSuffix ".debug"` and the launcher label `tsteps (dev)` (debug res overlay), so they install **side-by-side** with the release-signed app — series decision (Aug 2026), same as snake. The dev copy is a separate Health Connect client (permissions granted per app). The debug-signed *release* build (`-PsignReleaseWithDebugKey`) keeps the plain id: it exists for pre-release smoke tests, not for daily side-by-side testing.
 
 **CI**: `.github/workflows/android-ci.yml` runs on every push — unit tests, lint, then both APKs (tests *before* builds: a red suite never produces an installable artifact). Artifacts: `tsteps-debug-apk`, `tsteps-release-apk-testing-only`, `tsteps-release-mapping`.
 
