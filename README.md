@@ -90,7 +90,9 @@ universal 10,000.
 
 Booleans flip on tap, numbers open a terminal prompt, the trailing hint tells you
 the allowed values. Resetting is a command with a two-tap confirm:
-`$ git restore settings.config`.
+`$ git restore settings.config`. Two more commands sit at the bottom of the file,
+`$ tsteps export --json` and `$ tsteps export --csv`, and print what they wrote
+right under themselves (see [Export](#export)).
 
 ### `$ tsteps track`: a walk, live
 
@@ -133,8 +135,66 @@ Your movement history never leaves the device. Health Connect interop is opt-in
 sessions to the on-device Health Connect store and shows what other apps counted,
 each source on its own line, never summed into yours. The client is a Jetpack
 library talking local IPC: still no Play Services dependency, still no INTERNET
-permission. Export (JSON/CSV) is a planned phase; everything stays under your
-control.
+permission.
+
+### Export
+
+Your history is yours, so it can leave in a format you can read. Two commands at
+the bottom of `settings.config` write it into the phone's `Downloads` folder. No
+storage permission is involved: the files go in through MediaStore, they belong
+to you and they survive uninstalling the app. The terminal prints the name of
+every file it wrote, as the store actually named it.
+
+| Command | Files |
+| --- | --- |
+| `$ tsteps export --json` | `tsteps-export-YYYY-MM-DD.json` |
+| `$ tsteps export --csv` | `tsteps-days-YYYY-MM-DD.csv` and `tsteps-sessions-YYYY-MM-DD.csv` |
+
+JSON keeps everything in one document. CSV is one table per file, because days
+and sessions are different rows and a spreadsheet that mixes them is useless.
+Both carry the same two records:
+
+- **days**: `date`, `commit`, `steps`, `active_min`, `distance_m`, `active_kcal`,
+  `goal_steps`, `goal_met`, `committed`
+- **sessions**: `date`, `start`, `end`, `type`, `steps`, `distance_m`,
+  `active_min`, `avg_cadence_spm`, `source`, `start_approx`, `end_approx`
+
+```json
+{
+  "app": "tsteps",
+  "schema": 1,
+  "exported_at": "2026-08-20T16:32:05Z",
+  "timezone": "Europe/Rome",
+  "units": "steps, meters, minutes, kcal",
+  "estimates": "distance_m and active_kcal are estimated from your profile, not measured",
+  "days": [
+    { "date": "2026-08-19", "commit": "3f2c1a9", "steps": 11204, "active_min": 96, "distance_m": 8310.2, "active_kcal": 312, "goal_steps": 10000, "goal_met": true, "committed": true }
+  ],
+  "sessions": [
+    { "date": "2026-08-19", "start": "2026-08-19T09:32:00+02:00", "end": "2026-08-19T10:18:00+02:00", "type": "walk", "steps": 4210, "distance_m": 3120.5, "active_min": 46, "avg_cadence_spm": 92, "source": "manual", "start_approx": false, "end_approx": false }
+  ]
+}
+```
+
+Four rules the format keeps:
+
+1. **The units never move.** Meters, minutes and kcal whatever the app is set to
+   display, with the unit written into the key (`distance_m`). An archive opened
+   next year should not have to remember which setting was active.
+2. **Missing is empty, never zero.** No weight in your profile means
+   `active_kcal` is `null` (an empty cell in CSV). No goal means `goal_met` is
+   `null`: the check was skipped, not failed.
+3. **Today is exported too, flagged `"committed": false`.** The working tree is
+   real data, it just is not history yet. Committed days carry the numbers frozen
+   at their commit.
+4. **`distance_m` and `active_kcal` are estimates**, not measurements. The JSON
+   header says so; CSV has no comment channel a spreadsheet tolerates, so it is
+   said here instead.
+
+Sessions you removed with `[rm]` are not exported (you deleted them), and neither
+is a session still running (it has no ending yet). The hourly buckets stay out as
+well: a batched counter reading gets spread across the hours it covers, which
+makes those numbers an inference, and an archive should carry facts.
 
 ---
 

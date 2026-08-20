@@ -163,6 +163,16 @@ interface SessionDao {
     suspend fun byId(id: Long): SessionEntity?
 
     /**
+     * Every session the export writes (Fase 13), oldest first: tombstones out
+     * (`[rm]` means gone), still-running out (no end, no record yet).
+     */
+    @Query(
+        "SELECT * FROM session WHERE dismissedMillis IS NULL AND endMillis IS NOT NULL " +
+            "ORDER BY startMillis"
+    )
+    suspend fun allCompleted(): List<SessionEntity>
+
+    /**
      * Everything overlapping the range, tombstones included — the detector's
      * dedup view. A running manual session (endMillis null) counts from its
      * start onward.

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.room.Room
 import com.callbackdev.tsteps.data.local.TstepsDatabase
+import com.callbackdev.tsteps.export.DataExporter
+import com.callbackdev.tsteps.export.DownloadsExportSink
 import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
 import com.callbackdev.tsteps.healthconnect.HcStateStore
 import com.callbackdev.tsteps.healthconnect.HealthConnectSync
@@ -137,6 +139,19 @@ object ServiceLocator {
                 hcStateStore = hcStateStore(context)
             ).also { healthConnectSync = it }
         }
+
+    /**
+     * Stateless like the detector, built per call: an export is one pass over
+     * Room triggered by a tap, with nothing to keep between taps.
+     */
+    fun dataExporter(context: Context): DataExporter =
+        DataExporter(
+            hourlyDao = database(context).hourlyStepsDao(),
+            dayDao = database(context).daySummaryDao(),
+            sessionDao = database(context).sessionDao(),
+            settingsStore = settingsStore(context),
+            sink = DownloadsExportSink(context.applicationContext)
+        )
 
     /**
      * Test-only: swap dependencies for worker tests. Calling with no arguments

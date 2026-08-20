@@ -11,17 +11,47 @@ import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.WidgetOpacities
+import com.callbackdev.tsteps.export.DataExporter
+import com.callbackdev.tsteps.export.ExportFormat
+import com.callbackdev.tsteps.export.ExportResult
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/** What the `$ tsteps export` line prints right now (Fase 13). */
+sealed interface ExportState {
+
+    /** No command run yet in this visit: only the commands are on screen. */
+    data object Idle : ExportState
+
+    data object Running : ExportState
+
+    /** The outcome, printed as terminal output under the command. */
+    data class Done(val result: ExportResult) : ExportState
+}
+
 class SettingsViewModel(
-    private val settingsStore: SettingsStore
+    private val settingsStore: SettingsStore,
+    private val exporter: DataExporter
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = settingsStore.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
+
+    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+    val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
+
+    /** `$ tsteps export --json|--csv`. Taps during a run are ignored, not queued. */
+    fun export(format: ExportFormat) {
+        if (_exportState.value == ExportState.Running) return
+        _exportState.value = ExportState.Running
+        viewModelScope.launch {
+            _exportState.value = ExportState.Done(exporter.export(format))
+        }
+    }
 
     fun setLineNumbers(enabled: Boolean) = save { setLineNumbers(enabled) }
     fun setWordWrap(enabled: Boolean) = save { setWordWrap(enabled) }
@@ -74,7 +104,10 @@ class SettingsViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[AndroidViewModelFactory.APPLICATION_KEY])
-                SettingsViewModel(settingsStore = ServiceLocator.settingsStore(app))
+                SettingsViewModel(
+                    settingsStore = ServiceLocator.settingsStore(app),
+                    exporter = ServiceLocator.dataExporter(app)
+                )
             }
         }
     }

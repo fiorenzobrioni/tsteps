@@ -58,6 +58,8 @@ import com.callbackdev.tsteps.data.AppSettings
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsRanges
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.export.ExportFormat
+import com.callbackdev.tsteps.export.ExportResult
 import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
 import com.callbackdev.tsteps.healthconnect.HcAvailability
 import com.callbackdev.tsteps.healthconnect.HcPermissions
@@ -215,10 +217,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
         }
     }
 
+    val exportState by viewModel.exportState.collectAsStateWithLifecycle()
+
     SettingsScreen(
         settings = settings,
         notifState = notifState,
         hcStatus = hcStatus,
+        exportState = exportState,
+        onExport = viewModel::export,
         onHcLine = {
             when (hcStatus.availability) {
                 HcAvailability.UPDATE_REQUIRED -> uriHandler.openUri(
@@ -271,6 +277,8 @@ fun SettingsScreen(
     onNotifLine: () -> Unit = {},
     hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE),
     onHcLine: () -> Unit = {},
+    exportState: ExportState = ExportState.Idle,
+    onExport: (ExportFormat) -> Unit = {},
     canvasState: LazyListState = rememberLazyListState()
 ) {
     val syntax = TstepsTheme.syntax
@@ -351,6 +359,11 @@ fun SettingsScreen(
         onCancelEdit = { editing = null },
         cancelLabel = resources.getString(R.string.cd_cancel_edit),
         inputError = inputError,
+        exportState = exportState,
+        exportLabel = { format ->
+            resources.getString(R.string.cd_run_export, format.command)
+        },
+        onExport = onExport,
         resetArmed = resetArmed,
         resetLabel = resources.getString(
             if (resetArmed) R.string.cd_confirm_reset else R.string.cd_reset_settings
@@ -456,6 +469,9 @@ private fun buildSettingsLines(
     onCancelEdit: () -> Unit,
     cancelLabel: String,
     inputError: String?,
+    exportState: ExportState,
+    exportLabel: (ExportFormat) -> String,
+    onExport: (ExportFormat) -> Unit,
     resetArmed: Boolean,
     resetLabel: String,
     onResetLine: () -> Unit
@@ -739,6 +755,25 @@ private fun buildSettingsLines(
 
     add(punctLine("}", 0, syntax))
 
+    // Fase 13: the archive as two commands, printing their own output right
+    // below like any shell would. Non-destructive, so no confirm to arm.
+    add(punctLine("", 0, syntax))
+    add(commentLine("// your data, yours to keep (written to Downloads/):", syntax))
+    ExportFormat.entries.forEach { format ->
+        add(
+            CodeLine(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = syntax.comment)) { append("$ ") }
+                    append(format.command)
+                },
+                indent = 0,
+                onClick = { onExport(format) },
+                onClickLabel = exportLabel(format)
+            )
+        )
+    }
+    addAll(exportOutputLines(exportState, syntax))
+
     // Terminal prompt below the buffer: factory reset as a git command. First tap
     // arms it (confirm hint in diff-deletion red), second tap runs it.
     add(punctLine("", 0, syntax))
@@ -759,6 +794,67 @@ private fun buildSettingsLines(
             onClickLabel = resetLabel
         )
     )
+}
+
+/**
+ * What the export command printed, as terminal output: one line per file
+ * written (the name the store actually gave it), then the tally. Errors take
+ * the `// ERROR:` channel in deletion red; "nothing to export yet" is an
+ * answer, not a failure, so it stays a plain comment.
+ */
+private fun exportOutputLines(
+    state: ExportState,
+    syntax: SyntaxColors
+): List<CodeLine> = when (state) {
+    ExportState.Idle -> emptyList()
+    ExportState.Running -> listOf(
+        CodeLine(
+            AnnotatedString("// writing…", SpanStyle(color = syntax.comment)),
+            indent = 0
+        )
+    )
+    is ExportState.Done -> when (val result = state.result) {
+        is ExportResult.Written -> buildList {
+            result.files.forEach { name ->
+                add(
+                    CodeLine(
+                        AnnotatedString(
+                            "// wrote Downloads/$name",
+                            SpanStyle(color = syntax.diffAdd)
+                        ),
+                        indent = 0
+                    )
+                )
+            }
+            add(
+                CodeLine(
+                    AnnotatedString(
+                        "// ${result.days} days · ${result.sessions} sessions",
+                        SpanStyle(color = syntax.comment)
+                    ),
+                    indent = 0
+                )
+            )
+        }
+        ExportResult.Empty -> listOf(
+            CodeLine(
+                AnnotatedString(
+                    "// nothing to export yet",
+                    SpanStyle(color = syntax.comment)
+                ),
+                indent = 0
+            )
+        )
+        is ExportResult.Failed -> listOf(
+            CodeLine(
+                AnnotatedString(
+                    "// ERROR: ${result.message}",
+                    SpanStyle(color = syntax.diffDel)
+                ),
+                indent = 0
+            )
+        )
+    }
 }
 
 /**

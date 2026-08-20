@@ -14,6 +14,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import com.callbackdev.tsteps.data.AppSettings
 import com.callbackdev.tsteps.data.HealthConnectSettings
+import com.callbackdev.tsteps.export.ExportFormat
+import com.callbackdev.tsteps.export.ExportResult
 import com.callbackdev.tsteps.healthconnect.HcAvailability
 import com.callbackdev.tsteps.healthconnect.HcSectionStatus
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
@@ -63,17 +65,22 @@ class SettingsScreenTest {
         )
     }
 
+    private var exported: ExportFormat? = null
+
     private fun setContent(
         settings: AppSettings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
         recorded: RecordedActions = RecordedActions(),
-        hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE)
+        hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE),
+        exportState: ExportState = ExportState.Idle
     ): RecordedActions {
         compose.setContent {
             TstepsTheme {
                 SettingsScreen(
                     settings = settings,
                     actions = recorded.actions(),
-                    hcStatus = hcStatus
+                    hcStatus = hcStatus,
+                    exportState = exportState,
+                    onExport = { exported = it }
                 )
             }
         }
@@ -215,6 +222,47 @@ class SettingsScreenTest {
         line("tap again to confirm").assertIsDisplayed()
         command.performClick()
         assertTrue(recorded.resetCalled)
+    }
+
+    @Test
+    fun `export is two commands, one per format, and runs on a single tap`() {
+        setContent()
+        line("$ tsteps export --json").performClick()
+        assertEquals(ExportFormat.JSON, exported)
+        line("$ tsteps export --csv").performClick()
+        assertEquals(ExportFormat.CSV, exported)
+        // Non-destructive: unlike the reset, no confirm to arm.
+        compose.onNodeWithText("tap again to confirm", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a finished export prints every file it wrote and the tally`() {
+        setContent(
+            exportState = ExportState.Done(
+                ExportResult.Written(
+                    files = listOf("tsteps-days-2026-08-20.csv", "tsteps-sessions-2026-08-20.csv"),
+                    days = 128,
+                    sessions = 42
+                )
+            )
+        )
+        line("// wrote Downloads/tsteps-days-2026-08-20.csv").assertIsDisplayed()
+        line("// wrote Downloads/tsteps-sessions-2026-08-20.csv").assertIsDisplayed()
+        line("// 128 days · 42 sessions").assertIsDisplayed()
+    }
+
+    @Test
+    fun `an empty history is an answer, not an error`() {
+        setContent(exportState = ExportState.Done(ExportResult.Empty))
+        line("// nothing to export yet").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a failed export reads like a compiler message`() {
+        setContent(
+            exportState = ExportState.Done(ExportResult.Failed("Downloads is not writable"))
+        )
+        line("// ERROR: Downloads is not writable").assertIsDisplayed()
     }
 
     @Test

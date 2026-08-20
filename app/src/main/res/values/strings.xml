@@ -51,6 +51,7 @@
     <string name="cd_open_link">Open %1$s website</string>
     <string name="cd_reset_settings">Reset all settings to defaults</string>
     <string name="cd_confirm_reset">Confirm settings reset</string>
+    <string name="cd_run_export">Run %1$s and write your data to Downloads</string>
     <string name="cd_cancel_edit">Cancel editing</string>
     <string name="cd_toggle_commit">Expand or collapse the %1$s commit</string>
     <string name="cd_open_commit">Open the %1$s commit in the log</string>

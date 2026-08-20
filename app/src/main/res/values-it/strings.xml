@@ -37,6 +37,7 @@
     <string name="cd_open_link">Apri il sito di %1$s</string>
     <string name="cd_reset_settings">Ripristina tutte le impostazioni</string>
     <string name="cd_confirm_reset">Conferma il ripristino delle impostazioni</string>
+    <string name="cd_run_export">Esegui %1$s e scrivi i tuoi dati in Download</string>
     <string name="cd_cancel_edit">Annulla la modifica</string>
     <string name="cd_toggle_commit">Espandi o comprimi il commit del %1$s</string>
     <string name="cd_open_commit">Apri il commit del %1$s nel log</string>
