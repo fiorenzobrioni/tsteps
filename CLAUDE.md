@@ -26,6 +26,8 @@ Stack: Kotlin 2.2 + Compose (Material 3), Gradle 9.1 / AGP 8.13, version catalog
 
 **CI**: `.github/workflows/android-ci.yml` runs on every push — unit tests, lint, then both APKs (tests *before* builds: a red suite never produces an installable artifact). Artifacts: `tsteps-debug-apk`, `tsteps-release-apk-testing-only`, `tsteps-release-mapping`.
 
+**Release signing**: the real keystore lives OUTSIDE the repo (`C:\Fiorenzo\keys\tsteps-release.jks`); the `release` signingConfig is created only when the four `TSTEPS_KEYSTORE*` properties are all set — from `~/.gradle/gradle.properties` locally, from `ORG_GRADLE_PROJECT_*` env vars (GitHub Secrets) in CI — and wins whenever configured. On an unconfigured checkout the release build is unsigned by default; `-PsignReleaseWithDebugKey` signs it with the committed debug key so the minified build is installable for testing (R8 breakage shows up nowhere else) — opt-in so an unconfigured checkout can never produce an installable release by accident. `.github/workflows/release.yml` fires on `v*` tags: tests + lint, then the real-key APK published as a GitHub Release together with its R8 mapping.
+
 ## Design constraints (non-negotiable, inherited from tweather)
 
 - **Typography**: JetBrains Mono everywhere, 4px baseline grid, 20px indent per nesting level. The home widget is the single exception (system `monospace` — CVE-2021-0567, launchers silently drop `@font/` in widget layouts).

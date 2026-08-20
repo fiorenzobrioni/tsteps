@@ -197,7 +197,7 @@ Volutamente tardi: prima il modello sessione doveva essere validato dal tracking
 - [ ] Passata di coerenza design su tutte le schermate (l'equivalente della Fase 11b di tweather): niente deriva dai vincoli, spazi, scala font di sistema, TalkBack
 - [ ] Review batteria completa su device (profilare i flush del sensore)
 - [ ] Edge case checklist verificata uno a uno: sensore assente o temporaneamente indisponibile, permission negate/revocate, riavvio (singolo e doppio), cambio timezone e DST, giorno senza dati, dati duplicati, sessioni incomplete (crash/kill durante il tracking), profilo incompleto, battery saver
-- [ ] Keystore di release reale (sostituisce il flag debug-sign), versioning, store listing
+- [x] Keystore di release reale — anticipato (ago 2026), fatto in coppia con la Fase 12 di tweather: chiave RSA 4096 trentennale (alias `tsteps`) generata dal committente con `keytool`, custodita fuori dal repo in `C:\Fiorenzo\keys\` con backup nel password manager; la signingConfig `release` nasce solo se le 4 proprietà `TSTEPS_*` sono valorizzate (da `~/.gradle/gradle.properties` in locale, da `ORG_GRADLE_PROJECT_*`/GitHub Secrets in CI) e vince sempre quando c'è — il flag `-PsignReleaseWithDebugKey` resta per la CI per-push; `release.yml` su tag `v*` pubblica la GitHub Release con APK firmato e mapping R8. Restano per questa fase i secrets sul repo, versioning e tag
 - [ ] Screenshot per il README (`docs/screenshots/`)
 
 ---
