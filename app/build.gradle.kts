@@ -57,6 +57,12 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("debug")
+            // Dev builds are a different app id, so they install side-by-side with
+            // the release-signed app instead of being uninstallable over it (same
+            // id + different signature = no install at all). Series decision
+            // (Aug 2026); snake had it from its skeleton. A debug res overlay
+            // relabels the launcher icon "tsteps (dev)" to tell the two apart.
+            applicationIdSuffix = ".debug"
         }
         release {
             isMinifyEnabled = true
