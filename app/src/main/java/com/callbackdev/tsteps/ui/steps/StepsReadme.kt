@@ -209,7 +209,7 @@ object StepsReadme {
                     R.string.readme_week_total,
                     numbers.format(weekDays.sumOf { it.first }),
                     UnitFormat.distance(weekDays.sumOf { it.second }, units),
-                    weekDays.sumOf { it.third }
+                    UnitFormat.activeSpan(weekDays.sumOf { it.third })
                 )
             )
         }

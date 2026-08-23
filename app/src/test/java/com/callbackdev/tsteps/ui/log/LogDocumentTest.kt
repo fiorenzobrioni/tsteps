@@ -177,7 +177,7 @@ class LogDocumentTest {
     }
 
     @Test
-    fun `week separators carry the total and the delta vs the week before`() {
+    fun `week separators carry that week's committed total`() {
         // ISO weeks: Aug 17 2026 is a Monday (week 34); Aug 16 a Sunday (week 33).
         val lines = build(
             days = listOf(
@@ -186,19 +186,24 @@ class LogDocumentTest {
                 day("2026-08-14", steps = 4_000, goal = 0)
             )
         )
-        lines.lineWith("--- week 34 · 11,204 steps (+2,204 vs week 33) ---")
+        lines.lineWith("--- week 34 · 11,204 steps ---")
         lines.lineWith("--- week 33 · 9,000 steps ---")
     }
 
     @Test
-    fun `a lighter week gets a red minus delta`() {
+    fun `the separator states no delta - week dot diff owns the comparison`() {
+        // It used to say "(+2,204 vs week 33)", comparing one committed day
+        // against two and disagreeing with week.diff about the current week's
+        // total by exactly today's steps. A divider states, it does not compare.
         val lines = build(
+            today = today(),
             days = listOf(
                 day("2026-08-17", steps = 3_000, goal = 0),
                 day("2026-08-16", steps = 9_000, goal = 0)
             )
         )
-        lines.lineWith("--- week 34 · 3,000 steps (-6,000 vs week 33) ---")
+        lines.lineWith("--- week 34 · 3,000 steps ---")
+        assertTrue(lines.texts().none { it.contains("vs week") })
     }
 
     @Test

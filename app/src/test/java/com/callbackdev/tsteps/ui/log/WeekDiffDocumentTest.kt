@@ -75,7 +75,7 @@ class WeekDiffDocumentTest {
     @Test
     fun `a week in progress says so instead of quietly pro-rating`() {
         val lines = build()
-        lines.lineWith("// week 34 is still being written: 2 of 7 days so far")
+        lines.lineWith("// week 34 in progress: 2 of 7 days")
         // The totals stay the totals: no scaled-up figure anywhere.
         lines.lineWith("+ 10,000")
     }
@@ -87,7 +87,7 @@ class WeekDiffDocumentTest {
         } + (0..6).map {
             day(LocalDate.parse("2026-08-10").plusDays(it.toLong()).toString(), 7_000)
         }
-        assertTrue(build(days = complete).texts().none { it.contains("still being written") })
+        assertTrue(build(days = complete).texts().none { it.contains("in progress") })
     }
 
     @Test
@@ -145,6 +145,9 @@ class WeekDiffDocumentTest {
         lines.lineWith("+ ·")
         assertTrue(lines.texts().none { it.contains("0/0") })
         lines.lineWith("- ✓✓✓✓✓✓✓  7/7")
+        // And no delta: nothing has been measured, so nothing was lost. A `-7`
+        // would claim seven failures that never happened.
+        assertEquals("@@ goal_checks @@", lines.lineWith("@@ goal_checks @@").text.text)
     }
 
     @Test
@@ -156,7 +159,7 @@ class WeekDiffDocumentTest {
     @Test
     fun `an empty previous week is a stated absence, never a zero`() {
         val lines = build(days = listOf(day("2026-08-18", 5_000)))
-        lines.lineWith("// nothing to compare: week 33 has no committed days")
+        lines.lineWith("// nothing to compare: week 33 has no commits")
         assertTrue(lines.texts().none { it.contains("@@ steps @@") })
     }
 

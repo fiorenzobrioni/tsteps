@@ -106,7 +106,9 @@ does not touch it: which file is open is editor state, not a setting.
 
 One commit per day, committed at midnight by the system. Today sits on top as
 uncommitted changes. Expand a day and the walks appear as hunks; personal records
-are tags pinned to their commit.
+are tags pinned to their commit. Week boundaries are dividers carrying that week's
+committed total: the comparison between weeks lives in `week.diff`, where it can
+be made honestly.
 
 ```diff
 commit 4f82a1c  (tag: best-week)

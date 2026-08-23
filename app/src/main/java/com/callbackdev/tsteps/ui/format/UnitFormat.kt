@@ -37,12 +37,17 @@ object UnitFormat {
         if (units == UnitsSystem.METRIC) "min/km" else "min/mi"
 
     /**
-     * Active time at the scale it is being read: `47 min` for a day, `58 h` for
-     * everything since the first commit. Four-digit minutes are a number nobody
-     * converts in their head.
+     * Active time at the scale it is being read: `47 min` for a day, `8 h 35 min`
+     * for a week, `58 h` for everything since the first commit. Three- and
+     * four-digit minute counts are a number nobody converts in their head, and
+     * a bare `8 h` would throw away the half hour a week's total still cares
+     * about — so the remainder rides along whenever there is one.
      */
-    fun activeSpan(minutes: Int): String =
-        if (minutes >= 60) "${minutes / 60} h" else "$minutes min"
+    fun activeSpan(minutes: Int): String = when {
+        minutes < 60 -> "$minutes min"
+        minutes % 60 == 0 -> "${minutes / 60} h"
+        else -> "${minutes / 60} h ${minutes % 60} min"
+    }
 
     private val ClockTime = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 

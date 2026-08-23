@@ -58,14 +58,14 @@ object WeekDiffDocument {
             add(
                 commentLine(
                     if (week != null) {
-                        "// nothing to compare: week $week has no committed days"
+                        "// nothing to compare: week $week has no commits"
                     } else {
                         "// nothing to compare: no history yet"
                     },
                     syntax
                 )
             )
-            add(commentLine("// the diff appears once two consecutive weeks have data", syntax))
+            add(commentLine("// two consecutive weeks are needed", syntax))
             return@buildList
         }
 
@@ -78,8 +78,8 @@ object WeekDiffDocument {
             add(blank())
             add(
                 commentLine(
-                    "// week ${current.week} is still being written: " +
-                        "${current.daysWithData} of ${WeekDiff.DAYS_IN_WEEK} days so far",
+                    "// week ${current.week} in progress: " +
+                        "${current.daysWithData} of ${WeekDiff.DAYS_IN_WEEK} days",
                     syntax
                 )
             )
@@ -127,7 +127,13 @@ object WeekDiffDocument {
                 key = "goal_checks",
                 old = checkColumn(previous),
                 new = checkColumn(current),
-                delta = abs(current.checksPassed - previous.checksPassed).toString(),
+                // No check has run this week yet, so nothing has been lost:
+                // a `-7` here would claim seven failures that never happened.
+                delta = if (current.checksRun == 0) {
+                    null
+                } else {
+                    abs(current.checksPassed - previous.checksPassed).toString()
+                },
                 up = current.checksPassed >= previous.checksPassed,
                 syntax = syntax
             )
@@ -170,7 +176,7 @@ object WeekDiffDocument {
         key: String,
         old: String,
         new: String,
-        delta: String,
+        delta: String?,
         up: Boolean,
         percent: String? = null,
         syntax: SyntaxColors
@@ -179,7 +185,10 @@ object WeekDiffDocument {
         add(
             CodeLine(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(color = syntax.comment)) { append("@@ $key @@  ") }
+                    withStyle(SpanStyle(color = syntax.comment)) {
+                        append(if (delta == null) "@@ $key @@" else "@@ $key @@  ")
+                    }
+                    if (delta == null) return@buildAnnotatedString
                     withStyle(SpanStyle(color = if (up) syntax.diffAdd else syntax.diffDel)) {
                         append((if (up) "+" else "-") + delta)
                         if (percent != null) append("  $percent")

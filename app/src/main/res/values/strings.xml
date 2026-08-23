@@ -78,7 +78,7 @@
     <string name="readme_t_distance">Distance</string>
     <string name="readme_t_active">Active</string>
     <string name="readme_t_day">Day</string>
-    <string name="readme_week_total">Total: **%1$s steps** \u00b7 %2$s \u00b7 %3$d min</string>
+    <string name="readme_week_total">Total: **%1$s steps** \u00b7 %2$s \u00b7 %3$s</string>
     <string name="readme_rec_best_day">Best day: **%1$s steps** (%2$s)</string>
     <string name="readme_rec_longest_walk">Longest walk: **%1$d min** \u00b7 %2$s (%3$s)</string>
     <string name="readme_rec_best_week">Best week: **%1$s steps** (week %2$d)</string>

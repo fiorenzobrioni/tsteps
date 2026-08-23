@@ -42,8 +42,8 @@ data class CommitDay(
  * The `steps_history.diff` document — the git log made real. Today sits on top as
  * uncommitted changes; every finished day is a commit (stable hash, author,
  * factual goal-check line) that expands into its diff, where steps are the added
- * lines. Week boundaries render as separators carrying the week total and the
- * delta against the week before: the week as a diff.
+ * lines. Week boundaries render as separators carrying that week's committed
+ * total; the week-over-week comparison is `week.diff`, the screen's other file.
  */
 object LogDocument {
 
@@ -94,16 +94,13 @@ object LogDocument {
         }
         val weekTotals: Map<Pair<Int, Int>, Long> = days.groupBy { weekOf(it.date) }
             .mapValues { (_, weekDays) -> weekDays.sumOf { it.steps } }
-        // Weeks newest-first, for "vs previous week" lookups.
-        val weekOrder = days.map { weekOf(it.date) }.distinct()
-
         var currentWeek: Pair<Int, Int>? = null
         days.forEach { day ->
             val week = weekOf(day.date)
             if (week != currentWeek) {
                 currentWeek = week
                 add(blank())
-                add(weekSeparator(week, weekTotals, weekOrder, numbers, syntax))
+                add(weekSeparator(week, weekTotals, numbers, syntax))
             }
             add(blank())
             addCommit(
@@ -123,35 +120,30 @@ object LogDocument {
     }
 
     /** `--- week 34 · 52,340 steps (+2,340 vs week 33) ---`, delta in diff colors. */
+    /**
+     * A divider between the weeks of the commit stream, carrying that week's
+     * committed total and nothing more.
+     *
+     * It used to append a `(+2,204 vs week 33)` delta, and that delta was wrong
+     * twice over (Fase 15). It compared whatever days each week happened to have
+     * in the log — a Monday-only week against a two-day one — and stated the
+     * result as a week-over-week change; and because the commit stream excludes
+     * today, its current-week total disagreed with `week.diff`, one tab away, by
+     * exactly today's steps. Two numbers for one week in the same app. The
+     * comparison now lives in the file built to make it honestly, so the
+     * separator went back to being a separator.
+     */
     private fun weekSeparator(
         week: Pair<Int, Int>,
         totals: Map<Pair<Int, Int>, Long>,
-        weekOrder: List<Pair<Int, Int>>,
         numbers: NumberFormat,
         syntax: SyntaxColors
-    ): CodeLine {
-        val total = totals.getValue(week)
-        val previous = weekOrder.getOrNull(weekOrder.indexOf(week) + 1)
-        return CodeLine(
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = syntax.comment)) {
-                    append("--- week ${week.second} · ${numbers.format(total)} steps")
-                }
-                if (previous != null) {
-                    val delta = total - totals.getValue(previous)
-                    val color = if (delta >= 0) syntax.diffAdd else syntax.diffDel
-                    withStyle(SpanStyle(color = syntax.comment)) { append(" (") }
-                    withStyle(SpanStyle(color = color)) {
-                        append((if (delta >= 0) "+" else "-") + numbers.format(kotlin.math.abs(delta)))
-                    }
-                    withStyle(SpanStyle(color = syntax.comment)) {
-                        append(" vs week ${previous.second})")
-                    }
-                }
-                withStyle(SpanStyle(color = syntax.comment)) { append(" ---") }
-            }
+    ): CodeLine = CodeLine(
+        AnnotatedString(
+            "--- week ${week.second} · ${numbers.format(totals.getValue(week))} steps ---",
+            SpanStyle(color = syntax.comment)
         )
-    }
+    )
 
     private fun MutableList<CanvasLine>.addCommit(
         day: CommitDay,

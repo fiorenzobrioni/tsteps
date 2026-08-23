@@ -63,7 +63,7 @@
     <string name="readme_t_distance">Distanza</string>
     <string name="readme_t_active">Attivi</string>
     <string name="readme_t_day">Giorno</string>
-    <string name="readme_week_total">Totale: **%1$s passi** \u00b7 %2$s \u00b7 %3$d min</string>
+    <string name="readme_week_total">Totale: **%1$s passi** \u00b7 %2$s \u00b7 %3$s</string>
     <string name="readme_rec_best_day">Giorno migliore: **%1$s passi** (%2$s)</string>
     <string name="readme_rec_longest_walk">Camminata pi\u00f9 lunga: **%1$d min** \u00b7 %2$s (%3$s)</string>
     <string name="readme_rec_best_week">Settimana migliore: **%1$s passi** (settimana %2$d)</string>

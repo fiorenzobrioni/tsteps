@@ -165,13 +165,13 @@ class StepsReadmeTest {
     @Test
     fun `the week closes with its totals, in the shape of the Today line`() {
         // today (8,432 · 6,123 m · 74 min) + yesterday (11,204 · 8,300 m · 96 min)
-        build().lineWith("Total: **19,636 steps** · 14.4 km · 170 min")
+        build().lineWith("Total: **19,636 steps** · 14.4 km · 2 h 50 min")
     }
 
     @Test
     fun `week totals count only the days there is data for`() {
         val lines = build(history = emptyList())
-        lines.lineWith("Total: **8,432 steps** · 6.1 km · 74 min")
+        lines.lineWith("Total: **8,432 steps** · 6.1 km · 1 h 14 min")
     }
 
     @Test
