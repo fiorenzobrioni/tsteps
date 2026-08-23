@@ -17,6 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.callbackdev.tsteps.R
+import com.callbackdev.tsteps.data.LogEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
 import com.callbackdev.tsteps.ui.components.CodeCanvas
@@ -31,26 +32,44 @@ import java.time.LocalDate
 import java.util.Locale
 
 /**
- * The Log tab: `steps_history.diff`, the git log made real. Today on top as
- * uncommitted changes, one commit per finished day (tap a commit to expand its
- * diff — steps are the added lines), week separators with the delta against the
- * week before, and records pinned as tags.
+ * The Log tab, two files. `steps_history.diff` is the git log made real: today
+ * on top as uncommitted changes, one commit per finished day (tap a commit to
+ * expand its diff — steps are the added lines), week separators with the delta
+ * against the week before, and records pinned as tags. `week.diff` (Fase 15) is
+ * `git diff last_week` in full: this ISO week against the one before, metric by
+ * metric — the separators carry one number in passing, this carries all five.
  */
 @Composable
 fun LogScreen(viewModel: LogViewModel = viewModel(factory = LogViewModel.Factory)) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LogScreen(state = state, onToggle = viewModel::toggle)
+    val activeFile by viewModel.activeFile.collectAsStateWithLifecycle()
+    LogScreen(
+        state = state,
+        activeFile = activeFile,
+        onToggle = viewModel::toggle,
+        onSelectFile = viewModel::selectFile
+    )
 }
 
 @Composable
 fun LogScreen(
     state: LogUiState,
-    onToggle: (LocalDate) -> Unit = {}
+    activeFile: LogEditorFile = LogEditorFile.HISTORY,
+    onToggle: (LocalDate) -> Unit = {},
+    onSelectFile: (LogEditorFile) -> Unit = {}
 ) {
     val syntax = TstepsTheme.syntax
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
-    val lines = remember(state, syntax, locale) {
+    val lines = remember(state, activeFile, syntax, locale) {
+        if (activeFile == LogEditorFile.WEEK) {
+            return@remember WeekDiffDocument.build(
+                comparison = state.weekDiff,
+                units = state.units,
+                locale = locale,
+                syntax = syntax
+            )
+        }
         LogDocument.build(
             today = state.today,
             days = state.days,
@@ -69,8 +88,13 @@ fun LogScreen(
     val canvasState = rememberLazyListState()
     // A stats.md tag jump: the day arrived already expanded (LogFocus →
     // ViewModel); scroll its commit header into view, then consume the request.
-    LaunchedEffect(state.focusDate, lines) {
+    LaunchedEffect(state.focusDate, lines, activeFile) {
         val date = state.focusDate ?: return@LaunchedEffect
+        // A tag jump always means a commit, so it lands on the history file.
+        if (activeFile != LogEditorFile.HISTORY) {
+            onSelectFile(LogEditorFile.HISTORY)
+            return@LaunchedEffect
+        }
         val header = "commit " + CommitHash.of(date)
         val index = lines.indexOfFirst { it is CodeLine && it.text.text.startsWith(header) }
         if (index >= 0) {
@@ -81,9 +105,9 @@ fun LogScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             EditorTabs(
-                fileNames = listOf("steps_history.diff"),
-                activeIndex = 0,
-                onSelect = {}
+                fileNames = listOf("steps_history.diff", "week.diff"),
+                activeIndex = LogEditorFile.entries.indexOf(activeFile),
+                onSelect = { index -> onSelectFile(LogEditorFile.entries[index]) }
             )
             CodeCanvas(
                 lines = lines,

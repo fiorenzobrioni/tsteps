@@ -6,8 +6,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import com.callbackdev.tsteps.data.LogEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
+import com.callbackdev.tsteps.domain.WeekDay
+import com.callbackdev.tsteps.domain.WeekDiff
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -54,6 +57,52 @@ class LogScreenTest {
         compose.onNodeWithText(
             "HEAD → " + CommitHash.of(LocalDate.parse("2026-08-17"))
         ).assertExists()
+    }
+
+    @Test
+    fun `the tab strip carries both files and the active one is the stored file`() {
+        compose.setContent {
+            TstepsTheme { LogScreen(state = state(), activeFile = LogEditorFile.HISTORY) }
+        }
+        compose.onNodeWithText("steps_history.diff").assertExists()
+        compose.onNodeWithText("week.diff").assertExists()
+        line("# Changes not yet committed (today)").assertExists()
+    }
+
+    @Test
+    fun `selecting week diff asks for the other file`() {
+        var selected: LogEditorFile? = null
+        compose.setContent {
+            TstepsTheme { LogScreen(state = state(), onSelectFile = { selected = it }) }
+        }
+        compose.onNodeWithText("week.diff").performClick()
+        assertEquals(LogEditorFile.WEEK, selected)
+    }
+
+    @Test
+    fun `the week tab renders the diff instead of the history`() {
+        val comparison = WeekDiff.of(
+            (0..6).map { back ->
+                WeekDay(
+                    date = LocalDate.parse("2026-08-10").plusDays(back.toLong()),
+                    steps = 7_000, distanceMeters = 5_040.0, activeMinutes = 70,
+                    walks = 1, goalMet = true
+                )
+            } + WeekDay(LocalDate.parse("2026-08-18"), 5_000, 3_600.0, 50, 1, null),
+            LocalDate.parse("2026-08-18")
+        )
+        compose.setContent {
+            TstepsTheme {
+                LogScreen(
+                    state = state().copy(weekDiff = comparison),
+                    activeFile = LogEditorFile.WEEK
+                )
+            }
+        }
+        line("$ git diff @{last.week}").assertExists()
+        line("@@ steps @@").assertExists()
+        compose.onNodeWithText("# Changes not yet committed (today)", substring = true)
+            .assertDoesNotExist()
     }
 
     @Test

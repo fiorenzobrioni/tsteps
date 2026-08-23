@@ -228,6 +228,7 @@ fun StepsScreen(
                     status = state.status,
                     sessions = state.sessions,
                     history = state.history,
+                    records = state.records,
                     units = state.units,
                     zone = state.zone,
                     locale = locale,

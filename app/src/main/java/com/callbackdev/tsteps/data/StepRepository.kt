@@ -140,6 +140,9 @@ class StepRepository(
 
     fun observeAllSessions(): Flow<List<SessionEntity>> = sessionDao.observeAll()
 
+    /** The `longest-walk` record alone — see [SessionDao.observeLongest]. */
+    fun observeLongestSession(): Flow<SessionEntity?> = sessionDao.observeLongest()
+
     suspend fun insertSession(session: SessionEntity): Long = sessionDao.insert(session)
 
     /**

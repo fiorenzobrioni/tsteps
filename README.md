@@ -91,7 +91,11 @@ badge (goal progress in neutral words, never guilt), the walks table, and
 `## Settimana` with the last seven days, today in bold and still moving, untracked
 days marked with a placeholder dash (missing data, not zero) and a totals line
 underneath. The status badge carries the same completion percentage the JSON's
-check bar shows: the prose and the machine file never disagree on a number.
+check bar shows: the prose and the machine file never disagree on a number. It
+closes with `## Record`, the same three all-time tags `stats.md` pins in a table,
+written as sentences: best day, longest walk, best week. Records come from
+committed days only, so a personal best set this morning is announced tomorrow,
+exactly like a tag on a commit.
 Sensor problems show up as `>` warning
 blockquotes. The active tab survives restarts, and `$ git restore settings.config`
 does not touch it: which file is open is editor state, not a setting.
@@ -118,6 +122,35 @@ Date:   Sun Aug 17
 
 The goal check is factual, never guilt-driven: a red ✗ states a number, and if no
 goal is set no check runs at all. The app is fully functional without one.
+
+### `week.diff`: this week against last week
+
+The Log's second tab, and a real diff: `git diff last_week`, one hunk per metric,
+old value removed and new value added.
+
+```diff
+$ git diff @{last.week}
+
+--- a/week 33   aug 10..16   7/7 days
++++ b/week 34   aug 17..23   2/7 days
+
+// week 34 is still being written: 2 of 7 days so far
+
+@@ steps @@  -39,000  -80%
+- 49,000
++ 10,000
+
+@@ goal_checks @@  -6
+- ✓✓✓✓✓✓✓  7/7
++ ✓·  1/1
+```
+
+Nothing is pro-rated to make the two sides look comparable: both headers carry how
+many of their seven days have data, and a week still in progress says so in the
+comment channel. The `-` side is always the week immediately before, empty or not:
+promoting an older week to "last week" because the real one is blank would be the
+file lying about what it compared. Only steps get a percentage, because distance
+and active minutes are computed from steps and would just repeat it.
 
 ### `stats.md`: the contribution graph
 
@@ -207,24 +240,24 @@ JSON keeps everything in one document. CSV is one table per file, because days
 and sessions are different rows and a spreadsheet that mixes them is useless.
 Both carry the same two records:
 
-- **days**: `date`, `commit`, `steps`, `active_min`, `distance_m`, `active_kcal`,
-  `goal_steps`, `goal_met`, `committed`
-- **sessions**: `date`, `start`, `end`, `type`, `steps`, `distance_m`,
+- **days**: `date`, `commit`, `steps`, `active_min`, `distance_m`, `stride_m`,
+  `active_kcal`, `goal_steps`, `goal_met`, `committed`
+- **sessions**: `date`, `start`, `end`, `type`, `steps`, `distance_m`, `stride_m`,
   `active_min`, `avg_cadence_spm`, `source`, `start_approx`, `end_approx`
 
 ```json
 {
   "app": "tsteps",
-  "schema": 1,
+  "schema": 2,
   "exported_at": "2026-08-20T16:32:05Z",
   "timezone": "Europe/Rome",
   "units": "steps, meters, minutes, kcal",
   "estimates": "distance_m and active_kcal are estimated from your profile, not measured",
   "days": [
-    { "date": "2026-08-19", "commit": "3f2c1a9", "steps": 11204, "active_min": 96, "distance_m": 8310.2, "active_kcal": 312, "goal_steps": 10000, "goal_met": true, "committed": true }
+    { "date": "2026-08-19", "commit": "3f2c1a9", "steps": 11204, "active_min": 96, "distance_m": 8310.2, "stride_m": 0.742, "active_kcal": 312, "goal_steps": 10000, "goal_met": true, "committed": true }
   ],
   "sessions": [
-    { "date": "2026-08-19", "start": "2026-08-19T09:32:00+02:00", "end": "2026-08-19T10:18:00+02:00", "type": "walk", "steps": 4210, "distance_m": 3120.5, "active_min": 46, "avg_cadence_spm": 92, "source": "manual", "start_approx": false, "end_approx": false }
+    { "date": "2026-08-19", "start": "2026-08-19T09:32:00+02:00", "end": "2026-08-19T10:18:00+02:00", "type": "walk", "steps": 4210, "distance_m": 3120.5, "stride_m": 0.741, "active_min": 46, "avg_cadence_spm": 92, "source": "manual", "start_approx": false, "end_approx": false }
   ]
 }
 ```
@@ -243,6 +276,11 @@ Four rules the format keeps:
 4. **`distance_m` and `active_kcal` are estimates**, not measurements. The JSON
    header says so; CSV has no comment channel a spreadsheet tolerates, so it is
    said here instead.
+5. **Every estimate ships the factor behind it.** `stride_m` is the stride that
+   produced that row's `distance_m`, frozen with the row: without it a reader
+   cannot tell a day measured at 0.78 m from one guessed at the 0.72 m fallback,
+   and cannot recompute anything after measuring their own. It is `null` on a day
+   that took no step, because there is no factor to report.
 
 Sessions you removed with `[rm]` are not exported (you deleted them), and neither
 is a session still running (it has no ending yet). The hourly buckets stay out as

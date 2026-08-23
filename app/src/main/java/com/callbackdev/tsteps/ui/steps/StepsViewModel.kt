@@ -26,6 +26,7 @@ import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.DayStats
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
+import com.callbackdev.tsteps.domain.Records
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.domain.Streaks
 import com.callbackdev.tsteps.healthconnect.ExternalStepsState
@@ -66,6 +67,8 @@ data class StepsUiState(
     val history: List<DayStats> = emptyList(),
     /** What other apps counted today (Fase 12) — shown, never added. */
     val externalSteps: List<OriginSteps> = emptyList(),
+    /** All-time tags for the README's `## Records`; null until something ranks. */
+    val records: DayRecords? = null,
     val zone: ZoneId = ZoneId.systemDefault(),
     /** Date of the newest committed day, for the status bar's `Last commit:`. */
     val lastCommitDate: LocalDate? = null
@@ -187,17 +190,18 @@ class StepsViewModel(
             ) { rows, sessions -> Triple(date, rows, sessions) }
         },
         repository.observeHistory(),
-        // Paired upstream: combine tops out at five flows and these two always
-        // travel together (the external block only exists while sync is on).
+        // Bundled upstream: combine tops out at five flows. The external block
+        // only exists while sync is on, and the longest walk is a single row the
+        // README's records need (never the whole session table on this screen).
         combine(
             settingsStore.settings,
             hcStateStore?.external ?: flowOf<ExternalStepsState?>(null),
-            ::Pair
-        ),
+            repository.observeLongestSession()
+        ) { settings, external, longest -> Triple(settings, external, longest) },
         permissionGranted,
         expandedSessions
-    ) { (date, hourlyRows, sessionRows), history, settingsAndHc, granted, expandedIds ->
-        val (settings, hcExternal) = settingsAndHc
+    ) { (date, hourlyRows, sessionRows), history, upstream, granted, expandedIds ->
+        val (settings, hcExternal, longestRow) = upstream
         StepsUiState(
             snapshot = snapshot(date, hourlyRows, history, settings),
             status = when {
@@ -215,8 +219,30 @@ class StepsViewModel(
             history = history.map {
                 DayStats(LocalDate.parse(it.date), it.steps, it.distanceMeters, it.activeMinutes)
             },
+            records = records(history, longestRow?.toItem()),
             zone = clock.zone,
             lastCommitDate = history.firstOrNull()?.let { LocalDate.parse(it.date) }
+        )
+    }
+
+    /**
+     * The all-time tags, from the committed days alone — today is the working
+     * tree, and a record is a tag on a commit: a personal best set this morning
+     * shows up tomorrow, exactly as it does in `stats.md`. Null when nothing has
+     * been committed yet: an empty records section is worse than none.
+     */
+    private fun records(
+        history: List<DaySummaryEntity>,
+        longestWalk: SessionItem?
+    ): DayRecords? {
+        val days = history.map { LocalDate.parse(it.date) to it.steps }.filter { it.second > 0 }
+        val bestDate = Records.bestDay(days)
+        val bestDay = bestDate?.let { date -> date to days.first { it.first == date }.second }
+        if (bestDay == null && longestWalk == null) return null
+        return DayRecords(
+            bestDay = bestDay,
+            longestWalk = longestWalk,
+            bestWeek = Records.bestWeek(days)
         )
     }
 

@@ -9,6 +9,7 @@ import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.StepSource
 import com.callbackdev.tsteps.data.TrackerStateStore
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
+import com.callbackdev.tsteps.data.local.SessionEntity
 import com.callbackdev.tsteps.data.local.TstepsDatabase
 import com.callbackdev.tsteps.healthconnect.ExternalStepsState
 import com.callbackdev.tsteps.healthconnect.HcStateStore
@@ -259,6 +260,54 @@ class StepsViewModelTest {
             subscription.cancel()
         }
     }
+
+    @Test
+    fun `records come from committed days and the single longest walk`() = runBlocking {
+        database.daySummaryDao().insertIfAbsent(day("2026-08-16", goalMet = true))
+        database.daySummaryDao().insertIfAbsent(
+            day("2026-08-17", goalMet = true).copy(steps = 14_823)
+        )
+        database.sessionDao().insert(walk("2026-08-16T09:00:00", minutes = 40, steps = 4_000))
+        database.sessionDao().insert(walk("2026-08-17T09:00:00", minutes = 92, steps = 9_120))
+
+        val vm = viewModel()
+        val subscription = subscribe(vm)
+        try {
+            waitFor { vm.uiState.value.records?.longestWalk != null }
+            val records = vm.uiState.value.records!!
+            assertEquals(LocalDate.parse("2026-08-17"), records.bestDay?.first)
+            assertEquals(14_823L, records.bestDay?.second)
+            assertEquals(9_120L, records.longestWalk?.steps) // the 92-minute one
+            // Sun 16 closes ISO week 33, mon 17 opens week 34: different weeks,
+            // so the best one is week 34 with its single day.
+            assertEquals(34, records.bestWeek?.week)
+            assertEquals(14_823L, records.bestWeek?.steps)
+        } finally {
+            subscription.cancel()
+        }
+    }
+
+    @Test
+    fun `nothing committed means no records section to render`() = runBlocking {
+        val vm = viewModel()
+        val subscription = subscribe(vm)
+        try {
+            waitFor { vm.uiState.value.snapshot != null }
+            assertNull(vm.uiState.value.records)
+        } finally {
+            subscription.cancel()
+        }
+    }
+
+    private fun walk(start: String, minutes: Int, steps: Long) = SessionEntity(
+        startMillis = millis(start),
+        endMillis = millis(start) + minutes * 60_000L,
+        type = "walk",
+        steps = steps,
+        distanceMeters = steps * 0.72,
+        avgCadenceSpm = 100,
+        activeMillis = minutes * 60_000L
+    )
 
     private fun day(date: String, goalMet: Boolean) = DaySummaryEntity(
         date = date,

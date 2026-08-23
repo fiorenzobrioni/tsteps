@@ -63,6 +63,7 @@
     <string name="readme_h_status">Status</string>
     <string name="readme_h_walks">Walks</string>
     <string name="readme_h_week">Week</string>
+    <string name="readme_h_records">Records</string>
     <string name="readme_summary">**%1$s steps** \u00b7 %2$s \u00b7 %3$d min</string>
     <string name="readme_kcal">Active calories: %1$s kcal (estimate)</string>
     <string name="readme_goal_reached">\u2713 Goal reached: %1$s of %2$s steps (%3$d%%)</string>
@@ -78,5 +79,8 @@
     <string name="readme_t_active">Active</string>
     <string name="readme_t_day">Day</string>
     <string name="readme_week_total">Total: **%1$s steps** \u00b7 %2$s \u00b7 %3$d min</string>
+    <string name="readme_rec_best_day">Best day: **%1$s steps** (%2$s)</string>
+    <string name="readme_rec_longest_walk">Longest walk: **%1$d min** \u00b7 %2$s (%3$s)</string>
+    <string name="readme_rec_best_week">Best week: **%1$s steps** (week %2$d)</string>
     <string name="readme_footer">Computed on device \u00b7 %1$d committed days</string>
 </resources>

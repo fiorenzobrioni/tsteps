@@ -4,6 +4,7 @@ import android.content.res.Resources
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.DayStats
+import com.callbackdev.tsteps.domain.Records
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.ui.format.TableAlign
 import com.callbackdev.tsteps.ui.format.TableCell
@@ -11,6 +12,7 @@ import com.callbackdev.tsteps.ui.format.TableColumn
 import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.ui.format.markdownTable
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -28,6 +30,20 @@ import java.util.Locale
  * blockquote warnings. Tables are [markdownTable]s: columns padded to their
  * widest cell, numbers right-aligned (tweather's Fase 11c convention).
  */
+/**
+ * The all-time tags the README closes with. Same three records `stats.md` pins
+ * as `tag:` refs, told as sentences instead of a table: the README is the human
+ * summary, and a third pipe table on a page that already has two would be the
+ * stats screen wearing prose. Each field is null until something ranks.
+ */
+data class DayRecords(
+    val bestDay: Pair<LocalDate, Long>? = null,
+    val longestWalk: SessionItem? = null,
+    val bestWeek: Records.BestWeek? = null
+) {
+    val isEmpty: Boolean get() = bestDay == null && longestWalk == null && bestWeek == null
+}
+
 object StepsReadme {
 
     fun build(
@@ -35,6 +51,7 @@ object StepsReadme {
         status: SensorStatus,
         sessions: List<SessionItem>,
         history: List<DayStats>,
+        records: DayRecords?,
         units: UnitsSystem,
         zone: ZoneId,
         locale: Locale,
@@ -197,9 +214,49 @@ object StepsReadme {
             )
         }
 
+        if (records != null && !records.isEmpty) {
+            add("")
+            add("## ${s(R.string.readme_h_records)}")
+            records.bestDay?.let { (date, steps) ->
+                add(
+                    s(
+                        R.string.readme_rec_best_day,
+                        numbers.format(steps),
+                        recordDate(date, locale)
+                    )
+                )
+            }
+            records.longestWalk?.let { walk ->
+                add(
+                    s(
+                        R.string.readme_rec_longest_walk,
+                        walk.activeMinutes,
+                        UnitFormat.distance(walk.distanceMeters, units),
+                        recordDate(
+                            Instant.ofEpochMilli(walk.startMillis).atZone(zone).toLocalDate(),
+                            locale
+                        )
+                    )
+                )
+            }
+            records.bestWeek?.let { week ->
+                add(
+                    s(
+                        R.string.readme_rec_best_week,
+                        numbers.format(week.steps),
+                        week.week
+                    )
+                )
+            }
+        }
+
         add("")
         add("*${s(R.string.readme_footer, history.size)}*")
     }
+
+    /** `12 July 2026` — a record's date, shorter than the title's full form. */
+    private fun recordDate(date: LocalDate, locale: Locale): String =
+        date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
 
     /** `Tuesday 18 August 2026`, capitalized — prose, so fully localized. */
     private fun title(date: LocalDate, locale: Locale): String =

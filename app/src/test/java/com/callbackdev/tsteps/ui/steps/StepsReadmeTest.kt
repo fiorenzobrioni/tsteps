@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.test.core.app.ApplicationProvider
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.DayStats
+import com.callbackdev.tsteps.domain.Records
 import com.callbackdev.tsteps.domain.SessionItem
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -52,9 +53,14 @@ class StepsReadmeTest {
         sessions: List<SessionItem> = emptyList(),
         history: List<DayStats> = listOf(
             DayStats(LocalDate.parse("2026-08-17"), 11_204, 8_300.0, 96)
+        ),
+        records: DayRecords? = DayRecords(
+            bestDay = LocalDate.parse("2026-07-12") to 14_823L,
+            longestWalk = walk().copy(activeMillis = 92 * 60_000L, distanceMeters = 6_600.0),
+            bestWeek = Records.BestWeek(2026, 33, 52_340)
         )
     ) = StepsReadme.build(
-        snapshot, status, sessions, history,
+        snapshot, status, sessions, history, records,
         UnitsSystem.METRIC, rome, Locale.ENGLISH, resources
     )
 
@@ -172,6 +178,32 @@ class StepsReadmeTest {
     fun `an empty week has no totals line to print`() {
         val lines = build(snapshot = null, status = SensorStatus.NO_SENSOR, history = emptyList())
         assertTrue(lines.none { it.contains("Total:") })
+    }
+
+    @Test
+    fun `records close the file as sentences, not a third table`() {
+        val lines = build()
+        lines.lineWith("## Records")
+        lines.lineWith("Best day: **14,823 steps** (12 July 2026)")
+        lines.lineWith("Longest walk: **92 min** · 6.6 km (18 August 2026)")
+        lines.lineWith("Best week: **52,340 steps** (week 33)")
+        // Prose, so no pipes: stats.md owns the tabular view of the same tags.
+        val records = lines.dropWhile { !it.contains("## Records") }
+        assertTrue(records.none { it.startsWith("|") })
+    }
+
+    @Test
+    fun `a record that does not exist yet prints no line`() {
+        val lines = build(records = DayRecords(bestDay = LocalDate.parse("2026-07-12") to 9L))
+        lines.lineWith("## Records")
+        assertTrue(lines.none { it.contains("Longest walk") })
+        assertTrue(lines.none { it.contains("Best week") })
+    }
+
+    @Test
+    fun `no records at all means no section`() {
+        assertTrue(build(records = null).none { it.contains("## Records") })
+        assertTrue(build(records = DayRecords()).none { it.contains("## Records") })
     }
 
     @Test
