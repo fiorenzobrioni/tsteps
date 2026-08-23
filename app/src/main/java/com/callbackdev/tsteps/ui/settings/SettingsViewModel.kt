@@ -61,6 +61,9 @@ class SettingsViewModel(
     fun setDailyGoalSteps(steps: Int) = save { setDailyGoalSteps(steps) }
     fun setWeightKg(weightKg: Double?) = save { setWeightKg(weightKg) }
     fun setHeightCm(heightCm: Int?) = save { setHeightCm(heightCm) }
+
+    /** `profile.stride_cm` — the measured stride that overrides height_cm. */
+    fun setStrideCm(strideCm: Int?) = save { setStrideCm(strideCm) }
     fun setThemeProfile(name: String) = save { setThemeProfileName(name) }
 
     /** `sessions.auto_detect` — Fase 11's opt-in switch, default off. */

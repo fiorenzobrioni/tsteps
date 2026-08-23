@@ -38,9 +38,19 @@ object StepsGlyphs {
      */
     fun goalBar(steps: Long, goalSteps: Int, width: Int = 16): String {
         require(goalSteps > 0) { "goalBar needs a goal; the check is skipped without one" }
-        val ratio = steps.toDouble() / goalSteps
-        val filled = (ratio * width).toInt().coerceIn(0, width)
-        val percent = (ratio * 100).toInt()
-        return "▓".repeat(filled) + "░".repeat(width - filled) + " $percent%"
+        val filled = (steps.toDouble() / goalSteps * width).toInt().coerceIn(0, width)
+        return "▓".repeat(filled) + "░".repeat(width - filled) + " ${goalPercent(steps, goalSteps)}%"
+    }
+
+    /**
+     * The one definition of "how far along today is". The README says it in
+     * prose and the bar above draws it; a second `steps * 100 / goal` written
+     * somewhere else would eventually disagree by a point on a float rounding,
+     * and the two files must never disagree on a number. Integer arithmetic so
+     * it cannot: 29 of 100 is 29%, not the 28 a double round-trip can produce.
+     */
+    fun goalPercent(steps: Long, goalSteps: Int): Int {
+        require(goalSteps > 0) { "there is no percentage without a goal" }
+        return (steps * 100 / goalSteps).toInt()
     }
 }

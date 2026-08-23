@@ -56,6 +56,7 @@ import com.callbackdev.tsteps.BuildConfig
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.AppSettings
 import com.callbackdev.tsteps.data.SessionMetric
+import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.SettingsRanges
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.export.ExportFormat
@@ -96,6 +97,7 @@ class SettingsActions(
     val onHealthConnect: (Boolean) -> Unit,
     val onWeight: (Double?) -> Unit,
     val onHeight: (Int?) -> Unit,
+    val onStride: (Int?) -> Unit,
     val onToggleUnits: () -> Unit,
     val onToggleSessionMetric: () -> Unit,
     val onThemeProfile: (String) -> Unit,
@@ -104,8 +106,8 @@ class SettingsActions(
     val onReset: () -> Unit
 )
 
-/** The three numbers edited through a terminal input instead of cycling. */
-internal enum class NumericField { GOAL, WEIGHT, HEIGHT }
+/** The free numbers edited through a terminal input instead of cycling. */
+internal enum class NumericField { GOAL, WEIGHT, HEIGHT, STRIDE }
 
 /** Status of the `notifications` block's dynamic `//` line (tweather's states). */
 enum class NotifLineState {
@@ -259,6 +261,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
             },
             onWeight = viewModel::setWeightKg,
             onHeight = viewModel::setHeightCm,
+            onStride = viewModel::setStrideCm,
             onToggleUnits = viewModel::toggleUnits,
             onToggleSessionMetric = viewModel::toggleSessionMetric,
             onThemeProfile = viewModel::setThemeProfile,
@@ -312,6 +315,7 @@ fun SettingsScreen(
                 settings.dailyGoalSteps.takeIf { it > 0 }?.toString() ?: ""
             NumericField.WEIGHT -> settings.weightKg?.let { formatWeight(it) } ?: ""
             NumericField.HEIGHT -> settings.heightCm?.toString() ?: ""
+            NumericField.STRIDE -> settings.strideCm?.toString() ?: ""
         }
     }
 
@@ -323,6 +327,7 @@ fun SettingsScreen(
                     NumericField.GOAL -> actions.onDailyGoal(result.value.toInt())
                     NumericField.WEIGHT -> actions.onWeight(result.value)
                     NumericField.HEIGHT -> actions.onHeight(result.value.toInt())
+                    NumericField.STRIDE -> actions.onStride(result.value.toInt())
                 }
                 editing = null
             }
@@ -332,6 +337,7 @@ fun SettingsScreen(
                     NumericField.GOAL -> actions.onDailyGoal(0)
                     NumericField.WEIGHT -> actions.onWeight(null)
                     NumericField.HEIGHT -> actions.onHeight(null)
+                    NumericField.STRIDE -> actions.onStride(null)
                 }
                 editing = null
             }
@@ -444,6 +450,16 @@ internal fun parseNumericInput(field: NumericField, raw: String): NumericInput {
                     "// ERROR: expected ${SettingsRanges.HEIGHT_CM.first}..${SettingsRanges.HEIGHT_CM.last} cm"
                 )
             }
+        NumericField.STRIDE ->
+            if (number == number.toInt().toDouble() &&
+                number.toInt() in SettingsRanges.STRIDE_CM
+            ) {
+                NumericInput.Value(number)
+            } else {
+                NumericInput.Invalid(
+                    "// ERROR: expected ${SettingsRanges.STRIDE_CM.first}..${SettingsRanges.STRIDE_CM.last} cm"
+                )
+            }
     }
 }
 
@@ -501,7 +517,13 @@ private fun buildSettingsLines(
         renderedValue = settings.dailyGoalSteps.toString(),
         isNull = false,
         comma = false,
-        hint = "// 0 disables the check",
+        // With a goal set the hint says how to switch the check off; with none
+        // it names the number the JSON is offering, so the two files agree.
+        hint = if (settings.dailyGoalSteps > 0) {
+            "// 0 disables the check"
+        } else {
+            "// no check · $SUGGESTED_DAILY_GOAL_STEPS suggested"
+        },
         field = NumericField.GOAL,
         syntax = syntax,
         changeLabel = changeLabel,
@@ -550,9 +572,33 @@ private fun buildSettingsLines(
         key = "height_cm",
         renderedValue = settings.heightCm?.toString() ?: "null",
         isNull = settings.heightCm == null,
-        comma = false,
-        hint = "// empty uses the 0.72 m stride",
+        comma = true,
+        // The file must not lie: with a measured stride set, height no longer
+        // feeds the distance estimate, and the hint has to say so.
+        hint = if (settings.strideCm != null) {
+            "// unused: stride_cm overrides it"
+        } else {
+            "// empty uses the 0.72 m stride"
+        },
         field = NumericField.HEIGHT,
+        syntax = syntax,
+        changeLabel = changeLabel,
+        editing = editing,
+        editValue = editValue,
+        onEditValue = onEditValue,
+        onStartEdit = onStartEdit,
+        onSubmitEdit = onSubmitEdit,
+        onCancelEdit = onCancelEdit,
+        cancelLabel = cancelLabel,
+        inputError = inputError
+    )
+    addNumericLine(
+        key = "stride_cm",
+        renderedValue = settings.strideCm?.toString() ?: "null",
+        isNull = settings.strideCm == null,
+        comma = false,
+        hint = "// measured stride, beats height_cm",
+        field = NumericField.STRIDE,
         syntax = syntax,
         changeLabel = changeLabel,
         editing = editing,
@@ -1031,7 +1077,7 @@ private fun SettingsScreenPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }
@@ -1042,7 +1088,7 @@ private fun SettingsScreenDefaultsPreview() {
     TstepsTheme {
         SettingsScreen(
             settings = AppSettings(),
-            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         )
     }
 }

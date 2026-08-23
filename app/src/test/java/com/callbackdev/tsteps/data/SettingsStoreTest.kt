@@ -38,6 +38,7 @@ class SettingsStoreTest {
         assertEquals(0, settings.dailyGoalSteps)
         assertNull(settings.weightKg)
         assertNull(settings.heightCm)
+        assertNull(settings.strideCm)
         assertEquals(UnitsSystem.METRIC, settings.units)
         assertEquals("Obsidian", settings.themeProfileName)
     }
@@ -54,6 +55,21 @@ class SettingsStoreTest {
         assertEquals(78.0, settings.weightKg!!, 1e-9)
         assertEquals(175, settings.heightCm)
         assertEquals(UnitsSystem.IMPERIAL, settings.units)
+    }
+
+    @Test
+    fun `stride_cm round-trips and overrides height for the distance estimate`() = runBlocking {
+        val store = store(tmp.newFile("s.preferences_pb"))
+        store.setHeightCm(175)
+        assertEquals(0.72625, store.read().strideMeters(), 1e-9)
+        store.setStrideCm(78)
+        val withOverride = store.read()
+        assertEquals(78, withOverride.strideCm)
+        assertEquals(0.78, withOverride.strideMeters(), 1e-9)
+        assertEquals(7800.0, withOverride.distanceMeters(10_000), 1e-6)
+        // Cleared, the profile falls back to the height it never forgot.
+        store.setStrideCm(null)
+        assertEquals(0.72625, store.read().strideMeters(), 1e-9)
     }
 
     @Test

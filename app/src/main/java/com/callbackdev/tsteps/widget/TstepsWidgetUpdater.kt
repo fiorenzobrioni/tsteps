@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import com.callbackdev.tsteps.data.ServiceLocator
+import com.callbackdev.tsteps.data.distanceMeters
 import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
@@ -53,7 +54,7 @@ object TstepsWidgetUpdater {
             sensorOk = sensorOk,
             todaySteps = steps,
             goalSteps = settings.dailyGoalSteps,
-            distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
+            distanceMeters = settings.distanceMeters(steps),
             activeMinutes = activeMinutes,
             activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
             streakDays = Streaks.current(

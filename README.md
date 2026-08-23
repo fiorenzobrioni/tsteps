@@ -69,6 +69,19 @@ Switch to imperial and the keys change too, to `distance_mi`. A JSON file should
 not lie about its units. Calories are hidden until you give the app your weight:
 an estimate without its input is not shown, it is invented.
 
+Before you pick a goal the file says so and offers one, rather than staying
+silent or inventing a target you never chose:
+
+```json
+  "steps": {
+    "count": 8432,
+    "goal": null   // tap to set 8000
+  },
+```
+
+One tap on that line sets the goal and the check, the bar and the streak appear.
+Until then no check runs.
+
 ### `README.md`: the day in prose
 
 A second editor tab, in the place an editor would put it. The same day as the
@@ -76,7 +89,10 @@ JSON, written for a human and fully localized (it is prose, so here even the
 headings translate): `## Oggi` with the totals, `## Stato` as the day's build
 badge (goal progress in neutral words, never guilt), the walks table, and
 `## Settimana` with the last seven days, today in bold and still moving, untracked
-days marked with a placeholder dash (missing data, not zero). Sensor problems show up as `>` warning
+days marked with a placeholder dash (missing data, not zero) and a totals line
+underneath. The status badge carries the same completion percentage the JSON's
+check bar shows: the prose and the machine file never disagree on a number.
+Sensor problems show up as `>` warning
 blockquotes. The active tab survives restarts, and `$ git restore settings.config`
 does not touch it: which file is open is editor state, not a setting.
 
@@ -106,7 +122,8 @@ goal is set no check runs at all. The app is fully functional without one.
 ### `stats.md`: the contribution graph
 
 Your movement as a GitHub-style heatmap, rendered as a markdown file: twelve weeks
-of green squares, the current and longest streak, 7 and 30 day averages, and the
+of green squares, the current and longest streak, 7 and 30 day averages, a
+`## totals` line with everything you have moved since the first commit, and the
 records table. Intensity buckets are relative to your own history, not to a
 universal 10,000.
 
@@ -117,6 +134,12 @@ the allowed values. Resetting is a command with a two-tap confirm:
 `$ git restore settings.config`. Two more commands sit at the bottom of the file,
 `$ tsteps export --json` and `$ tsteps export --csv`, and print what they wrote
 right under themselves (see [Export](#export)).
+
+The profile block feeds the estimates and nothing else. `weight_kg` is what
+turns calories on, `height_cm` derives your stride, and `stride_cm` overrides
+that derivation if you have measured your own: walk a known distance, divide,
+type the number. When it is set, the hint on `height_cm` says out loud that the
+line is no longer being used.
 
 <img src="docs/screenshots/settings.jpg" width="250" alt="Settings as an editable config file: goal, profile, units, theme profiles">
 

@@ -36,6 +36,14 @@ object UnitFormat {
     fun paceLabel(units: UnitsSystem): String =
         if (units == UnitsSystem.METRIC) "min/km" else "min/mi"
 
+    /**
+     * Active time at the scale it is being read: `47 min` for a day, `58 h` for
+     * everything since the first commit. Four-digit minutes are a number nobody
+     * converts in their head.
+     */
+    fun activeSpan(minutes: Int): String =
+        if (minutes >= 60) "${minutes / 60} h" else "$minutes min"
+
     private val ClockTime = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 
     /** `09:32` — the wall-clock shape used by session hunks and arrays. */

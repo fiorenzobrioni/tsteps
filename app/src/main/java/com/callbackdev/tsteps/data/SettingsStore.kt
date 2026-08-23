@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.callbackdev.tsteps.domain.Estimates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -65,9 +66,10 @@ data class HealthConnectSettings(
  * Defaults are deliberate: `dailyGoalSteps = 0` means **no goal and no CI check**
  * until the user opts in (no guilt mechanics by default, VISION §3.3), and the
  * profile starts empty — kcal stays hidden and stride falls back to a labeled
- * average until the user provides a body to compute with. [themeProfileName]
- * stays a string here so the data layer doesn't depend on the UI's ThemeProfile
- * enum; the UI maps it safely.
+ * average until the user provides a body to compute with — what the file offers
+ * instead of a silent default is [SUGGESTED_DAILY_GOAL_STEPS], one tap away.
+ * [themeProfileName] stays a string here so the data layer doesn't depend on the
+ * UI's ThemeProfile enum; the UI maps it safely.
  */
 data class AppSettings(
     val editor: EditorSettings = EditorSettings(),
@@ -76,6 +78,12 @@ data class AppSettings(
     val dailyGoalSteps: Int = 0,
     val weightKg: Double? = null,
     val heightCm: Int? = null,
+    /**
+     * `profile.stride_cm` — a measured stride that OVERRIDES the height rule of
+     * thumb (VISION §5). Null is the normal state: the estimate then falls back
+     * to height, and to the labeled 0.72 m average without one.
+     */
+    val strideCm: Int? = null,
     val units: UnitsSystem = UnitsSystem.METRIC,
     val sessionMetric: SessionMetric = SessionMetric.SPEED,
     /**
@@ -99,7 +107,33 @@ object SettingsRanges {
     val GOAL_STEPS = 0..100_000
     val WEIGHT_KG = 20.0..300.0
     val HEIGHT_CM = 100..250
+    val STRIDE_CM = 30..120
 }
+
+/**
+ * The goal `steps_data.json` OFFERS when none is set — never the goal it
+ * imposes. VISION §3.3.5 is explicit that a fresh install runs no check, and a
+ * goal the user never chose would be exactly the guilt machine the principle
+ * guards against; but a setting nobody finds hides the best half of the
+ * metaphor, so the file asks for one tap instead of staying silent.
+ *
+ * 8,000 rather than the folkloric 10,000 (a 1965 Japanese pedometer's brand
+ * name): the mortality-benefit plateau in the large step-count cohorts sits
+ * around 6,000–8,000 steps/day for older adults and 8,000–10,000 for younger
+ * ones, so 8,000 is the one number inside the evidence for the whole adult
+ * range — and it is not a round marketing figure, which suits a file that
+ * doesn't lie.
+ */
+const val SUGGESTED_DAILY_GOAL_STEPS = 8_000
+
+/**
+ * The stride these settings imply, and the distance they turn steps into.
+ * Every screen and worker asks the profile rather than [Estimates] directly,
+ * so the override can never be honored in one place and forgotten in another.
+ */
+fun AppSettings.strideMeters(): Double = Estimates.strideMeters(heightCm, strideCm)
+
+fun AppSettings.distanceMeters(steps: Long): Double = steps * strideMeters()
 
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
@@ -120,6 +154,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
                 dailyGoalSteps = prefs[DailyGoalSteps] ?: 0,
                 weightKg = prefs[WeightKg],
                 heightCm = prefs[HeightCm],
+                strideCm = prefs[StrideCm],
                 units = prefs[Units]
                     ?.let { name -> UnitsSystem.entries.firstOrNull { it.name == name } }
                     ?: UnitsSystem.METRIC,
@@ -153,6 +188,8 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setWeightKg(weightKg: Double?) = setOrRemove(WeightKg, weightKg)
 
     suspend fun setHeightCm(heightCm: Int?) = setOrRemove(HeightCm, heightCm)
+
+    suspend fun setStrideCm(strideCm: Int?) = setOrRemove(StrideCm, strideCm)
 
     suspend fun setUnits(units: UnitsSystem) = set(Units, units.name)
 
@@ -197,6 +234,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         private val DailyGoalSteps = intPreferencesKey("daily_goal_steps")
         private val WeightKg = doublePreferencesKey("weight_kg")
         private val HeightCm = intPreferencesKey("height_cm")
+        private val StrideCm = intPreferencesKey("stride_cm")
         private val Units = stringPreferencesKey("units")
         private val SessionMetricKey = stringPreferencesKey("session_metric")
         private val AutoDetectSessions = booleanPreferencesKey("auto_detect_sessions")

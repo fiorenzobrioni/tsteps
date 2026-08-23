@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.SessionItem
@@ -48,7 +49,10 @@ import java.util.Locale
 data class TodaySnapshot(
     val date: LocalDate,
     val steps: Long,
-    /** 0 = no goal: the check lines simply don't exist (no guilt without opt-in). */
+    /**
+     * 0 = no goal: no check, no bar, no streak (no guilt without opt-in). The
+     * key still exists as an explicit `null` offering one — see [StepsDocument].
+     */
     val goalSteps: Int,
     val distanceMeters: Double,
     val activeMinutes: Int,
@@ -113,6 +117,8 @@ object StepsDocument {
         zone: ZoneId = ZoneId.systemDefault(),
         onGrantPermission: (() -> Unit)? = null,
         grantClickLabel: String? = null,
+        onAcceptGoal: (() -> Unit)? = null,
+        acceptGoalLabel: String? = null,
         onToggleSession: (Long) -> Unit = {},
         sessionToggleLabel: (String) -> String = { it },
         controls: SessionControls = SessionControls(),
@@ -138,7 +144,8 @@ object StepsDocument {
                 dataDocument(
                     snapshot ?: return@buildList, units, syntax, sessions,
                     expandedSessionIds, sessionMetric, zone, onToggleSession,
-                    sessionToggleLabel, controls, externalSteps
+                    sessionToggleLabel, controls, externalSteps,
+                    onAcceptGoal, acceptGoalLabel
                 )
             )
         }
@@ -155,14 +162,16 @@ object StepsDocument {
         onToggleSession: (Long) -> Unit,
         sessionToggleLabel: (String) -> String,
         controls: SessionControls,
-        externalSteps: List<OriginSteps>
+        externalSteps: List<OriginSteps>,
+        onAcceptGoal: (() -> Unit)?,
+        acceptGoalLabel: String?
     ): List<CanvasLine> = buildList {
         add(punctLine("{", 0, syntax))
         add(stringLine("date", snapshot.date.toString(), comma = true, syntax, indent = 1))
 
         add(keyOpen("steps", syntax, indent = 1))
         val hasGoal = snapshot.goalSteps > 0
-        add(numberLine("count", snapshot.steps.toString(), comma = hasGoal, syntax, indent = 2))
+        add(numberLine("count", snapshot.steps.toString(), comma = true, syntax, indent = 2))
         if (hasGoal) {
             add(numberLine("goal", snapshot.goalSteps.toString(), comma = true, syntax, indent = 2))
             add(
@@ -170,6 +179,19 @@ object StepsDocument {
                     "check",
                     StepsGlyphs.goalBar(snapshot.steps, snapshot.goalSteps),
                     comma = false, syntax, indent = 2
+                )
+            )
+        } else {
+            // No goal is a real state, not an empty one: an explicit null that
+            // OFFERS a number instead of imposing one. Tapping it is the whole
+            // opt-in — the same tappable-way-out idiom as the grant command
+            // above, and until it is tapped no check runs and no streak exists.
+            add(
+                rawValueLine(
+                    "goal", "null", comma = false, syntax, indent = 2,
+                    hint = "// tap to set $SUGGESTED_DAILY_GOAL_STEPS",
+                    onClick = onAcceptGoal,
+                    onClickLabel = acceptGoalLabel
                 )
             )
         }
@@ -556,8 +578,11 @@ object StepsDocument {
         value: String,
         comma: Boolean,
         syntax: SyntaxColors,
-        indent: Int
-    ) = valueLine(key, value, syntax.comment, comma, syntax, indent, hint = null)
+        indent: Int,
+        hint: String? = null,
+        onClick: (() -> Unit)? = null,
+        onClickLabel: String? = null
+    ) = valueLine(key, value, syntax.comment, comma, syntax, indent, hint, onClick, onClickLabel)
 
     private fun valueLine(
         key: String,

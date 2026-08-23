@@ -109,7 +109,7 @@ class StepRepository(
                 steps = steps,
                 activeMinutes = activeMinutes,
                 // Frozen with today's profile: history must not follow the scale.
-                distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
+                distanceMeters = settings.distanceMeters(steps),
                 activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
                 goalSteps = settings.dailyGoalSteps,
                 goalMet = when (check) {
@@ -169,7 +169,7 @@ class StepRepository(
         val steps = SessionResize.steps(samples, hourly, startMillis, endMillis, zoneId)
         val strideMeters = session.distanceMeters
             ?.takeIf { session.steps > 0 }?.div(session.steps)
-            ?: Estimates.strideMeters(settingsStore.read().heightCm)
+            ?: settingsStore.read().strideMeters()
         val activeMillis = endMillis - startMillis
         sessionDao.updateBounds(
             id = id,

@@ -70,12 +70,17 @@ object StepsReadme {
             SensorStatus.OK -> if (snapshot != null) {
                 val goal = snapshot.goalSteps
                 if (goal > 0) {
+                    // Literally the number the JSON's `check` bar draws, from
+                    // the same function: the README is the human summary of the
+                    // machine file, so the two can never disagree on it.
+                    val percent = StepsGlyphs.goalPercent(snapshot.steps, goal)
                     if (snapshot.steps >= goal) {
                         add(
                             s(
                                 R.string.readme_goal_reached,
                                 numbers.format(snapshot.steps),
-                                numbers.format(goal)
+                                numbers.format(goal),
+                                percent
                             )
                         )
                     } else {
@@ -84,6 +89,7 @@ object StepsReadme {
                                 R.string.readme_goal_progress,
                                 numbers.format(snapshot.steps),
                                 numbers.format(goal),
+                                percent,
                                 numbers.format(goal - snapshot.steps)
                             )
                         )
@@ -125,6 +131,7 @@ object StepsReadme {
         add("")
         add("## ${s(R.string.readme_h_week)}")
         val byDate = history.associateBy { it.date }
+        val week = (6 downTo 0).map { back -> today.minusDays(back.toLong()) }
         addAll(
             markdownTable(
                 columns = listOf(
@@ -133,8 +140,7 @@ object StepsReadme {
                     TableColumn(s(R.string.readme_t_distance), TableAlign.RIGHT),
                     TableColumn(s(R.string.readme_t_active), TableAlign.RIGHT)
                 ),
-                rows = (6 downTo 0).map { back ->
-                    val date = today.minusDays(back.toLong())
+                rows = week.map { date ->
                     val name = date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
                         .lowercase(locale).take(3)
                     when {
@@ -165,6 +171,31 @@ object StepsReadme {
                 }
             )
         )
+
+        // Totals under the table, not a row in it: a "**Total**" cell would
+        // widen the day column on every line, and this shape mirrors the
+        // `## Today` summary the reader has already met at the top. Days with
+        // no data contribute nothing — they are missing, never zeros.
+        val weekDays = week.mapNotNull { date ->
+            when {
+                date == today && snapshot != null && status == SensorStatus.OK ->
+                    Triple(
+                        snapshot.steps, snapshot.distanceMeters, snapshot.activeMinutes
+                    )
+                else -> byDate[date]?.let { Triple(it.steps, it.distanceMeters, it.activeMinutes) }
+            }
+        }
+        if (weekDays.isNotEmpty()) {
+            add("")
+            add(
+                s(
+                    R.string.readme_week_total,
+                    numbers.format(weekDays.sumOf { it.first }),
+                    UnitFormat.distance(weekDays.sumOf { it.second }, units),
+                    weekDays.sumOf { it.third }
+                )
+            )
+        }
 
         add("")
         add("*${s(R.string.readme_footer, history.size)}*")

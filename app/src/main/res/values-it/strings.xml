@@ -14,6 +14,7 @@
 
     <!-- Accessibilità -->
     <string name="cd_grant_activity_recognition">Concedi il permesso di leggere il contapassi</string>
+    <string name="cd_accept_suggested_goal">Imposta l\u2019obiettivo giornaliero suggerito</string>
     <string name="cd_start_track">Avvia una camminata tracciata</string>
     <string name="cd_open_track">Apri la sessione in corso</string>
     <string name="cd_toggle_session">Espandi o comprimi la sessione delle %1$s</string>
@@ -49,8 +50,8 @@
     <string name="readme_h_week">Settimana</string>
     <string name="readme_summary">**%1$s passi** \u00b7 %2$s \u00b7 %3$d min</string>
     <string name="readme_kcal">Calorie attive: %1$s kcal (stima)</string>
-    <string name="readme_goal_reached">\u2713 Obiettivo raggiunto: %1$s passi su %2$s</string>
-    <string name="readme_goal_progress">%1$s passi su %2$s \u00b7 ne mancano %3$s</string>
+    <string name="readme_goal_reached">\u2713 Obiettivo raggiunto: %1$s passi su %2$s (%3$d%%)</string>
+    <string name="readme_goal_progress">%1$s passi su %2$s (%3$d%%) \u00b7 ne mancano %4$s</string>
     <string name="readme_goal_none">Nessun obiettivo impostato.</string>
     <string name="readme_streak">Streak corrente: %1$d giorni</string>
     <string name="readme_warn_no_sensor">\u26a0\ufe0f Nessun sensore di passi su questo dispositivo</string>
@@ -61,5 +62,6 @@
     <string name="readme_t_distance">Distanza</string>
     <string name="readme_t_active">Attivi</string>
     <string name="readme_t_day">Giorno</string>
+    <string name="readme_week_total">Totale: **%1$s passi** \u00b7 %2$s \u00b7 %3$d min</string>
     <string name="readme_footer">Calcolato sul dispositivo \u00b7 %1$d giorni committati</string>
 </resources>

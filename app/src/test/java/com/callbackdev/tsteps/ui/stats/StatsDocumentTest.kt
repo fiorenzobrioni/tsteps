@@ -32,6 +32,7 @@ class StatsDocumentTest {
         grid: HeatmapGrid? = grid("2026-08-17" to 11_204L),
         streak: StreakInfo? = StreakInfo(6, 19),
         averages: List<WindowAverages> = listOf(WindowAverages(7, 5, 8_120, 5_900.0, 68)),
+        totals: Totals? = Totals(LocalDate.parse("2026-06-01"), 412_309L, 291_400.0, 3_480),
         bestDay: Pair<LocalDate, Long>? = LocalDate.parse("2026-07-12") to 14_823L,
         longestWalk: SessionItem? = walk(),
         bestWeek: Records.BestWeek? = Records.BestWeek(2026, 33, 52_340),
@@ -39,7 +40,7 @@ class StatsDocumentTest {
         units: UnitsSystem = UnitsSystem.METRIC,
         onOpenCommit: (LocalDate) -> Unit = {}
     ) = StatsDocument.build(
-        grid, streak, averages, bestDay, longestWalk, bestWeek, committedDays,
+        grid, streak, averages, totals, bestDay, longestWalk, bestWeek, committedDays,
         units, Locale.ENGLISH, rome, syntax, onOpenCommit
     )
 
@@ -63,6 +64,24 @@ class StatsDocumentTest {
         val line = filterIsInstance<CodeLine>().firstOrNull { it.text.text.contains(sub) }
         assertNotNull("no line contains '$sub' in:\n${texts().joinToString("\n")}", line)
         return line!!
+    }
+
+    @Test
+    fun `totals add up the whole repo since the first day that moved`() {
+        val lines = build()
+        lines.lineWith("## totals")
+        lines.lineWith("since 2026-06-01: **412,309 steps** · 291.4 km · 58 h")
+    }
+
+    @Test
+    fun `an imperial reader gets miles in the totals too`() {
+        build(units = UnitsSystem.IMPERIAL).lineWith("181.1 mi")
+    }
+
+    @Test
+    fun `nothing moved yet means no totals section`() {
+        val lines = build(totals = null)
+        assertTrue(lines.texts().none { it.contains("## totals") })
     }
 
     @Test

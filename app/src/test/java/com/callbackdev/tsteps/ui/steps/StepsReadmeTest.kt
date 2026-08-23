@@ -85,14 +85,25 @@ class StepsReadmeTest {
     @Test
     fun `status is neutral progress words, never guilt`() {
         val lines = build()
-        lines.lineWith("8,432 of 10,000 steps · 1,568 to go")
+        lines.lineWith("8,432 of 10,000 steps (84%) · 1,568 to go")
         lines.lineWith("Current streak: 6 days")
+    }
+
+    @Test
+    fun `the percentage is the one the JSON check bar shows`() {
+        // README prose and steps_data.json must never disagree on the number.
+        val lines = build(snapshot = snapshot(steps = 5_000, goal = 8_000))
+        lines.lineWith("(62%)")
+        assertTrue(StepsGlyphs.goalBar(5_000, 8_000).endsWith(" 62%"))
+        // 29 of 100 is where a double round-trip used to lose a point.
+        build(snapshot = snapshot(steps = 29, goal = 100)).lineWith("(29%)")
+        assertTrue(StepsGlyphs.goalBar(29, 100).endsWith(" 29%"))
     }
 
     @Test
     fun `a reached goal gets its check`() {
         build(snapshot = snapshot(steps = 11_000))
-            .lineWith("✓ Goal reached: 11,000 of 10,000 steps")
+            .lineWith("✓ Goal reached: 11,000 of 10,000 steps (110%)")
     }
 
     @Test
@@ -143,6 +154,24 @@ class StepsReadmeTest {
         assertTrue(gapRow.contains("—"))
         // Rectangle: every week row is as wide as the header
         assertEquals(1, weekRows.map { it.length }.distinct().size)
+    }
+
+    @Test
+    fun `the week closes with its totals, in the shape of the Today line`() {
+        // today (8,432 · 6,123 m · 74 min) + yesterday (11,204 · 8,300 m · 96 min)
+        build().lineWith("Total: **19,636 steps** · 14.4 km · 170 min")
+    }
+
+    @Test
+    fun `week totals count only the days there is data for`() {
+        val lines = build(history = emptyList())
+        lines.lineWith("Total: **8,432 steps** · 6.1 km · 74 min")
+    }
+
+    @Test
+    fun `an empty week has no totals line to print`() {
+        val lines = build(snapshot = null, status = SensorStatus.NO_SENSOR, history = emptyList())
+        assertTrue(lines.none { it.contains("Total:") })
     }
 
     @Test

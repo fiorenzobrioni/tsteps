@@ -63,6 +63,7 @@ class StepsDocumentTest {
         expandedIds: Set<Long> = emptySet(),
         sessionMetric: SessionMetric = SessionMetric.SPEED,
         onGrant: (() -> Unit)? = null,
+        onAcceptGoal: (() -> Unit)? = null,
         onToggleSession: (Long) -> Unit = {},
         controls: SessionControls = SessionControls(),
         externalSteps: List<OriginSteps> = emptyList()
@@ -77,6 +78,8 @@ class StepsDocumentTest {
         zone = rome,
         onGrantPermission = onGrant,
         grantClickLabel = "grant",
+        onAcceptGoal = onAcceptGoal,
+        acceptGoalLabel = "set goal",
         onToggleSession = onToggleSession,
         controls = controls,
         externalSteps = externalSteps
@@ -139,12 +142,32 @@ class StepsDocumentTest {
     }
 
     @Test
-    fun `no goal means no goal, no check, no streak`() {
+    fun `no goal means no check and no streak, only an offer`() {
         val lines = build(snapshot = snapshot(goal = 0))
-        assertTrue(lines.texts().none { it.contains("\"goal\"") })
         assertTrue(lines.texts().none { it.contains("\"check\"") })
         assertTrue(lines.texts().none { it.contains("\"streak_days\"") })
         lines.lineWith("\"count\"")
+        // The key exists as an explicit null that offers a number, never imposes it.
+        val goal = lines.lineWith("\"goal\"")
+        assertTrue(goal.text.text.contains("null"))
+        assertTrue(goal.text.text.contains("// tap to set 8000"))
+    }
+
+    @Test
+    fun `tapping the null goal accepts the suggestion`() {
+        var accepted = 0
+        val lines = build(snapshot = snapshot(goal = 0), onAcceptGoal = { accepted++ })
+        lines.lineWith("\"goal\"").onClick!!.invoke()
+        assertEquals(1, accepted)
+    }
+
+    @Test
+    fun `a goal that exists is a number, not an offer`() {
+        val lines = build(snapshot = snapshot(goal = 10_000))
+        val goal = lines.lineWith("\"goal\"")
+        assertTrue(goal.text.text.contains("10000"))
+        assertTrue(goal.text.text.none { it == '/' })
+        assertNull(goal.onClick)
     }
 
     @Test

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.callbackdev.tsteps.data.AppSettings
+import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
@@ -18,6 +19,7 @@ import com.callbackdev.tsteps.data.TrackingState
 import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.WorkspaceStore
+import com.callbackdev.tsteps.data.distanceMeters
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
 import com.callbackdev.tsteps.data.toItem
@@ -107,6 +109,18 @@ class StepsViewModel(
     /** Expands/collapses one session's in-file detail object. */
     fun toggleSession(id: Long) {
         expandedSessions.update { if (id in it) it - id else it + id }
+    }
+
+    /**
+     * The JSON's `"goal": null` line, tapped: the suggested goal becomes the
+     * real one. Writing a setting from the working tree is deliberate — this is
+     * the one opt-in the file itself offers, and hiding it in settings.config is
+     * what kept the check invisible on a fresh install.
+     */
+    fun acceptSuggestedGoal() {
+        viewModelScope.launch {
+            settingsStore.setDailyGoalSteps(SUGGESTED_DAILY_GOAL_STEPS)
+        }
     }
 
     /** `[rm]` (confirmed): a tombstone, so the detector never re-creates it. */
@@ -220,7 +234,7 @@ class StepsViewModel(
             date = date,
             steps = steps,
             goalSteps = settings.dailyGoalSteps,
-            distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
+            distanceMeters = settings.distanceMeters(steps),
             activeMinutes = activeMinutes,
             activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
             hourlySteps = hourly.toList(),

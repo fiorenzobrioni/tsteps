@@ -11,6 +11,7 @@ import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.data.distanceMeters
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.Estimates
@@ -90,7 +91,7 @@ class LogViewModel(
             today = UncommittedToday(
                 date = date,
                 steps = todaySteps,
-                distanceMeters = Estimates.distanceMeters(todaySteps, settings.heightCm),
+                distanceMeters = settings.distanceMeters(todaySteps),
                 activeMinutes = Estimates.activeMinutes(hourlyRows.map { it.steps })
             ),
             days = days,

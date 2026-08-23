@@ -3,6 +3,7 @@ package com.callbackdev.tsteps.ui.steps
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.StepSource
@@ -237,6 +238,23 @@ class StepsViewModelTest {
             settingsStore.setHealthConnectSync(true)
             waitFor { vm.uiState.value.externalSteps.isNotEmpty() }
             assertEquals("shealth", vm.uiState.value.externalSteps.single().label)
+        } finally {
+            subscription.cancel()
+        }
+    }
+
+    @Test
+    fun `accepting the file's offer writes the suggested goal, once`() = runBlocking {
+        val vm = viewModel()
+        val subscription = subscribe(vm)
+        try {
+            waitFor { vm.uiState.value.snapshot != null }
+            // A fresh install runs no check: the goal is the offer, not a default.
+            assertEquals(0, vm.uiState.value.snapshot!!.goalSteps)
+            vm.acceptSuggestedGoal()
+            waitFor { vm.uiState.value.snapshot!!.goalSteps > 0 }
+            assertEquals(SUGGESTED_DAILY_GOAL_STEPS, vm.uiState.value.snapshot!!.goalSteps)
+            assertEquals(SUGGESTED_DAILY_GOAL_STEPS, settingsStore.read().dailyGoalSteps)
         } finally {
             subscription.cancel()
         }

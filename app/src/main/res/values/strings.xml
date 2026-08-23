@@ -19,6 +19,7 @@
 
     <!-- Accessibility -->
     <string name="cd_grant_activity_recognition">Grant permission to read the step counter</string>
+    <string name="cd_accept_suggested_goal">Set the suggested daily step goal</string>
     <string name="cd_start_track">Start a tracked walk</string>
     <string name="cd_open_track">Open the running session</string>
     <string name="cd_toggle_session">Expand or collapse the %1$s session</string>
@@ -64,8 +65,8 @@
     <string name="readme_h_week">Week</string>
     <string name="readme_summary">**%1$s steps** \u00b7 %2$s \u00b7 %3$d min</string>
     <string name="readme_kcal">Active calories: %1$s kcal (estimate)</string>
-    <string name="readme_goal_reached">\u2713 Goal reached: %1$s of %2$s steps</string>
-    <string name="readme_goal_progress">%1$s of %2$s steps \u00b7 %3$s to go</string>
+    <string name="readme_goal_reached">\u2713 Goal reached: %1$s of %2$s steps (%3$d%%)</string>
+    <string name="readme_goal_progress">%1$s of %2$s steps (%3$d%%) \u00b7 %4$s to go</string>
     <string name="readme_goal_none">No goal set.</string>
     <string name="readme_streak">Current streak: %1$d days</string>
     <string name="readme_warn_no_sensor">\u26a0\ufe0f No step sensor on this device</string>
@@ -76,5 +77,6 @@
     <string name="readme_t_distance">Distance</string>
     <string name="readme_t_active">Active</string>
     <string name="readme_t_day">Day</string>
+    <string name="readme_week_total">Total: **%1$s steps** \u00b7 %2$s \u00b7 %3$d min</string>
     <string name="readme_footer">Computed on device \u00b7 %1$d committed days</string>
 </resources>

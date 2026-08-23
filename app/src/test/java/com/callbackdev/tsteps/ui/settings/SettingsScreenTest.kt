@@ -38,6 +38,7 @@ class SettingsScreenTest {
         var lineNumbers: Boolean? = null
         var goal: Int? = null
         var weight: Double? = Double.NaN // NaN = never called; null is a real value
+        var stride: Int? = -1 // -1 = never called; null is a real value
         var unitsToggled = false
         var theme: String? = null
         var resetCalled = false
@@ -56,6 +57,7 @@ class SettingsScreenTest {
             onHealthConnect = { healthConnect = it },
             onWeight = { weight = it },
             onHeight = {},
+            onStride = { stride = it },
             onToggleUnits = { unitsToggled = true },
             onToggleSessionMetric = {},
             onThemeProfile = { theme = it },
@@ -211,6 +213,52 @@ class SettingsScreenTest {
         setContent(settings = AppSettings())
         line("\"weight_kg\": null").assertIsDisplayed()
         line("\"height_cm\": null").assertIsDisplayed()
+        line("\"stride_cm\": null").assertIsDisplayed()
+    }
+
+    @Test
+    fun `stride_cm edits through the terminal input like every free number`() {
+        val recorded = setContent()
+        line("\"stride_cm\": null").performClick()
+        val input = compose.onNode(hasSetTextAction())
+        input.performTextInput("78")
+        input.performImeAction()
+        assertEquals(78, recorded.stride)
+    }
+
+    @Test
+    fun `an out-of-range stride shows the error and saves nothing`() {
+        val recorded = setContent()
+        line("\"stride_cm\": null").performClick()
+        val input = compose.onNode(hasSetTextAction())
+        input.performTextInput("300")
+        input.performImeAction()
+        assertEquals(-1, recorded.stride)
+        line("// ERROR: expected 30..120").assertIsDisplayed()
+    }
+
+    @Test
+    fun `without an override height_cm still owns the stride estimate`() {
+        setContent(settings = AppSettings(heightCm = 175))
+        line("// empty uses the 0.72 m stride").assertIsDisplayed()
+    }
+
+    @Test
+    fun `height_cm stops claiming a job stride_cm has taken over`() {
+        setContent(settings = AppSettings(heightCm = 175, strideCm = 78))
+        line("// unused: stride_cm overrides it").assertIsDisplayed()
+    }
+
+    @Test
+    fun `with no goal the settings file names the number the JSON offers`() {
+        setContent(settings = AppSettings())
+        line("// no check · 8000 suggested").assertIsDisplayed()
+    }
+
+    @Test
+    fun `with a goal set the hint is how to switch the check off`() {
+        setContent(settings = AppSettings(dailyGoalSteps = 10_000))
+        line("// 0 disables the check").assertIsDisplayed()
     }
 
     @Test
