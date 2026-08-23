@@ -163,6 +163,20 @@ interface SessionDao {
     suspend fun byId(id: Long): SessionEntity?
 
     /**
+     * The `longest-walk` tag, as one row. The main screen's README needs the
+     * record but not the table it lives in, and that screen is the one that
+     * ticks live all day — `observeAll()` there would hand it every walk ever
+     * taken to find a single maximum. Ties go to the most recent, like
+     * [com.callbackdev.tsteps.domain.Records.longestWalk], which still does the
+     * picking wherever the full list is already in hand.
+     */
+    @Query(
+        "SELECT * FROM session WHERE dismissedMillis IS NULL AND endMillis IS NOT NULL " +
+            "ORDER BY activeMillis DESC, startMillis DESC LIMIT 1"
+    )
+    fun observeLongest(): Flow<SessionEntity?>
+
+    /**
      * Every session the export writes (Fase 13), oldest first: tombstones out
      * (`[rm]` means gone), still-running out (no end, no record yet).
      */

@@ -63,11 +63,21 @@ data class ExportFile(val name: String, val mimeType: String, val content: Strin
  * - **The estimate disclaimer rides the JSON, not the CSV.** CSV has no comment
  *   channel a spreadsheet tolerates, so its header stays clean and the README
  *   carries the sentence instead.
+ * - **Every estimate ships the factor that produced it.** `distance_m` is
+ *   `steps × stride`, and without the stride a future reader cannot tell a
+ *   6 km day measured at 0.78 m from one guessed at the 0.72 m fallback, nor
+ *   recompute anything if they later measure their own. [strideMeters] recovers
+ *   it from the row itself rather than storing a second copy that could drift:
+ *   the distance IS the product, so the quotient is the factor, frozen with the
+ *   day whatever the profile says today.
  */
 object ExportDocuments {
 
-    /** Bumped only if the shape changes in a way a reader would notice. */
-    const val SCHEMA_VERSION = 1
+    /**
+     * Bumped only if the shape changes in a way a reader would notice.
+     * v2 added `stride_m` to days and sessions.
+     */
+    const val SCHEMA_VERSION = 2
 
     const val JSON_MIME = "application/json"
     const val CSV_MIME = "text/csv"
@@ -111,8 +121,8 @@ object ExportDocuments {
 
     fun daysCsv(bundle: ExportBundle): String = buildString {
         appendLine(
-            "date,commit,steps,active_min,distance_m,active_kcal,goal_steps," +
-                "goal_met,committed"
+            "date,commit,steps,active_min,distance_m,stride_m,active_kcal," +
+                "goal_steps,goal_met,committed"
         )
         bundle.days.forEach { day ->
             appendLine(
@@ -122,6 +132,7 @@ object ExportDocuments {
                     day.steps.toString(),
                     day.activeMinutes.toString(),
                     meters(day.distanceMeters),
+                    strideMeters(day.steps, day.distanceMeters)?.let(::stride).orEmpty(),
                     day.activeKcal?.let(::kcal).orEmpty(),
                     day.goalSteps.toString(),
                     day.goalMet?.toString().orEmpty(),
@@ -133,8 +144,8 @@ object ExportDocuments {
 
     fun sessionsCsv(bundle: ExportBundle): String = buildString {
         appendLine(
-            "date,start,end,type,steps,distance_m,active_min,avg_cadence_spm," +
-                "source,start_approx,end_approx"
+            "date,start,end,type,steps,distance_m,stride_m,active_min," +
+                "avg_cadence_spm,source,start_approx,end_approx"
         )
         bundle.sessions.forEach { session ->
             appendLine(
@@ -145,6 +156,7 @@ object ExportDocuments {
                     session.type,
                     session.steps.toString(),
                     meters(session.distanceMeters),
+                    strideMeters(session.steps, session.distanceMeters)?.let(::stride).orEmpty(),
                     session.activeMinutes.toString(),
                     session.avgCadenceSpm?.toString().orEmpty(),
                     source(session),
@@ -177,6 +189,7 @@ object ExportDocuments {
         """"steps": ${day.steps}""",
         """"active_min": ${day.activeMinutes}""",
         """"distance_m": ${meters(day.distanceMeters)}""",
+        """"stride_m": ${strideMeters(day.steps, day.distanceMeters)?.let(::stride) ?: "null"}""",
         """"active_kcal": ${day.activeKcal?.let(::kcal) ?: "null"}""",
         """"goal_steps": ${day.goalSteps}""",
         """"goal_met": ${day.goalMet?.toString() ?: "null"}""",
@@ -190,6 +203,7 @@ object ExportDocuments {
         """"type": "${escape(session.type)}"""",
         """"steps": ${session.steps}""",
         """"distance_m": ${meters(session.distanceMeters)}""",
+        """"stride_m": ${strideMeters(session.steps, session.distanceMeters)?.let(::stride) ?: "null"}""",
         """"active_min": ${session.activeMinutes}""",
         """"avg_cadence_spm": ${session.avgCadenceSpm?.toString() ?: "null"}""",
         """"source": "${source(session)}"""",
@@ -198,6 +212,15 @@ object ExportDocuments {
     ).joinToString(", ", prefix = "{ ", postfix = " }")
 
     private fun source(session: SessionItem): String = if (session.auto) "auto" else "manual"
+
+    /**
+     * The stride the row's own distance was computed with. Null on a day that
+     * took no step: there is no factor to report, and 0/0 is not 0.
+     */
+    private fun strideMeters(steps: Long, distanceMeters: Double): Double? =
+        if (steps > 0) distanceMeters / steps else null
+
+    private fun stride(value: Double): String = "%.3f".format(Locale.ROOT, value)
 
     private fun meters(value: Double): String = "%.1f".format(Locale.ROOT, value)
 

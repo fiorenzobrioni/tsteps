@@ -94,6 +94,7 @@ fun StepsScreen(
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         },
         onToggleSession = viewModel::toggleSession,
+        onAcceptGoal = viewModel::acceptSuggestedGoal,
         onStartTrack = {
             // Idempotent when a session already runs: the manager's start no-ops
             // and the screen simply reopens the process.
@@ -114,12 +115,14 @@ fun StepsScreen(
     onSelectFile: (MainEditorFile) -> Unit = {},
     onGrantPermission: () -> Unit = {},
     onToggleSession: (Long) -> Unit = {},
+    onAcceptGoal: () -> Unit = {},
     onStartTrack: () -> Unit = {},
     onRemoveSession: (Long) -> Unit = {},
     onResizeSession: (id: Long, startMillis: Long, endMillis: Long) -> Unit = { _, _, _ -> }
 ) {
     val syntax = TstepsTheme.syntax
     val grantLabel = stringResource(R.string.cd_grant_activity_recognition)
+    val acceptGoalLabel = stringResource(R.string.cd_accept_suggested_goal)
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
 
@@ -210,6 +213,8 @@ fun StepsScreen(
                 zone = state.zone,
                 onGrantPermission = onGrantPermission,
                 grantClickLabel = grantLabel,
+                onAcceptGoal = onAcceptGoal,
+                acceptGoalLabel = acceptGoalLabel,
                 onToggleSession = onToggleSession,
                 sessionToggleLabel = { start ->
                     resources.getString(R.string.cd_toggle_session, start)
@@ -223,6 +228,7 @@ fun StepsScreen(
                     status = state.status,
                     sessions = state.sessions,
                     history = state.history,
+                    records = state.records,
                     units = state.units,
                     zone = state.zone,
                     locale = locale,

@@ -1,7 +1,6 @@
 package com.callbackdev.tsteps.data
 
 import com.callbackdev.tsteps.data.local.SessionEntity
-import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.LiveSessionState
 import com.callbackdev.tsteps.domain.LiveSessionTracker
 import com.callbackdev.tsteps.domain.SessionMetrics
@@ -50,7 +49,7 @@ class TrackingManager(
 
     suspend fun start(type: String, nowMillis: Long) {
         if (isActive) return
-        val stride = Estimates.strideMeters(settingsStore.read().heightCm)
+        val stride = settingsStore.read().strideMeters()
         _state.value = TrackingState(
             session = LiveSessionTracker.start(type, nowMillis),
             strideMeters = stride

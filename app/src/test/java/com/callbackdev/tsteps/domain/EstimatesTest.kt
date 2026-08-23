@@ -13,9 +13,19 @@ class EstimatesTest {
     }
 
     @Test
+    fun `a measured stride beats both the height rule and the fallback`() {
+        assertEquals(0.78, Estimates.strideMeters(175, 78), 1e-9)
+        assertEquals(0.78, Estimates.strideMeters(null, 78), 1e-9)
+        // Clearing it hands the estimate back to height, then to the average.
+        assertEquals(0.72625, Estimates.strideMeters(175, null), 1e-9)
+        assertEquals(Estimates.DEFAULT_STRIDE_METERS, Estimates.strideMeters(null, null), 1e-9)
+    }
+
+    @Test
     fun `distance is steps times stride`() {
         assertEquals(7262.5, Estimates.distanceMeters(10_000, 175), 1e-6)
         assertEquals(7200.0, Estimates.distanceMeters(10_000, null), 1e-6)
+        assertEquals(7800.0, Estimates.distanceMeters(10_000, 175, 78), 1e-6)
     }
 
     @Test

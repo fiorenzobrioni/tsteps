@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.test.core.app.ApplicationProvider
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.DayStats
+import com.callbackdev.tsteps.domain.Records
 import com.callbackdev.tsteps.domain.SessionItem
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -52,9 +53,14 @@ class StepsReadmeTest {
         sessions: List<SessionItem> = emptyList(),
         history: List<DayStats> = listOf(
             DayStats(LocalDate.parse("2026-08-17"), 11_204, 8_300.0, 96)
+        ),
+        records: DayRecords? = DayRecords(
+            bestDay = LocalDate.parse("2026-07-12") to 14_823L,
+            longestWalk = walk().copy(activeMillis = 92 * 60_000L, distanceMeters = 6_600.0),
+            bestWeek = Records.BestWeek(2026, 33, 52_340)
         )
     ) = StepsReadme.build(
-        snapshot, status, sessions, history,
+        snapshot, status, sessions, history, records,
         UnitsSystem.METRIC, rome, Locale.ENGLISH, resources
     )
 
@@ -85,14 +91,25 @@ class StepsReadmeTest {
     @Test
     fun `status is neutral progress words, never guilt`() {
         val lines = build()
-        lines.lineWith("8,432 of 10,000 steps · 1,568 to go")
+        lines.lineWith("8,432 of 10,000 steps (84%) · 1,568 to go")
         lines.lineWith("Current streak: 6 days")
+    }
+
+    @Test
+    fun `the percentage is the one the JSON check bar shows`() {
+        // README prose and steps_data.json must never disagree on the number.
+        val lines = build(snapshot = snapshot(steps = 5_000, goal = 8_000))
+        lines.lineWith("(62%)")
+        assertTrue(StepsGlyphs.goalBar(5_000, 8_000).endsWith(" 62%"))
+        // 29 of 100 is where a double round-trip used to lose a point.
+        build(snapshot = snapshot(steps = 29, goal = 100)).lineWith("(29%)")
+        assertTrue(StepsGlyphs.goalBar(29, 100).endsWith(" 29%"))
     }
 
     @Test
     fun `a reached goal gets its check`() {
         build(snapshot = snapshot(steps = 11_000))
-            .lineWith("✓ Goal reached: 11,000 of 10,000 steps")
+            .lineWith("✓ Goal reached: 11,000 of 10,000 steps (110%)")
     }
 
     @Test
@@ -143,6 +160,50 @@ class StepsReadmeTest {
         assertTrue(gapRow.contains("—"))
         // Rectangle: every week row is as wide as the header
         assertEquals(1, weekRows.map { it.length }.distinct().size)
+    }
+
+    @Test
+    fun `the week closes with its totals, in the shape of the Today line`() {
+        // today (8,432 · 6,123 m · 74 min) + yesterday (11,204 · 8,300 m · 96 min)
+        build().lineWith("Total: **19,636 steps** · 14.4 km · 2 h 50 min")
+    }
+
+    @Test
+    fun `week totals count only the days there is data for`() {
+        val lines = build(history = emptyList())
+        lines.lineWith("Total: **8,432 steps** · 6.1 km · 1 h 14 min")
+    }
+
+    @Test
+    fun `an empty week has no totals line to print`() {
+        val lines = build(snapshot = null, status = SensorStatus.NO_SENSOR, history = emptyList())
+        assertTrue(lines.none { it.contains("Total:") })
+    }
+
+    @Test
+    fun `records close the file as sentences, not a third table`() {
+        val lines = build()
+        lines.lineWith("## Records")
+        lines.lineWith("Best day: **14,823 steps** (12 July 2026)")
+        lines.lineWith("Longest walk: **92 min** · 6.6 km (18 August 2026)")
+        lines.lineWith("Best week: **52,340 steps** (week 33)")
+        // Prose, so no pipes: stats.md owns the tabular view of the same tags.
+        val records = lines.dropWhile { !it.contains("## Records") }
+        assertTrue(records.none { it.startsWith("|") })
+    }
+
+    @Test
+    fun `a record that does not exist yet prints no line`() {
+        val lines = build(records = DayRecords(bestDay = LocalDate.parse("2026-07-12") to 9L))
+        lines.lineWith("## Records")
+        assertTrue(lines.none { it.contains("Longest walk") })
+        assertTrue(lines.none { it.contains("Best week") })
+    }
+
+    @Test
+    fun `no records at all means no section`() {
+        assertTrue(build(records = null).none { it.contains("## Records") })
+        assertTrue(build(records = DayRecords()).none { it.contains("## Records") })
     }
 
     @Test

@@ -11,9 +11,11 @@ import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.data.distanceMeters
 import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.Averages
 import com.callbackdev.tsteps.domain.DayStats
+import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
 import com.callbackdev.tsteps.domain.Heatmap
 import com.callbackdev.tsteps.domain.HeatmapGrid
@@ -41,6 +43,8 @@ data class StatsUiState(
     /** Null when no goal is set — the section vanishes, not the number. */
     val streak: StreakInfo? = null,
     val averages: List<WindowAverages> = emptyList(),
+    /** Everything since the first commit; null until something has been moved. */
+    val totals: Totals? = null,
     val bestDay: Pair<LocalDate, Long>? = null,
     val longestWalk: SessionItem? = null,
     val bestWeek: Records.BestWeek? = null,
@@ -80,6 +84,16 @@ class StatsViewModel(
         val dayStats = history.map {
             DayStats(LocalDate.parse(it.date), it.steps, it.distanceMeters, it.activeMinutes)
         }
+        // Today counts live, exactly as it does in the heatmap: the working
+        // tree is real movement, it is just not history yet. A day the summary
+        // already holds is dropped so the safety net can never double it.
+        val todaySteps = hourlyRows.sumOf { it.steps }
+        val lifetime = dayStats.filter { it.date != date } + DayStats(
+            date = date,
+            steps = todaySteps,
+            distanceMeters = settings.distanceMeters(todaySteps),
+            activeMinutes = Estimates.activeMinutes(hourlyRows.map { it.steps })
+        )
         val sessions = sessionRows.mapNotNull { it.toItem() }
         // Today rides the grid live as the working tree's cell.
         val stepsByDate = days.toMap() + (date to hourlyRows.sumOf { it.steps })
@@ -97,6 +111,14 @@ class StatsViewModel(
                 Averages.over(dayStats, date, 7),
                 Averages.over(dayStats, date, 30)
             ),
+            totals = lifetime.filter { it.steps > 0 }.takeIf { it.isNotEmpty() }?.let { moved ->
+                Totals(
+                    since = moved.minOf { it.date },
+                    steps = moved.sumOf { it.steps },
+                    distanceMeters = moved.sumOf { it.distanceMeters },
+                    activeMinutes = moved.sumOf { it.activeMinutes }
+                )
+            },
             bestDay = Records.bestDay(days)?.let { best ->
                 best to (days.toMap().getValue(best))
             },

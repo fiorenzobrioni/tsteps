@@ -61,7 +61,7 @@ tweather's git layer was a stretch: every fetch became a "commit", and the commi
 | commit streak / contribution graph | **the streak** and the month-at-a-glance activity heatmap |
 | `git tag` | **personal records** (best day, longest walk) pinned to their commit |
 | a running process (`^C` to stop) | **a manually tracked walk**, live |
-| `git diff last_week` | **week-over-week comparison** |
+| `git diff last_week` | **week-over-week comparison** — a real diff in `week.diff`, the Log's second file (§4.2) |
 
 And the word **commit** gains its double meaning: the app is about committing — showing up every day. A streak is literally a commit streak.
 
@@ -125,12 +125,13 @@ The working tree. The step count ticks live while you watch — the file is bein
 }
 ```
 
+- **No goal set is a state, not a hole**: the `steps` block still carries the key, as an explicit `"goal": null,  // tap to set 8000` that is tappable and sets it. The offer is the whole opt-in — no check, no bar and no streak exist until it is taken (§3.3.5 stays intact: the app never imposes a goal, it just stops hiding the one it would suggest). See §6.11 for why a silent install-time default was rejected.
 - Imperial switch renames keys, tweather-style: `distance_km` → `distance_mi`.
 - The hourly sparkline is the draft's "activity timeline", terminal-ified: it answers *when was I active* in one line of glyphs.
 - `//` comments carry sensor state: `// sensor: TYPE_STEP_COUNTER (hardware, batched)` or the graceful failure `// E: no step sensor on this device`.
 - Tapping a session opens its detail (the hunk view, §4.2).
 - **FAB** (glowing, rectangular): `▶` — starts a manual session (§4.5). tweather's FAB re-runs the fetch; tsteps' FAB starts the walk. Each app gets exactly one glowing verb.
-- **Second editor tab: `README.md`** — the day as localized prose (markdown source), like tweather's city README: `## Today` summary, `## Status` (goal state, streak), `## Week` compact table. Fully localized, headings included.
+- **Second editor tab: `README.md`** — the day as localized prose (markdown source), like tweather's city README: `## Today` summary, `## Status` (goal state with the same completion percentage the JSON's `check` bar shows, streak), `## Week` compact table closed by a totals line in the shape of the `## Today` summary, and `## Records` — the same three all-time tags `stats.md` pins in a table, told as sentences (a third pipe table on this page would be the stats screen wearing prose). Records come from committed days only, like any tag on a commit. Fully localized, headings included.
 
 ### 4.2 `steps_history.diff` — the log
 
@@ -164,6 +165,31 @@ Date:   Sat Aug 16
 - Records are `tag:` refs on their commit (`tag: best-day`).
 - Week boundaries render as `--- week 34 ---` separators with the week total and a `+/-` delta vs the previous week — the week as a diff, as promised.
 
+**Second editor tab: `week.diff`** — `git diff last_week` made literal, the last row of §2's table to get a file of its own. The log's week separators carry the steps delta in passing; this is the whole comparison, one hunk per metric with the change in the hunk header's context slot:
+
+```diff
+$ git diff @{last.week}
+
+--- a/week 33   aug 10..16   7/7 days
++++ b/week 34   aug 17..23   2/7 days
+
+// week 34 is still being written: 2 of 7 days so far
+
+@@ steps @@  -39,000  -80%
+- 49,000
++ 10,000
+
+@@ distance_km @@  -28.1
+- 34.9
++ 6.8
+
+@@ goal_checks @@  -6
+- ✓✓✓✓✓✓✓  7/7
++ ✓·  1/1
+```
+
+Three rules keep it honest: **nothing is pro-rated** (both headers carry their day count, a week in progress says so in the comment channel, and the totals stay the totals); **the `-` side is the week immediately before**, empty or not — promoting an older week because the real one is blank would lie about what was compared, so an empty previous week renders as a stated absence; and **only steps carry a percentage**, since distance and active minutes are linear in steps and three near-identical percentages would imply three measurements. Today rides the current side from the working tree with a skipped check: the check runs at midnight, and claiming a result before it has run is the one lie this file could tell.
+
 ### 4.3 `stats.md` — the contribution graph
 
 The screen the git metaphor unlocks — the one no mainstream health app has. Your movement as a GitHub-style contribution heatmap, rendered as a markdown file.
@@ -191,6 +217,10 @@ current: 6 days       longest: 19 days
 | distance | 5.9 km |
 | active   | 68 min |
 
+## totals
+
+since 2026-04-02: **412,309 steps** · 291.4 km · 58 h
+
 ## tags
 
 | tag           | value         | date       |
@@ -199,7 +229,7 @@ current: 6 days       longest: 19 days
 | longest-walk  | 92 min        | 2026-06-28 |
 ```
 
-Intensity buckets (□ ▪ ■ in 4–5 green shades) are relative to the user's own distribution, not to an absolute 10k. Streaks and tags are informational — nothing flashes, nothing is lost dramatically.
+Intensity buckets (□ ▪ ■ in 4–5 green shades) are relative to the user's own distribution, not to an absolute 10k. Streaks and tags are informational — nothing flashes, nothing is lost dramatically. `## totals` is the repo's own size (`git log --shortstat` for a body): it sums what the app already measured — committed days plus today's live working tree — and infers no new fact about the user, which is what keeps it on the right side of §3.2.
 
 ### 4.4 `settings.config` — the settings
 
@@ -208,10 +238,12 @@ tweather's pattern verbatim: values cycle or open terminal inputs on tap, traili
 ```ini
 [goal]
 daily_steps = 10000            // 0 disables the CI check
+                               // at 0 the hint names the suggested 8000 instead
 
 [profile]
 weight_kg = 78                 // only for kcal estimate; empty hides kcal
 height_cm = 175                // only for stride estimate
+stride_cm = 78                 // measured stride; overrides height_cm
 
 [units]
 system = "metric"              // metric | imperial
@@ -269,7 +301,7 @@ The full metric set, with placement. "Core" appears in `steps_data.json`; "sessi
 | metric | placement | notes |
 | --- | --- | --- |
 | steps (day) | core | hardware `TYPE_STEP_COUNTER`, the one number that must always work |
-| distance | core | steps × stride; stride from height or manual override; honest `//` comment |
+| distance | core | steps × stride; stride from `profile.stride_cm` if measured, else derived from height, else a labeled average; honest `//` comment |
 | active minutes | core | minutes containing meaningful step cadence; no "move ring" theatrics |
 | active kcal | core | MET estimate; **hidden until weight is set** — never invented |
 | hourly sparkline | core | the "when" of the day in one line |
@@ -280,6 +312,7 @@ The full metric set, with placement. "Core" appears in `steps_data.json`; "sessi
 | streak | core, stats | consecutive goal-met days; absent if no goal — no guilt without opt-in |
 | heatmap | stats | 12-week contribution graph, relative intensity buckets |
 | averages 7/30d | stats | steps, distance, active min |
+| totals | stats | steps, distance, active time since the first commit — a sum, never a new inference |
 | records | stats, log | `tag:` refs — best-day, longest-walk, best-week |
 
 Deliberately absent: floors climbed, VO₂ estimates, "fitness age", intensity zones, move/exercise/stand rings, calories-vs-food, and anything requiring a heart rate.
@@ -300,6 +333,10 @@ Recorded here so the reasoning survives:
 8. **The widget is promoted** from "future feature" to an early phase: a step counter's most common interaction is a glance, and the series already owns a proven widget stack.
 9. **Added: contribution heatmap, tags-as-records, week diffs, streak-as-commit-streak** — the features the git metaphor makes natural, absent from the draft.
 10. **Added: data export** (`$ tsteps export` → JSON/CSV in Downloads) — a local-first app owes the user their data.
+11. **An install-time default goal was rejected; the file offers one instead.** A goal written at install would make every day the user did not choose it fail a check they never opted into — precisely the guilt machine §3.3.5 forbids. But a goal buried in `settings.config` also hides the check, the bar and the streak from anyone who never opens that file, which is most of the metaphor. The resolution keeps both: the stored default stays 0, and `steps_data.json` renders `"goal": null` as a tappable offer (§4.1). 8,000 rather than 10,000 as the suggested number — 10,000 is a 1965 pedometer's brand name, while the step-count cohorts put the mortality-benefit plateau around 6,000–8,000/day for older adults and 8,000–10,000 for younger ones. 8,000 is the one figure inside the evidence for the whole adult range.
+12. **`week.diff` promoted from a separator to a file, and the separator's delta removed.** The week-over-week comparison was in §2's table from the start and shipped as one number on the log's week separators — a steps delta glimpsed while scrolling past. That is a hint, not the comparison; the Log grows a second tab, exactly what §1.2's one-element tab strip was built to allow. What the file must never do is make the two sides look commensurable when they are not: the day counts are on both headers and no total is ever scaled. The old separator delta then had to go, because it broke the same rule twice — it compared whatever days each week happened to have in the log and called the result a week-over-week change, and its current-week total excluded today while `week.diff` includes it, so one app showed two numbers for one week. A divider states; the file compares.
+13. **`stride_m` added to the export.** The archive carried `distance_m` but not the factor that produced it, so a reader could not tell a day measured at 0.78 m from one guessed at the 0.72 m fallback, nor recompute after measuring their own stride. It is derived from the row itself (`distance / steps`) rather than stored a second time: the distance *is* the product, so there is no copy that can drift. Schema bumped to 2.
+14. **Sex/gender was considered for the profile and rejected.** It would change nothing tsteps computes: active kcal is `MET × weight × time`, which has no sex term, and the anthropometric stride factors differ by ~0.5% (0.415 vs 0.413 of height) — far below the noise floor of a step-derived distance. Using it meaningfully would mean a BMR/TDEE model, which needs age too and lands squarely in the health-dashboard category §3.2 excludes. A profile field that implies a personalization it does not deliver is the same lie as a fake unit. The honest way to a better distance was already in §5 and merely unimplemented: `profile.stride_cm`.
 
 ---
 

@@ -1,6 +1,7 @@
 package com.callbackdev.tsteps.export
 
 import com.callbackdev.tsteps.data.SettingsStore
+import com.callbackdev.tsteps.data.distanceMeters
 import com.callbackdev.tsteps.data.local.DaySummaryDao
 import com.callbackdev.tsteps.data.local.HourlyStepsDao
 import com.callbackdev.tsteps.data.local.SessionDao
@@ -113,7 +114,7 @@ class DataExporter(
                     commit = CommitHash.of(LocalDate.parse(date)),
                     steps = steps,
                     activeMinutes = activeMinutes,
-                    distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
+                    distanceMeters = settings.distanceMeters(steps),
                     activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
                     goalSteps = settings.dailyGoalSteps,
                     goalMet = when (GoalCheck.run(steps, settings.dailyGoalSteps)) {

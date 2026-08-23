@@ -140,6 +140,25 @@ class StatsViewModelTest {
     }
 
     @Test
+    fun `totals sum the committed days plus the live working tree`() = runBlocking {
+        database.daySummaryDao().insertIfAbsent(day("2026-08-16", 14_823))
+        database.daySummaryDao().insertIfAbsent(day("2026-08-17", 11_204))
+        database.hourlyStepsDao().upsert(HourlyStepsEntity("2026-08-18", 9, 2_500))
+        val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }
+        try {
+            waitFor { viewModel.uiState.value.totals != null }
+            val totals = viewModel.uiState.value.totals!!
+            assertEquals(LocalDate.parse("2026-08-16"), totals.since)
+            assertEquals(28_527L, totals.steps) // 14,823 + 11,204 + today's 2,500
+            // The two committed days carry their frozen 0.7 m stride, today the
+            // profile's own — neither is recomputed behind the other's back.
+            assertEquals(14_823 * 0.7 + 11_204 * 0.7 + 2_500 * 0.72, totals.distanceMeters, 1e-6)
+        } finally {
+            subscription.cancel()
+        }
+    }
+
+    @Test
     fun `no goal means no streak section`() = runBlocking {
         database.daySummaryDao().insertIfAbsent(day("2026-08-17", 9_000, goalMet = null))
         val subscription = launch(mainDispatcher) { viewModel.uiState.collect {} }

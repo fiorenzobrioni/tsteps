@@ -65,6 +65,7 @@ fun StatsScreen(
             grid = state.grid,
             streak = state.streak,
             averages = state.averages,
+            totals = state.totals,
             bestDay = state.bestDay,
             longestWalk = state.longestWalk,
             bestWeek = state.bestWeek,

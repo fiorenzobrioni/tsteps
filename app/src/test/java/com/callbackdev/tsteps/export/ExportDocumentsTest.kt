@@ -89,7 +89,7 @@ class ExportDocumentsTest {
         val json = ExportDocuments.json(bundle())
         assertTrue(json.startsWith("{\n"))
         assertTrue(json.contains(""""app": "tsteps","""))
-        assertTrue(json.contains(""""schema": 1,"""))
+        assertTrue(json.contains(""""schema": 2,"""))
         assertTrue(json.contains(""""exported_at": "2026-08-20T16:32:05Z","""))
         assertTrue(json.contains(""""timezone": "Europe/Rome","""))
         assertTrue(json.contains(""""units": "steps, meters, minutes, kcal","""))
@@ -106,10 +106,32 @@ class ExportDocumentsTest {
         val line = ExportDocuments.json(bundle()).lines().first { it.contains("2026-08-19\"") }
         assertEquals(
             """    { "date": "2026-08-19", "commit": "3f2c1a9", "steps": 11204, """ +
-                """"active_min": 96, "distance_m": 8310.2, "active_kcal": 312, """ +
-                """"goal_steps": 10000, "goal_met": true, "committed": true },""",
+                """"active_min": 96, "distance_m": 8310.2, "stride_m": 0.742, """ +
+                """"active_kcal": 312, "goal_steps": 10000, "goal_met": true, """ +
+                """"committed": true },""",
             line
         )
+    }
+
+    @Test
+    fun `stride_m is the factor that produced the distance, recoverable exactly`() {
+        val bundle = bundle()
+        val day = ExportDocuments.json(bundle).lines().first { it.contains("2026-08-19\"") }
+        // 8310.24 / 11204 = 0.7417... — the stride the day was committed with,
+        // not whatever the profile happens to say when the export runs.
+        assertTrue(day.contains(""""stride_m": 0.742"""))
+        val session = ExportDocuments.json(bundle).lines().first { it.contains("09:32:00") }
+        assertTrue(session.contains(""""stride_m": 0.741"""))
+    }
+
+    @Test
+    fun `a day that took no step reports no stride - zero over zero is not zero`() {
+        val still = committed.copy(steps = 0, distanceMeters = 0.0)
+        val line = ExportDocuments.json(bundle(days = listOf(still))).lines()
+            .first { it.contains("2026-08-19\"") }
+        assertTrue(line.contains(""""stride_m": null"""))
+        val row = ExportDocuments.daysCsv(bundle(days = listOf(still))).trim().lines()[1]
+        assertEquals("2026-08-19,3f2c1a9,0,96,0.0,,312,10000,true,true", row)
     }
 
     @Test
@@ -149,30 +171,31 @@ class ExportDocumentsTest {
     fun `days csv is one table with empty cells for what is missing`() {
         val rows = ExportDocuments.daysCsv(bundle()).trim().lines()
         assertEquals(
-            "date,commit,steps,active_min,distance_m,active_kcal,goal_steps,goal_met,committed",
+            "date,commit,steps,active_min,distance_m,stride_m,active_kcal," +
+                "goal_steps,goal_met,committed",
             rows[0]
         )
-        assertEquals("2026-08-19,3f2c1a9,11204,96,8310.2,312,10000,true,true", rows[1])
+        assertEquals("2026-08-19,3f2c1a9,11204,96,8310.2,0.742,312,10000,true,true", rows[1])
         // No weight, no goal: two empty cells — not zeros, which would be a lie.
-        assertEquals("2026-08-20,a10c4e5,4120,41,3058.0,,0,,false", rows[2])
+        assertEquals("2026-08-20,a10c4e5,4120,41,3058.0,0.742,,0,,false", rows[2])
     }
 
     @Test
     fun `sessions csv keeps the local wall time with its offset`() {
         val rows = ExportDocuments.sessionsCsv(bundle()).trim().lines()
         assertEquals(
-            "date,start,end,type,steps,distance_m,active_min,avg_cadence_spm," +
-                "source,start_approx,end_approx",
+            "date,start,end,type,steps,distance_m,stride_m,active_min," +
+                "avg_cadence_spm,source,start_approx,end_approx",
             rows[0]
         )
         assertEquals(
             "2026-08-19,2026-08-19T09:32:00+02:00,2026-08-19T10:18:00+02:00," +
-                "walk,4210,3120.5,46,92,manual,false,false",
+                "walk,4210,3120.5,0.741,46,92,manual,false,false",
             rows[1]
         )
         assertEquals(
             "2026-08-20,2026-08-20T07:05:00+02:00,2026-08-20T07:40:00+02:00," +
-                "walk,3010,2200.0,35,,auto,true,false",
+                "walk,3010,2200.0,0.731,35,,auto,true,false",
             rows[2]
         )
     }

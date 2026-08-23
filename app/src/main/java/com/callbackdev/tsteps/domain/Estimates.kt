@@ -30,11 +30,22 @@ object Estimates {
      */
     const val WALKING_CADENCE_SPM = 100.0
 
-    fun strideMeters(heightCm: Int?): Double =
-        heightCm?.let { it * STRIDE_HEIGHT_FACTOR / 100.0 } ?: DEFAULT_STRIDE_METERS
+    /**
+     * The stride actually used, in the order the user's own knowledge beats the
+     * app's guess: a measured [strideCm] wins over the height rule of thumb,
+     * which wins over the labeled fallback. VISION §5 always specified this
+     * override ("stride from height **or manual override**"); the height factor
+     * is a population average and a walk down a measured stretch beats it for
+     * anyone who cares enough to count ten steps with a tape.
+     */
+    fun strideMeters(heightCm: Int?, strideCm: Int? = null): Double = when {
+        strideCm != null -> strideCm / 100.0
+        heightCm != null -> heightCm * STRIDE_HEIGHT_FACTOR / 100.0
+        else -> DEFAULT_STRIDE_METERS
+    }
 
-    fun distanceMeters(steps: Long, heightCm: Int?): Double =
-        steps * strideMeters(heightCm)
+    fun distanceMeters(steps: Long, heightCm: Int?, strideCm: Int? = null): Double =
+        steps * strideMeters(heightCm, strideCm)
 
     /** Active minutes for one hour bucket, capped at the hour's own 60. */
     fun activeMinutesInHour(hourSteps: Long): Int =

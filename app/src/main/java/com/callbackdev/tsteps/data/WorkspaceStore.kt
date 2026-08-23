@@ -15,6 +15,9 @@ private val Context.workspaceDataStore by preferencesDataStore(name = "workspace
 /** The two files open in the main editor's tab bar (Fase 10). */
 enum class MainEditorFile { JSON, README }
 
+/** The two files open in the Log screen's tab bar (Fase 15). */
+enum class LogEditorFile { HISTORY, WEEK }
+
 /**
  * Editor workspace state — what a real editor keeps in its session, not in its
  * settings: the last active file of the main screen survives app restarts like
@@ -36,8 +39,21 @@ class WorkspaceStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[MainActiveFile] = file.name }
     }
 
+    val logActiveFile: Flow<LogEditorFile> = dataStore.data
+        .map { prefs ->
+            prefs[LogActiveFile]
+                ?.let { name -> LogEditorFile.entries.firstOrNull { it.name == name } }
+                ?: LogEditorFile.HISTORY
+        }
+        .distinctUntilChanged()
+
+    suspend fun setLogActiveFile(file: LogEditorFile) {
+        dataStore.edit { it[LogActiveFile] = file.name }
+    }
+
     companion object {
         private val MainActiveFile = stringPreferencesKey("main_active_file")
+        private val LogActiveFile = stringPreferencesKey("log_active_file")
 
         fun create(context: Context) = WorkspaceStore(context.workspaceDataStore)
     }

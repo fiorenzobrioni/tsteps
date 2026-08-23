@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.callbackdev.tsteps.data.AppSettings
+import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
@@ -18,12 +19,14 @@ import com.callbackdev.tsteps.data.TrackingState
 import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.WorkspaceStore
+import com.callbackdev.tsteps.data.distanceMeters
 import com.callbackdev.tsteps.data.local.DaySummaryEntity
 import com.callbackdev.tsteps.data.local.HourlyStepsEntity
 import com.callbackdev.tsteps.data.toItem
 import com.callbackdev.tsteps.domain.DayStats
 import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.GoalCheckResult
+import com.callbackdev.tsteps.domain.Records
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.domain.Streaks
 import com.callbackdev.tsteps.healthconnect.ExternalStepsState
@@ -64,6 +67,8 @@ data class StepsUiState(
     val history: List<DayStats> = emptyList(),
     /** What other apps counted today (Fase 12) — shown, never added. */
     val externalSteps: List<OriginSteps> = emptyList(),
+    /** All-time tags for the README's `## Records`; null until something ranks. */
+    val records: DayRecords? = null,
     val zone: ZoneId = ZoneId.systemDefault(),
     /** Date of the newest committed day, for the status bar's `Last commit:`. */
     val lastCommitDate: LocalDate? = null
@@ -107,6 +112,18 @@ class StepsViewModel(
     /** Expands/collapses one session's in-file detail object. */
     fun toggleSession(id: Long) {
         expandedSessions.update { if (id in it) it - id else it + id }
+    }
+
+    /**
+     * The JSON's `"goal": null` line, tapped: the suggested goal becomes the
+     * real one. Writing a setting from the working tree is deliberate — this is
+     * the one opt-in the file itself offers, and hiding it in settings.config is
+     * what kept the check invisible on a fresh install.
+     */
+    fun acceptSuggestedGoal() {
+        viewModelScope.launch {
+            settingsStore.setDailyGoalSteps(SUGGESTED_DAILY_GOAL_STEPS)
+        }
     }
 
     /** `[rm]` (confirmed): a tombstone, so the detector never re-creates it. */
@@ -173,17 +190,18 @@ class StepsViewModel(
             ) { rows, sessions -> Triple(date, rows, sessions) }
         },
         repository.observeHistory(),
-        // Paired upstream: combine tops out at five flows and these two always
-        // travel together (the external block only exists while sync is on).
+        // Bundled upstream: combine tops out at five flows. The external block
+        // only exists while sync is on, and the longest walk is a single row the
+        // README's records need (never the whole session table on this screen).
         combine(
             settingsStore.settings,
             hcStateStore?.external ?: flowOf<ExternalStepsState?>(null),
-            ::Pair
-        ),
+            repository.observeLongestSession()
+        ) { settings, external, longest -> Triple(settings, external, longest) },
         permissionGranted,
         expandedSessions
-    ) { (date, hourlyRows, sessionRows), history, settingsAndHc, granted, expandedIds ->
-        val (settings, hcExternal) = settingsAndHc
+    ) { (date, hourlyRows, sessionRows), history, upstream, granted, expandedIds ->
+        val (settings, hcExternal, longestRow) = upstream
         StepsUiState(
             snapshot = snapshot(date, hourlyRows, history, settings),
             status = when {
@@ -201,8 +219,30 @@ class StepsViewModel(
             history = history.map {
                 DayStats(LocalDate.parse(it.date), it.steps, it.distanceMeters, it.activeMinutes)
             },
+            records = records(history, longestRow?.toItem()),
             zone = clock.zone,
             lastCommitDate = history.firstOrNull()?.let { LocalDate.parse(it.date) }
+        )
+    }
+
+    /**
+     * The all-time tags, from the committed days alone — today is the working
+     * tree, and a record is a tag on a commit: a personal best set this morning
+     * shows up tomorrow, exactly as it does in `stats.md`. Null when nothing has
+     * been committed yet: an empty records section is worse than none.
+     */
+    private fun records(
+        history: List<DaySummaryEntity>,
+        longestWalk: SessionItem?
+    ): DayRecords? {
+        val days = history.map { LocalDate.parse(it.date) to it.steps }.filter { it.second > 0 }
+        val bestDate = Records.bestDay(days)
+        val bestDay = bestDate?.let { date -> date to days.first { it.first == date }.second }
+        if (bestDay == null && longestWalk == null) return null
+        return DayRecords(
+            bestDay = bestDay,
+            longestWalk = longestWalk,
+            bestWeek = Records.bestWeek(days)
         )
     }
 
@@ -220,7 +260,7 @@ class StepsViewModel(
             date = date,
             steps = steps,
             goalSteps = settings.dailyGoalSteps,
-            distanceMeters = Estimates.distanceMeters(steps, settings.heightCm),
+            distanceMeters = settings.distanceMeters(steps),
             activeMinutes = activeMinutes,
             activeKcal = Estimates.activeKcal(settings.weightKg, activeMinutes),
             hourlySteps = hourly.toList(),

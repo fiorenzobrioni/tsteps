@@ -29,6 +29,20 @@ import java.util.Locale
 data class StreakInfo(val current: Int, val longest: Int)
 
 /**
+ * The `## totals` section: everything moved since the first commit — the repo's
+ * own size, `git log --shortstat` for a body. Deliberately NOT a health metric:
+ * it adds up what tsteps already measured instead of inferring a new fact about
+ * the user (VISION §3.2), and it answers the one question the app could not
+ * answer before — "how far have I come since I started?".
+ */
+data class Totals(
+    val since: LocalDate,
+    val steps: Long,
+    val distanceMeters: Double,
+    val activeMinutes: Int
+)
+
+/**
  * The `stats.md` document: the movement contribution graph plus streaks,
  * averages and record tags — rendered as highlighted markdown SOURCE like every
  * file in the series. Static sections ride [buildMarkdownLines]; the heatmap
@@ -44,6 +58,7 @@ object StatsDocument {
         grid: HeatmapGrid?,
         streak: StreakInfo?,
         averages: List<WindowAverages>,
+        totals: Totals?,
         bestDay: Pair<LocalDate, Long>?,
         longestWalk: SessionItem?,
         bestWeek: Records.BestWeek?,
@@ -101,6 +116,20 @@ object StatsDocument {
             )
             addAll(buildMarkdownLines(rows, syntax))
             add(blank())
+        }
+
+        if (totals != null) {
+            val numbers = NumberFormat.getIntegerInstance(locale)
+            addAll(md("## totals", "", syntax = syntax))
+            addAll(
+                md(
+                    "since ${totals.since}: **${numbers.format(totals.steps)} steps** " +
+                        "\u00b7 ${UnitFormat.distance(totals.distanceMeters, units)} " +
+                        "\u00b7 ${UnitFormat.activeSpan(totals.activeMinutes)}",
+                    "",
+                    syntax = syntax
+                )
+            )
         }
 
         val tags = tagRows(bestDay, longestWalk, bestWeek, units, locale, zone)

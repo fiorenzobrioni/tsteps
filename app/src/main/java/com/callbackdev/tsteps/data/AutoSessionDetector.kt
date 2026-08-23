@@ -4,7 +4,6 @@ import com.callbackdev.tsteps.data.local.SessionDao
 import com.callbackdev.tsteps.data.local.SessionEntity
 import com.callbackdev.tsteps.data.local.StepSampleDao
 import com.callbackdev.tsteps.domain.AutoDetect
-import com.callbackdev.tsteps.domain.Estimates
 import com.callbackdev.tsteps.domain.SampleSpan
 import com.callbackdev.tsteps.domain.SessionMetrics
 import java.time.Instant
@@ -74,7 +73,7 @@ class AutoSessionDetector(
             trackingStartMillis()?.let { add(AutoDetect.Exclusion(it, nowMillis)) }
         }
 
-        val strideMeters = Estimates.strideMeters(settings.heightCm)
+        val strideMeters = settings.strideMeters()
         return AutoDetect.detect(samples, dayStartMillis, nowMillis, exclusions, tuning)
             .map { walk ->
                 // An inferred walk has no pause knowledge: active time is the
