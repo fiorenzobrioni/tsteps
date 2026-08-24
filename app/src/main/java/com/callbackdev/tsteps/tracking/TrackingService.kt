@@ -109,7 +109,7 @@ class TrackingService : Service() {
                 updateNotification(manager.state.value)
                 GoalWatcher.evaluate(this@TrackingService)
                 // A walk with the screen off is when the widget matters most.
-                TstepsWidgetUpdater.updateAll(this@TrackingService)
+                TstepsWidgetUpdater.updateAllSafely(this@TrackingService)
             }
         }
     }

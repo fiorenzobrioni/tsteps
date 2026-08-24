@@ -4,10 +4,12 @@ import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
+import android.hardware.SensorEventListener2
 import android.hardware.SensorManager
 import android.os.SystemClock
 import android.provider.Settings
 import com.callbackdev.tsteps.domain.StepReading
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -51,33 +53,63 @@ class StepSensorReader(context: Context) : StepSource {
     override val isAvailable: Boolean get() = sensor != null
 
     /**
-     * STEP_COUNTER is a wake-up-on-change sensor: registering always delivers the
-     * current value promptly, so the timeout is a guard, not an expected path.
+     * STEP_COUNTER is a wake-up-on-change sensor: registering delivers a value
+     * promptly, so the timeout is a guard, not an expected path. That first value
+     * is not necessarily the *current* one though — a batching counter hands out
+     * whatever last reached the AP, which can be minutes old. So the sample waits
+     * for the flush to drain the hardware FIFO and keeps the newest event it saw,
+     * instead of unregistering on the first one and throwing the fresher batch
+     * away (the old code did, and the ↻ tap paid for it).
      */
     override suspend fun readCurrent(timeoutMillis: Long): StepReading? {
         val stepSensor = sensor ?: return null
-        return withTimeoutOrNull(timeoutMillis) {
+        // Held outside the timeout on purpose: an event that arrived before a
+        // flush that never completed is still a valid sample, and reporting it
+        // beats reporting silence (which the widget would wear as `# stale`).
+        val latest = AtomicReference<StepReading?>(null)
+        withTimeoutOrNull(timeoutMillis) {
             suspendCancellableCoroutine { continuation ->
-                val listener = object : SensorEventListener {
+                val listener = object : SensorEventListener2 {
+                    // Written from the flush fallback below (caller's thread) and
+                    // read from the sensor callbacks (main looper).
+                    @Volatile
+                    private var drained = false
+
                     override fun onSensorChanged(event: SensorEvent) {
-                        sensorManager.unregisterListener(this)
-                        if (continuation.isActive) {
-                            continuation.resumeWith(Result.success(event.toReading()))
-                        }
+                        // Flushed events arrive in timestamp order, so last wins.
+                        latest.set(event.toReading())
+                        if (drained) settle()
+                    }
+
+                    override fun onFlushCompleted(sensor: Sensor?) {
+                        drained = true
+                        // The FIFO can drain before the on-change event lands;
+                        // then the next reading is the one that settles this.
+                        if (latest.get() != null) settle()
                     }
 
                     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+                    private fun settle() {
+                        sensorManager.unregisterListener(this)
+                        if (continuation.isActive) {
+                            continuation.resumeWith(Result.success(Unit))
+                        }
+                    }
                 }
                 sensorManager.registerListener(
                     listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL
                 )
                 // Push whatever sits in the hardware FIFO out to the listener now.
-                sensorManager.flush(listener)
+                // false = nothing to drain (no batching, or the register did not
+                // take), so the first event is already the whole answer.
+                if (!sensorManager.flush(listener)) listener.onFlushCompleted(stepSensor)
                 continuation.invokeOnCancellation {
                     sensorManager.unregisterListener(listener)
                 }
             }
         }
+        return latest.get()
     }
 
     override fun readings(): Flow<StepReading> = callbackFlow {

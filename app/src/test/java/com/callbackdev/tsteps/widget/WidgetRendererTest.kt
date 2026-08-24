@@ -58,8 +58,9 @@ class WidgetRendererTest {
     private fun inflate(
         content: WidgetContent,
         tier: WidgetTier,
-        opacityPct: Int = 100
-    ): View = WidgetRenderer.render(context, content, palette, opacityPct, tier)
+        opacityPct: Int = 100,
+        syncing: Boolean = false
+    ): View = WidgetRenderer.render(context, content, palette, opacityPct, tier, syncing)
         .apply(context, FrameLayout(context))
 
     private fun View.text(id: Int): String = findViewById<TextView>(id).text.toString()
@@ -118,6 +119,27 @@ class WidgetRendererTest {
         assertEquals("▓▓▓▓▓▓▓▓░░ 84%", view.text(R.id.widget_small_label))
         assertEquals(palette.number, view.tokenColorAt(R.id.widget_small_value, 0))
         assertEquals(palette.prompt, view.tokenColorAt(R.id.widget_small_label, 0))
+    }
+
+    /**
+     * The tap's acknowledgment has to reach the sizes people actually place, and
+     * `# last_sync` is last in the transcript — the medium tier cuts it. So the
+     * glyph carries it, on every tier, and comes back on the next repaint.
+     */
+    @Test
+    fun theRefreshGlyphWearsTheTapOnEveryTier() {
+        val idle = context.getString(R.string.widget_refresh_glyph)
+        val busy = context.getString(R.string.widget_refresh_glyph_busy)
+
+        listOf(WidgetTier.Small, WidgetTier.Terminal(4), WidgetTier.Terminal(8)).forEach { tier ->
+            val waiting = inflate(content(tier), tier, syncing = true)
+            assertEquals(busy, waiting.text(R.id.widget_refresh))
+            assertEquals(palette.comment, waiting.findViewById<TextView>(R.id.widget_refresh).currentTextColor)
+
+            val settled = inflate(content(tier), tier)
+            assertEquals(idle, settled.text(R.id.widget_refresh))
+            assertEquals(palette.plain, settled.findViewById<TextView>(R.id.widget_refresh).currentTextColor)
+        }
     }
 
     @Test

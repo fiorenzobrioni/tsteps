@@ -29,8 +29,11 @@ object ServiceLocator {
     @Volatile
     private var stepRepository: StepRepository? = null
 
+    // Typed to the interface, not the reader: the workers, the widget tap and the
+    // tracking service all consume it as a source, and only that lets a test feed
+    // synthetic readings (or a silent counter) to the code that samples.
     @Volatile
-    private var stepSensorReader: StepSensorReader? = null
+    private var stepSensorReader: StepSource? = null
 
     @Volatile
     private var trackingManager: TrackingManager? = null
@@ -82,7 +85,7 @@ object ServiceLocator {
             ).also { stepRepository = it }
         }
 
-    fun stepSensorReader(context: Context): StepSensorReader =
+    fun stepSensorReader(context: Context): StepSource =
         stepSensorReader ?: synchronized(this) {
             stepSensorReader ?: StepSensorReader(context.applicationContext)
                 .also { stepSensorReader = it }
@@ -161,7 +164,7 @@ object ServiceLocator {
     @VisibleForTesting
     fun overrideForTests(
         stepRepository: StepRepository? = null,
-        stepSensorReader: StepSensorReader? = null,
+        stepSensorReader: StepSource? = null,
         settingsStore: SettingsStore? = null,
         trackerStateStore: TrackerStateStore? = null
     ) {
