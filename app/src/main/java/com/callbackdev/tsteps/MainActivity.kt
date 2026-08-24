@@ -9,6 +9,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.ui.navigation.TstepsApp
@@ -78,8 +80,19 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 .distinctUntilChanged()
-                .collect { TstepsWidgetUpdater.updateAll(this@MainActivity) }
+                .collect { TstepsWidgetUpdater.updateAllSafely(this@MainActivity) }
         }
+        // Leaving the app is the moment the widget goes back on show, and the
+        // whole session the live listener has been ingesting readings the widget
+        // never heard about: the collector above only fires on a settings change,
+        // and its one shot at launch races that first ingest. Without this the
+        // widget kept the last worker's number until the next 15-minute pass —
+        // the app told you the truth and did not pass it on.
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) {
+                TstepsWidgetUpdater.updateAllDetached(applicationContext)
+            }
+        })
         setContent {
             // Theme switches at runtime with settings.config's "active_profile"
             val profile by remember {

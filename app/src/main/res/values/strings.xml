@@ -46,8 +46,11 @@
          description and accessibility text are chrome (localized) -->
     <string name="widget_label" translatable="false">tsteps --today</string>
     <string name="widget_refresh_glyph" translatable="false">\u21bb</string>
+    <!-- the \u21bb while the tap it just took is being served -->
+    <string name="widget_refresh_glyph_busy" translatable="false">\u2026</string>
     <string name="widget_description">Today\'s steps as a terminal window</string>
     <string name="cd_widget_refresh">Read the step counter now</string>
+    <string name="cd_widget_refresh_busy">Reading the step counter</string>
     <string name="cd_change_setting">Change %1$s</string>
     <string name="cd_open_link">Open %1$s website</string>
     <string name="cd_reset_settings">Reset all settings to defaults</string>

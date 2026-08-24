@@ -14,19 +14,58 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Re-renders every widget instance from persisted state. Called by the sync
  * workers after each ingest/commit, by the tracking service's minute tick (a
  * walk with the screen off is exactly when the widget matters), from
- * MainActivity's settings collector (theme/units/goal/profile/opacity changes),
- * and on provider onUpdate. No-op with zero widgets. Unlike its tweather parent
- * there is one data source — the day — so a single render feeds every instance.
+ * MainActivity's settings collector (theme/units/goal/profile/opacity changes)
+ * and again when the app leaves the foreground (the live listener has been
+ * ingesting the whole session — the widget is the last thing to hear about it),
+ * on provider onUpdate, and around the ↻ tap. No-op with zero widgets. Unlike
+ * its tweather parent there is one data source — the day — so a single render
+ * feeds every instance.
  */
 object TstepsWidgetUpdater {
 
-    suspend fun updateAll(context: Context) {
+    /**
+     * Outlives any single caller: MainActivity's `onStop` is routinely followed by
+     * `onDestroy` (swipe away), which would cancel `lifecycleScope` mid-render.
+     */
+    private val detachedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * Repaint that never takes its caller down with it. Every background caller
+     * wants this one: a widget holding its last frame is a nuisance, a worker
+     * that dies because the repaint threw is a stopped schedule.
+     */
+    suspend fun updateAllSafely(context: Context, syncing: Boolean = false) {
+        try {
+            updateAll(context, syncing)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            // The widget simply keeps whatever it was showing.
+        }
+    }
+
+    /** Fire-and-forget repaint for callers whose own scope dies with them. */
+    fun updateAllDetached(context: Context) {
+        val appContext = context.applicationContext
+        detachedScope.launch { updateAllSafely(appContext) }
+    }
+
+    /**
+     * [syncing] paints the same state with the ↻ glyph in its working form — the
+     * acknowledgment a tap gets while the sample it asked for is still in flight.
+     */
+    suspend fun updateAll(context: Context, syncing: Boolean = false) {
         val manager = AppWidgetManager.getInstance(context)
         val ids = manager.getAppWidgetIds(
             ComponentName(context, TstepsWidgetProvider::class.java)
@@ -89,7 +128,8 @@ object TstepsWidgetUpdater {
                     )
                 },
                 palette = palette,
-                opacityPct = settings.widgetOpacityPct
+                opacityPct = settings.widgetOpacityPct,
+                syncing = syncing
             )
         )
     }

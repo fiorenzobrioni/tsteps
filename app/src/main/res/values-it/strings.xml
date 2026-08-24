@@ -34,6 +34,7 @@
     <string name="cd_grant_health">Concedi i permessi di Health Connect</string>
     <string name="widget_description">I passi di oggi come finestra di terminale</string>
     <string name="cd_widget_refresh">Leggi il contapassi adesso</string>
+    <string name="cd_widget_refresh_busy">Lettura del contapassi in corso</string>
     <string name="cd_change_setting">Modifica %1$s</string>
     <string name="cd_open_link">Apri il sito di %1$s</string>
     <string name="cd_reset_settings">Ripristina tutte le impostazioni</string>

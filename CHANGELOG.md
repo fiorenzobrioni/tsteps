@@ -4,6 +4,26 @@ All notable changes to tsteps are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- The home widget now repaints when you leave the app. The whole time the app is
+  open its live listener has been ingesting readings the widget never heard about;
+  it used to keep the last background sample's number until the next 15-minute
+  pass.
+- The widget's ↻ now reads the counter inside the tap instead of queueing the read
+  for WorkManager, where an expedited request degrades to an ordinary job once the
+  quota is spent — on a phone whose owner rarely opens the app, that meant minutes.
+  While the read is in flight the glyph turns into `…`, so a tap that found nothing
+  new is no longer indistinguishable from a tap that went nowhere.
+- A failing sync pass no longer skips the widget repaint, cancels the 15-minute
+  sampler, or (at midnight) drops the next rollover appointment. Health Connect's
+  IPC can throw, and one throw used to take all three with it.
+- A counter sample now waits for the hardware FIFO flush it already asked for and
+  keeps the newest reading, instead of taking the first value handed out at
+  registration — which on a batching step counter can be minutes old.
+
 ## [1.0.0] — 2026-08-20
 
 First release. Everything below is new.

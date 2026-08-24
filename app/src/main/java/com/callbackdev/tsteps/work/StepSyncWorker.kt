@@ -11,6 +11,7 @@ import com.callbackdev.tsteps.widget.TstepsWidgetUpdater
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 
 /**
  * The periodic sampler (`step-sync`, 15 min — WorkManager's floor). Reads one
@@ -24,16 +25,30 @@ class StepSyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
+        val failure = try {
+            pass()
+            null
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            e
+        }
+        // Redraw whatever happened: the stale marker exists exactly for a failed
+        // pass, and without a repaint it would never appear (tweather's lesson
+        // from the network-down case). The tail can throw for real — Health
+        // Connect's IPC surfaces a revoked permission as an exception — and it
+        // used to take the repaint down with it.
+        TstepsWidgetUpdater.updateAllSafely(applicationContext)
+        // Never `failure()`: for periodic work that state is terminal in
+        // WorkManager, so one bad pass would stop the 15-minute sampler until the
+        // next `reconcile` re-armed it. Retry keeps the schedule alive.
+        return if (failure == null) Result.success() else Result.retry()
+    }
+
+    private suspend fun pass() {
         val reader = ServiceLocator.stepSensorReader(applicationContext)
         val repository = ServiceLocator.stepRepository(applicationContext)
-        val reading = reader.readCurrent()
-        if (reading == null) {
-            // Redraw even when the sample fails: the stale marker exists exactly
-            // for this scenario, and without a repaint it would never appear
-            // (tweather's lesson from the network-down case).
-            TstepsWidgetUpdater.updateAll(applicationContext)
-            return Result.success()
-        }
+        val reading = reader.readCurrent() ?: return
         repository.ingest(reading)
         val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
         notifyDailyCommit(committed)
@@ -45,8 +60,6 @@ class StepSyncWorker(
         // Fase 12: reconcile Health Connect after detection so a fresh auto walk
         // ships in the same pass. Inert (one in-memory read) while sync is off.
         ServiceLocator.healthConnectSync(applicationContext).sync()
-        TstepsWidgetUpdater.updateAll(applicationContext)
-        return Result.success()
     }
 
     /**
