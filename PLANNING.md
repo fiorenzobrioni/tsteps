@@ -274,6 +274,8 @@ La hint (`// prima volta? apri HELP.md`) è attiva di default e **non è un togg
 - [x] Test (16 nuovi, 417 totali): i cinque stati della migrazione, le due risposte dell'init e il permesso negato, il documento di `HELP.md` con i suoi heading e la striscia dei tab, la hint che apre il file, il flag nel workspace store; il test di navigazione ora inietta il `FirstRunStore` (la decisione fra init e workspace dev'essere il suo input, non quello che ha lasciato su disco il test precedente)
 - [ ] Verifica su device del committente: installazione pulita (init → concedi → i passi partono; init → salta → il documento con `// E:` e il comando di grant) e **aggiornamento sopra l'app attuale, dove init non deve comparire**
 
+**Rifinitura della chiusura (26 ago, rilievo del committente, stessa modifica in tweather).** L'ultima riga di `## Perché ha questo aspetto` era «Se sei arrivato fin qui, sai già se fa per te»: non è imperativa in senso grammaticale, ma **emette un verdetto sul lettore**, e lo fa nell'ultima riga della pagina che esiste apposta per chi si è sentito perso. Divide chi legge in due categorie proprio dove il documento dovrebbe lasciare la porta aperta; sarebbe stata giusta nel README del repo o nella scheda dello store, dove si sta ancora decidendo se installare, non qui. Sostituita con una che **restituisce** invece di giudicare — «E se qualche parola qui sopra resta oscura, non importa: i passi li conta lo stesso» — vera per giunta: la metafora è decorazione, il contapassi funziona senza. La prima frase resta intatta, il registro secco è la voce dell'app e il difetto non era il tono.
+
 
 ## Note trasversali
 
