@@ -59,6 +59,15 @@ class MainActivity : ComponentActivity() {
         // sensor availability. The permission-request UI lands in Fase 3; until
         // it is granted this is a no-op that keeps zero jobs alive.
         SyncScheduler.reconcile(this)
+        // Fase 17: decides once whether this install predates `$ tsteps init`, and
+        // must land before the shell can tell a first run from a returning user. An
+        // app that holds the permission, or that has ever anchored a counter reading,
+        // has been answering the question by itself and is never asked again.
+        lifecycleScope.launch {
+            val used = SyncScheduler.hasPermission(this@MainActivity) ||
+                ServiceLocator.trackerStateStore(this@MainActivity).read() != null
+            ServiceLocator.firstRunStore(this@MainActivity).migrate(used)
+        }
         // The app is dark-only (see TstepsTheme), so the system bars must always
         // draw their icons light. enableEdgeToEdge()'s default is SystemBarStyle.auto,
         // which picks the appearance from the *system* dark-mode setting: on a phone

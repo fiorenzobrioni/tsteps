@@ -42,6 +42,9 @@ object ServiceLocator {
     private var workspaceStore: WorkspaceStore? = null
 
     @Volatile
+    private var firstRunStore: FirstRunStore? = null
+
+    @Volatile
     private var notificationStateStore: NotificationStateStore? = null
 
     @Volatile
@@ -101,6 +104,12 @@ object ServiceLocator {
         workspaceStore ?: synchronized(this) {
             workspaceStore ?: WorkspaceStore.create(context.applicationContext)
                 .also { workspaceStore = it }
+        }
+
+    fun firstRunStore(context: Context): FirstRunStore =
+        firstRunStore ?: synchronized(this) {
+            firstRunStore ?: FirstRunStore.create(context.applicationContext)
+                .also { firstRunStore = it }
         }
 
     fun trackingManager(context: Context): TrackingManager =
@@ -166,8 +175,10 @@ object ServiceLocator {
         stepRepository: StepRepository? = null,
         stepSensorReader: StepSource? = null,
         settingsStore: SettingsStore? = null,
-        trackerStateStore: TrackerStateStore? = null
+        trackerStateStore: TrackerStateStore? = null,
+        firstRunStore: FirstRunStore? = null
     ) {
+        this.firstRunStore = firstRunStore
         this.stepRepository = stepRepository
         this.stepSensorReader = stepSensorReader
         this.settingsStore = settingsStore

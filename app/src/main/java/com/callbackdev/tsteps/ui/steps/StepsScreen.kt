@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -38,6 +40,7 @@ import com.callbackdev.tsteps.data.MainEditorFile
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.tracking.TrackingService
 import com.callbackdev.tsteps.ui.components.CodeCanvas
+import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.buildMarkdownLines
 import com.callbackdev.tsteps.ui.components.EditorTabs
 import com.callbackdev.tsteps.ui.components.GlowFab
@@ -64,6 +67,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun StepsScreen(
     onOpenTrack: () -> Unit = {},
+    onOpenHelp: () -> Unit = {},
     viewModel: StepsViewModel = viewModel(factory = StepsViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,6 +88,7 @@ fun StepsScreen(
     }
     val activeFile by viewModel.activeFile.collectAsStateWithLifecycle()
     val tracking by viewModel.tracking.collectAsStateWithLifecycle()
+    val showHelpHint by viewModel.showHelpHint.collectAsStateWithLifecycle()
     StepsScreen(
         state = state,
         activeFile = activeFile,
@@ -95,6 +100,11 @@ fun StepsScreen(
         },
         onToggleSession = viewModel::toggleSession,
         onAcceptGoal = viewModel::acceptSuggestedGoal,
+        showHelpHint = showHelpHint,
+        onOpenHelp = {
+            viewModel.dismissHelpHint()
+            onOpenHelp()
+        },
         onStartTrack = {
             // Idempotent when a session already runs: the manager's start no-ops
             // and the screen simply reopens the process.
@@ -118,7 +128,10 @@ fun StepsScreen(
     onAcceptGoal: () -> Unit = {},
     onStartTrack: () -> Unit = {},
     onRemoveSession: (Long) -> Unit = {},
-    onResizeSession: (id: Long, startMillis: Long, endMillis: Long) -> Unit = { _, _, _ -> }
+    onResizeSession: (id: Long, startMillis: Long, endMillis: Long) -> Unit = { _, _, _ -> },
+    /** Fase 17: the one-shot pointer to `HELP.md`, first line of the document. */
+    showHelpHint: Boolean = false,
+    onOpenHelp: () -> Unit = {}
 ) {
     val syntax = TstepsTheme.syntax
     val grantLabel = stringResource(R.string.cd_grant_activity_recognition)
@@ -198,10 +211,21 @@ fun StepsScreen(
         cancelLabel = stringResource(R.string.cd_cancel_edit)
     )
 
+    val hint = if (showHelpHint) stringResource(R.string.help_hint) else null
     val lines = remember(
-        state, syntax, activeFile, locale, armedRemoveId, editingSessionId, editValue, editError
+        state, syntax, activeFile, locale, armedRemoveId, editingSessionId, editValue,
+        editError, hint
     ) {
-        when (activeFile) {
+        val head = hint?.let {
+            listOf(
+                CodeLine(
+                    AnnotatedString("// $it", SpanStyle(color = syntax.key)),
+                    onClick = onOpenHelp,
+                    onClickLabel = it
+                )
+            )
+        } ?: emptyList()
+        head + when (activeFile) {
             MainEditorFile.JSON -> StepsDocument.build(
                 snapshot = state.snapshot,
                 status = state.status,

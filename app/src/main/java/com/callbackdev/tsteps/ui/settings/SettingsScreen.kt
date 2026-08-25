@@ -106,6 +106,16 @@ class SettingsActions(
     val onReset: () -> Unit
 )
 
+/**
+ * The files open in the Settings tab bar: one until Fase 17, two since — `HELP.md`
+ * lands here because this is where someone goes when the app has confused them, and
+ * because the editor's two tabs belong to the day, not to the app.
+ */
+internal val SettingsFiles = listOf("settings.config", "HELP.md")
+
+/** Index of `HELP.md` in [SettingsFiles] — the target of the editor's first-run hint. */
+internal const val HelpFileIndex = 1
+
 /** The free numbers edited through a terminal input instead of cycling. */
 internal enum class NumericField { GOAL, WEIGHT, HEIGHT, STRIDE }
 
@@ -133,8 +143,31 @@ enum class NotifLineState {
  * state here, it's what hides kcal and falls back to the default stride.
  */
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
+    /** Set by the editor's `HELP.md` hint: open that file rather than the config. */
+    openHelp: Boolean = false,
+    onHelpOpened: () -> Unit = {}
+) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    // Two files behind one tab bar since Fase 17, scroll kept per file
+    var activeFile by rememberSaveable { mutableIntStateOf(0) }
+    val helpScroll = rememberLazyListState()
+
+    // The hint in the editor asks for a file, not just for this tab (the nav graph
+    // restores whichever one was open last).
+    LaunchedEffect(openHelp) {
+        if (openHelp) {
+            activeFile = HelpFileIndex
+            onHelpOpened()
+        }
+    }
+    if (activeFile == HelpFileIndex) {
+        // Seen is seen: the hint stops pointing at a file the user has now opened.
+        LaunchedEffect(Unit) { viewModel.markHelpSeen() }
+        HelpScreen(onSelectFile = { activeFile = it }, canvasState = helpScroll)
+        return
+    }
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -223,6 +256,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel(factory = SettingsVi
 
     SettingsScreen(
         settings = settings,
+        onSelectFile = { activeFile = it },
         notifState = notifState,
         hcStatus = hcStatus,
         exportState = exportState,
@@ -282,7 +316,9 @@ fun SettingsScreen(
     onHcLine: () -> Unit = {},
     exportState: ExportState = ExportState.Idle,
     onExport: (ExportFormat) -> Unit = {},
-    canvasState: LazyListState = rememberLazyListState()
+    canvasState: LazyListState = rememberLazyListState(),
+    /** Fase 17: the tab strip now carries `HELP.md` next to the config. */
+    onSelectFile: (Int) -> Unit = {}
 ) {
     val syntax = TstepsTheme.syntax
     val resources = LocalContext.current.resources
@@ -386,9 +422,9 @@ fun SettingsScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
             EditorTabs(
-                fileNames = listOf("settings.config"),
+                fileNames = SettingsFiles,
                 activeIndex = 0,
-                onSelect = {}
+                onSelect = onSelectFile
             )
             CodeCanvas(
                 lines = lines,

@@ -86,4 +86,51 @@
     <string name="readme_rec_longest_walk">Longest walk: **%1$d min** \u00b7 %2$s (%3$s)</string>
     <string name="readme_rec_best_week">Best week: **%1$s steps** (week %2$d)</string>
     <string name="readme_footer">Computed on device \u00b7 %1$d committed days</string>
+    <!-- `$ tsteps init` (Fase 17). Prose for someone seeing the app for the first
+         time, so LOCALIZED - the same exception the README.md day tab makes. The
+         command and the file names are code and stay as they are. -->
+    <string name="init_intro">tsteps counts your steps with the phone\'s own sensor.</string>
+    <string name="init_privacy">No network, no account, no GPS: nothing ever leaves the phone.</string>
+    <string name="init_option_grant">turn on the step counter</string>
+    <string name="init_option_grant_note">physical activity permission, Android asks you first</string>
+    <string name="init_option_skip">skip</string>
+    <string name="init_option_skip_note">decide later, from steps_data.json</string>
+    <string name="init_permission_denied"># permission denied: the counter stays off until you grant it</string>
+
+    <!-- The editor\'s one-shot pointer to HELP.md (Fase 17), localized for the same
+         reason as the init screen. The file name is a file name. -->
+    <string name="help_hint">new here? open HELP.md</string>
+
+    <!-- HELP.md (Fase 17): the second file behind the Settings tab bar. Prose, so
+         FULLY localized, headings included. One item per rendered line: the document
+         is markdown SOURCE, and Android collapses a real newline into a space. -->
+    <string-array name="help_md">
+        <item># tsteps</item>
+        <item></item>
+        <item>A step counter that presents itself as a code editor and a git repository: today is a file you read, and the past is its history. If the words below mean nothing to you, this page is for you.</item>
+        <item></item>
+        <item>## The four tabs</item>
+        <item></item>
+        <item>- **Editor** - `steps_data.json` and `README.md`: today. The first is the technical version, every field of it; the second is the same day told in words.</item>
+        <item>- **Log** - `steps_history.diff` and `week.diff`: one entry per day, with each walk shown as the stretch of time it covered.</item>
+        <item>- **Stats** - `stats.md`: totals, averages, and the coloured grid of the last weeks - one square per day, darker where you walked more.</item>
+        <item>- **Settings** - `settings.config`: options change by tapping the value itself. There is no switch to hunt for.</item>
+        <item></item>
+        <item>## The borrowed words</item>
+        <item></item>
+        <item>- **commit** - a day, closed and filed at midnight. Once committed, a day no longer changes.</item>
+        <item>- **working tree** - today: the one day still moving.</item>
+        <item>- **diff** - what a day contains, written as changes. `+` lines are steps added, and a walk appears under the hours it covered.</item>
+        <item>- **check** (`✓` / `✗`) - the daily goal, passed or missed: the test suite of a repository, run once a day.</item>
+        <item>- **branch** (`⎇`) - the day you are looking at.</item>
+        <item></item>
+        <item>## Where the numbers come from</item>
+        <item></item>
+        <item>The phone\'s own step counter, the same sensor every other pedometer reads. tsteps has no network permission at all: nothing can leave the phone, because there is nowhere for it to go. Distance and calories are estimates worked out from your steps, and the file says so wherever they appear - the ones it cannot work out, it leaves out.</item>
+        <item></item>
+        <item>## Why it looks like this</item>
+        <item></item>
+        <item>Because a file can be read all at once, and because we like it this way. If you got this far, you already know whether it is for you.</item>
+    </string-array>
+
 </resources>

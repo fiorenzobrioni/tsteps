@@ -105,6 +105,18 @@ class StepsViewModel(
         viewModelScope.launch { workspaceStore?.setMainActiveFile(file) }
     }
 
+    /** Fase 17: the `HELP.md` pointer, until it is used or the file has been opened. */
+    val showHelpHint: StateFlow<Boolean> =
+        // Same nullable-store pattern as activeFile: no store, no hint
+        (workspaceStore?.helpHintDismissed ?: flow { emit(true) })
+            .map { !it }
+            // Eagerly like activeFile: a hint one frame late reads as a glitch
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun dismissHelpHint() {
+        viewModelScope.launch { workspaceStore?.dismissHelpHint() }
+    }
+
     private val permissionGranted = MutableStateFlow(hasPermission())
 
     private val expandedSessions = MutableStateFlow<Set<Long>>(emptySet())

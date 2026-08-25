@@ -247,6 +247,34 @@ Due sintomi dal committente: «il tap sulla freccia di refresh non aggiorna semp
 
 ---
 
+## Fase 17 — `$ tsteps init` al primo avvio e `HELP.md` (porting da tweather, ago 2026)
+
+Richiesta del committente: dopo aver fatto il lavoro su tweather (sue fasi 14a-14d), portarlo qui. Non tutto si porta, e vale la pena dire cosa **non** è servito.
+
+**Le fasi 14a e 14b non hanno un equivalente qui**, ed è una buona notizia: nascevano dalla città seminata di tweather, che elencava in `cities.json` un posto che l'utente non aveva mai scelto. tsteps non semina niente e lo stato "non posso contare" **esiste già** ed è già onesto: senza `ACTIVITY_RECOGNITION` il documento apre con `// E: ACTIVITY_RECOGNITION permission not granted` e offre il comando per concederlo. Quel pezzo era già a posto dalla Fase 3.
+
+**La 14c invece qui ha un caso più forte che in tweather.** Là il permesso di posizione è opzionale (si può sempre cercare una città); qui senza il permesso l'app non conta **un solo passo**, e fino a oggi lo chiedeva un dialogo di sistema a freddo, con la motivazione da nessuna parte. `$ tsteps init` è quella motivazione, ed è la schermata stessa.
+
+Due risposte invece di tre, perché c'è una cosa sola da concedere: `attiva il contapassi` (lancia la richiesta e, al grant, riconcilia i job — il permesso è ciò che decide se devono esistere) e `salta`. Permesso negato: lo dice in rosso e lascia in piedi `salta`, non è un vicolo cieco. Le notifiche e Health Connect **restano dove sono**, in `settings.config`: infilare tre permessi di fila nel primo avvio trasformerebbe l'init in un casello, che è esattamente quello che una schermata di setup non deve essere.
+
+**Chi aggiorna non deve vedere niente.** `FirstRunStore.migrate(used)` gira una volta sola all'avvio: `used` è vero se l'app ha il permesso **oppure** ha mai ancorato una lettura del contatore (`TrackerStateStore`), cioè se ha già risposto a quella domanda da sé — qualunque cosa avesse risposto. Da qui `FirstRun.Unknown`, che disegna una superficie vuota: la decisione è a una lettura di DataStore di distanza, e indovinare "pending" per quel frame significa sbattere un setup in faccia a chi usa l'app da mesi. Il flag sta in un DataStore suo (`first_run`): non è una riga di `settings.config` né stato di sessione dell'editor, è un fatto sull'installazione.
+
+**La 14d si porta quasi identica.** `HELP.md` diventa il **secondo** file dietro la barra di Impostazioni (tweather ne aveva già due). Il contenuto no: cambia la metafora, quindi cambiano le parole — commit è il giorno chiuso a mezzanotte, working tree è oggi, il diff sono i passi aggiunti e le camminate sotto le ore che hanno occupato, il check `✓`/`✗` è l'obiettivo del giorno, la griglia colorata sono le settimane. E il paragrafo sui dati dice una cosa che tweather non può dire: **tsteps non ha nemmeno il permesso di rete**, quindi dal telefono non può uscire niente perché non c'è nessun posto dove andare.
+
+La hint (`// prima volta? apri HELP.md`) è attiva di default e **non è un toggle in `settings.config`**, per la stessa ragione di tweather: un interruttore per una cosa che succede una volta passerebbe il resto della vita dell'app appoggiato su `false` in un file che l'utente legge, e `$ tsteps reset settings` la rifarebbe comparire a chi usa l'app da un anno. Sta nel DataStore `workspace`, accanto al tab attivo, e sparisce quando l'aiuto è stato visto per qualunque strada.
+
+`init` e hint sono **localizzati**, a differenza dell'output di terminale del resto dell'app: stessa eccezione che fa già il tab `README.md`. La finzione la porta la forma — il prompt, le scelte `>`, le note `#` — non la lingua.
+
+- [x] `data/FirstRunStore.kt`: `FirstRun` (Unknown/Pending/Done), `migrate(used)` una volta sola, `markInitDone()`; registrato nel `ServiceLocator` (override per i test compreso)
+- [x] `ui/init/InitScreen.kt` e `TstepsApp` divisa in `FirstRunSetup` e `Workspace`; `MainActivity` esegue la migrazione allo startup
+- [x] `ui/settings/HelpScreen.kt`, `SettingsFiles` a due voci (`HelpFileIndex`), status bar `ro`
+- [x] `WorkspaceStore.helpHintDismissed` + `dismissHelpHint()`; `StepsViewModel.showHelpHint` (Eagerly, e col pattern dello store nullable già in uso) e `SettingsViewModel.markHelpSeen()`
+- [x] La hint viaggia fra i tab: `openHelp` nel `Workspace`, consumato da `SettingsScreen`
+- [x] Stringhe EN/IT: init, hint e `help_md` come `<string-array>` (una `<item>` per riga renderizzata: un a-capo vero dentro una risorsa Android viene schiacciato a spazio)
+- [x] Test (16 nuovi, 417 totali): i cinque stati della migrazione, le due risposte dell'init e il permesso negato, il documento di `HELP.md` con i suoi heading e la striscia dei tab, la hint che apre il file, il flag nel workspace store; il test di navigazione ora inietta il `FirstRunStore` (la decisione fra init e workspace dev'essere il suo input, non quello che ha lasciato su disco il test precedente)
+- [ ] Verifica su device del committente: installazione pulita (init → concedi → i passi partono; init → salta → il documento con `// E:` e il comando di grant) e **aggiornamento sopra l'app attuale, dove init non deve comparire**
+
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.
