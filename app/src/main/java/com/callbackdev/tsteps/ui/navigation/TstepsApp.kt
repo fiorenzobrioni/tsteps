@@ -35,6 +35,18 @@ import com.callbackdev.tsteps.ui.steps.StepsScreen
 import com.callbackdev.tsteps.ui.track.TrackOpenRequest
 import com.callbackdev.tsteps.ui.track.TrackScreen
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.callbackdev.tsteps.data.FirstRun
+import com.callbackdev.tsteps.data.FirstRunStore
+import com.callbackdev.tsteps.ui.init.InitScreen
+import com.callbackdev.tsteps.work.SyncScheduler
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 
 /**
@@ -53,8 +65,54 @@ object Routes {
 /** The live-session process; navigated to, never a bottom-bar destination. */
 private const val TrackRoute = "track"
 
+/**
+ * Decides between `$ tsteps init` and the workspace — see [FirstRunStore.state]. The
+ * [FirstRun.Unknown] branch draws an empty surface on purpose: the legacy check is
+ * one DataStore read away, and guessing "pending" for that frame would flash a setup
+ * screen at someone who has been using the app for months.
+ */
 @Composable
 fun TstepsApp() {
+    val context = LocalContext.current
+    val firstRunStore = remember(context) { ServiceLocator.firstRunStore(context) }
+    val firstRun by remember(firstRunStore) { firstRunStore.state }
+        .collectAsStateWithLifecycle(initialValue = FirstRun.Unknown)
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        when (firstRun) {
+            FirstRun.Unknown -> Unit
+            FirstRun.Pending -> FirstRunSetup(firstRunStore)
+            FirstRun.Done -> Workspace()
+        }
+    }
+}
+
+/** The state around [InitScreen]: the permission the app cannot count without. */
+@Composable
+private fun FirstRunSetup(firstRunStore: FirstRunStore) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var permissionDenied by rememberSaveable { mutableStateOf(false) }
+    val permission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // A grant flips the "should the background jobs exist" answer
+            SyncScheduler.reconcile(context)
+            scope.launch { firstRunStore.markInitDone() }
+        } else {
+            permissionDenied = true
+        }
+    }
+    InitScreen(
+        onGrant = { permission.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
+        onSkip = { scope.launch { firstRunStore.markInitDone() } },
+        permissionDenied = permissionDenied
+    )
+}
+
+@Composable
+private fun Workspace() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -86,12 +144,15 @@ fun TstepsApp() {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-        ) {
+    // The editor's HELP.md hint asks for a file on another tab: the flag rides
+    // across the tab switch, the Settings screen consumes it (Fase 17).
+    var openHelp by rememberSaveable { mutableStateOf(false) }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
             CompositionLocalProvider(
                 LocalEditorOptions provides EditorOptions(
                     showLineNumbers = editorSettings.lineNumbers,
@@ -104,13 +165,24 @@ fun TstepsApp() {
                     modifier = Modifier.weight(1f)
                 ) {
                     composable(Routes.Editor) {
-                        StepsScreen(onOpenTrack = { navController.navigate(TrackRoute) })
+                        StepsScreen(
+                            onOpenTrack = { navController.navigate(TrackRoute) },
+                            onOpenHelp = {
+                                openHelp = true
+                                navController.navigateToTab(Routes.Settings)
+                            }
+                        )
                     }
                     composable(Routes.Log) { LogScreen() }
                     composable(Routes.Stats) {
                         StatsScreen(onOpenLog = { navController.navigateToTab(Routes.Log) })
                     }
-                    composable(Routes.Settings) { SettingsScreen() }
+                    composable(Routes.Settings) {
+                        SettingsScreen(
+                            openHelp = openHelp,
+                            onHelpOpened = { openHelp = false }
+                        )
+                    }
                     // Not a tab: the live process opens over the editor's stack
                     // and pops back when it ends.
                     composable(TrackRoute) {
@@ -118,14 +190,13 @@ fun TstepsApp() {
                     }
                 }
             }
-            EditorNavBar(
-                items = EditorNavItems.All,
-                isSelected = { item ->
-                    currentDestination?.hierarchy?.any { it.route == item.route } == true
-                },
-                onSelect = { navController.navigateToTab(it.route) }
-            )
-        }
+        EditorNavBar(
+            items = EditorNavItems.All,
+            isSelected = { item ->
+                currentDestination?.hierarchy?.any { it.route == item.route } == true
+            },
+            onSelect = { navController.navigateToTab(it.route) }
+        )
     }
 }
 

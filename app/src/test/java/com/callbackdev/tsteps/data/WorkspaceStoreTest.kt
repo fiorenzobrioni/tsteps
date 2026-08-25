@@ -31,6 +31,20 @@ class WorkspaceStoreTest {
         scope.cancel()
     }
 
+    /**
+     * Fase 17: the HELP.md hint is workspace state on purpose — it must not be a
+     * `settings.config` key that `$ git restore` would bring back to a veteran.
+     */
+    @Test
+    fun `the help hint shows until it is dismissed`() = runBlocking {
+        val store = store(tmp.newFile("ws-help.preferences_pb"))
+        assertEquals(false, store.helpHintDismissed.first())
+
+        store.dismissHelpHint()
+
+        assertEquals(true, store.helpHintDismissed.first())
+    }
+
     @Test
     fun `first run opens on the JSON file`() = runBlocking {
         val store = store(tmp.newFile("ws.preferences_pb"))

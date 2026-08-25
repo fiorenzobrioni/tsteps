@@ -11,6 +11,7 @@ import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.data.WidgetOpacities
+import com.callbackdev.tsteps.data.WorkspaceStore
 import com.callbackdev.tsteps.export.DataExporter
 import com.callbackdev.tsteps.export.ExportFormat
 import com.callbackdev.tsteps.export.ExportResult
@@ -35,8 +36,17 @@ sealed interface ExportState {
 
 class SettingsViewModel(
     private val settingsStore: SettingsStore,
-    private val exporter: DataExporter
+    private val exporter: DataExporter,
+    private val workspaceStore: WorkspaceStore
 ) : ViewModel() {
+
+    /**
+     * The editor's `HELP.md` hint has done its job once the file has been opened —
+     * by any route, not only by tapping the hint (Fase 17).
+     */
+    fun markHelpSeen() {
+        viewModelScope.launch { workspaceStore.dismissHelpHint() }
+    }
 
     val settings: StateFlow<AppSettings> = settingsStore.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
@@ -109,7 +119,8 @@ class SettingsViewModel(
                 val app = checkNotNull(this[AndroidViewModelFactory.APPLICATION_KEY])
                 SettingsViewModel(
                     settingsStore = ServiceLocator.settingsStore(app),
-                    exporter = ServiceLocator.dataExporter(app)
+                    exporter = ServiceLocator.dataExporter(app),
+                    workspaceStore = ServiceLocator.workspaceStore(app)
                 )
             }
         }

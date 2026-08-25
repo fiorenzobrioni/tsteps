@@ -42,6 +42,10 @@ Stack: Kotlin 2.2 + Compose (Material 3), Gradle 9.1 / AGP 8.13, version catalog
 
 **No em dashes (`—`) or en dashes (`–`) in the root `README.md`.** Rewrite the sentence rather than swapping in a hyphen: use a colon when the clause explains, a full stop when the thoughts are separate, parentheses for an aside. Same house style as tweather, deliberately scoped to that one file — every other file keeps normal punctuation.
 
+## First run and HELP.md (Fase 17)
+
+A fresh install opens on `$ tsteps init`: one screen, two answers (grant `ACTIVITY_RECOGNITION`, or skip), deliberately not a carousel — the permission's reason belongs where it is asked, and skipping lands on the document that already says the counter is off. `FirstRunStore.migrate(used)` runs once at startup and never asks an install that already holds the permission or has ever anchored a counter reading; `FirstRun.Unknown` draws nothing until that check lands, so a returning user never sees a flash of setup. `HELP.md` is the second file behind the Settings tab bar: the app explained to someone who doesn't read `git` for a living, pointed at once by a `// new here?` line in the editor whose dismissed state lives in the `workspace` DataStore (never a `settings.config` toggle — `$ tsteps reset settings` would bring a one-time hint back). Both surfaces are **localized**, the same exception the `README.md` day tab makes: they are the only two addressed to someone who can't read the app yet.
+
 ## Domain notes
 
 - Step source: hardware `TYPE_STEP_COUNTER` (cumulative since boot, batched); continuity anchors in DataStore survive reboots (see PLANNING Fase 2 — the classic pedometer bug, test it).

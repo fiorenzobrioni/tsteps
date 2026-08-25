@@ -6,6 +6,20 @@ All notable changes to tsteps are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `$ tsteps init`: the first run now explains why the app needs the physical-activity
+  permission and asks for it there, instead of leaving a cold system dialog to do it.
+  Skipping is a real answer — you land on the document that already says the counter
+  is off and offers the grant command. Installs that are already counting never see
+  it.
+- `HELP.md`, a second file behind the Settings tab bar: what the four tabs are, what
+  the borrowed words mean (commit, working tree, diff, check, branch), where the
+  numbers come from and why the app looks like this. Written for someone who does not
+  read `git` for a living, and fully localized. A one-off `// new here? open HELP.md`
+  line at the top of the editor points at it once and goes away as soon as the file
+  has been opened.
+
 ### Fixed
 
 - The home widget now repaints when you leave the app. The whole time the app is

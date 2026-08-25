@@ -69,4 +69,45 @@
     <string name="readme_rec_longest_walk">Camminata pi\u00f9 lunga: **%1$d min** \u00b7 %2$s (%3$s)</string>
     <string name="readme_rec_best_week">Settimana migliore: **%1$s passi** (settimana %2$d)</string>
     <string name="readme_footer">Calcolato sul dispositivo \u00b7 %1$d giorni committati</string>
+    <!-- `$ tsteps init` (Fase 17): prosa per chi vede l\'app per la prima volta -->
+    <string name="init_intro">tsteps conta i passi con il sensore del telefono.</string>
+    <string name="init_privacy">Niente rete, niente account, niente GPS: dal telefono non esce niente.</string>
+    <string name="init_option_grant">attiva il contapassi</string>
+    <string name="init_option_grant_note">permesso Attività fisica, te lo chiede Android</string>
+    <string name="init_option_skip">salta</string>
+    <string name="init_option_skip_note">decidi dopo, da steps_data.json</string>
+    <string name="init_permission_denied"># permesso negato: il contapassi resta spento finché non lo concedi</string>
+
+    <string name="help_hint">prima volta? apri HELP.md</string>
+
+    <!-- HELP.md (Fase 17): prosa, quindi interamente localizzata -->
+    <string-array name="help_md">
+        <item># tsteps</item>
+        <item></item>
+        <item>Un contapassi che si presenta come un editor di codice e un repository git: oggi è un file da leggere, il passato è la sua storia. Se le parole qui sotto non ti dicono niente, questa pagina è per te.</item>
+        <item></item>
+        <item>## Le quattro schede</item>
+        <item></item>
+        <item>- **Editor** - `steps_data.json` e `README.md`: oggi. Il primo è la versione tecnica, con tutti i campi; il secondo è la stessa giornata raccontata a parole.</item>
+        <item>- **Log** - `steps_history.diff` e `week.diff`: una voce per ogni giorno, con ogni camminata mostrata nella fascia di tempo che ha occupato.</item>
+        <item>- **Stats** - `stats.md`: totali, medie e la griglia colorata delle ultime settimane - un quadretto per giorno, più scuro dove hai camminato di più.</item>
+        <item>- **Impostazioni** - `settings.config`: le opzioni si cambiano toccando il valore. Non c\'è nessun interruttore da cercare.</item>
+        <item></item>
+        <item>## Le parole prese in prestito</item>
+        <item></item>
+        <item>- **commit** - un giorno, chiuso e archiviato a mezzanotte. Una volta committato, un giorno non cambia più.</item>
+        <item>- **working tree** - oggi: l\'unico giorno ancora in movimento.</item>
+        <item>- **diff** - quello che un giorno contiene, scritto come cambiamenti. Le righe con `+` sono passi aggiunti, e una camminata compare sotto le ore che ha occupato.</item>
+        <item>- **check** (`✓` / `✗`) - l\'obiettivo del giorno, raggiunto o mancato: la suite di test di un repository, eseguita una volta al giorno.</item>
+        <item>- **branch** (`⎇`) - il giorno che stai guardando.</item>
+        <item></item>
+        <item>## Da dove arrivano i numeri</item>
+        <item></item>
+        <item>Dal contapassi del telefono, lo stesso sensore che legge qualunque altro pedometro. tsteps non ha nemmeno il permesso di rete: dal telefono non può uscire niente, perché non c\'è nessun posto dove andare. Distanza e calorie sono stime ricavate dai passi, e il file lo dichiara ovunque compaiano - quelle che non può ricavare, le lascia fuori.</item>
+        <item></item>
+        <item>## Perché ha questo aspetto</item>
+        <item></item>
+        <item>Perché un file si legge tutto insieme, e perché ci piace così. Se sei arrivato fin qui, sai già se fa per te.</item>
+    </string-array>
+
 </resources>
