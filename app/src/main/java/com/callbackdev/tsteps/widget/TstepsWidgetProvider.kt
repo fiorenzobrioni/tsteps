@@ -3,21 +3,26 @@ package com.callbackdev.tsteps.widget
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.VisibleForTesting
+import androidx.work.BackoffPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.work.StepSyncWorker
 import com.callbackdev.tsteps.work.SyncScheduler
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /**
  * The `tsteps --today` home widget. Deliberately passive on battery (tweather's
@@ -79,17 +84,24 @@ class TstepsWidgetProvider : AppWidgetProvider() {
         // Nullable despite the platform signature: goAsync() only returns a result
         // while a real broadcast is being dispatched. The work still has to run.
         val pendingResult: BroadcastReceiver.PendingResult? = goAsync()
-        CoroutineScope(Dispatchers.Default).launch {
+        val appContext = context.applicationContext
+        inFlight = CoroutineScope(workContext).launch {
             try {
-                if (reconcile) SyncScheduler.reconcile(context)
-                if (sample) {
-                    refresh(context)
-                } else if (render) {
-                    TstepsWidgetUpdater.updateAllSafely(context)
+                // A broadcast has a budget and nothing below is unbounded on its
+                // own: one hung DataStore read would hold the PendingResult open
+                // until the system killed the app for not finishing.
+                withTimeout(BROADCAST_BUDGET_MS) {
+                    if (reconcile) SyncScheduler.reconcile(appContext)
+                    if (sample) {
+                        runTap(appContext)
+                    } else if (render) {
+                        TstepsWidgetUpdater.updateAllSafely(appContext)
+                    }
                 }
             } catch (e: Exception) {
-                // An unhandled throw here would crash the app from a broadcast; the
-                // widget simply keeps whatever it was showing.
+                // Includes the timeout above. An unhandled throw here would crash
+                // the app from a broadcast; the widget keeps what it was showing —
+                // except for the glyph, which runTap's own finally always settles.
             } finally {
                 pendingResult?.finish()
             }
@@ -102,25 +114,35 @@ class TstepsWidgetProvider : AppWidgetProvider() {
      * that runs synchronously (as it does under a test WorkManager) would hide
      * whether the answer came from the tap or from the queue.
      */
-    private suspend fun refresh(context: Context) {
+    private suspend fun runTap(context: Context) {
         sampleAndRepaint(context)
-        enqueueTailSync(context)
+        enqueueTailSync(context, alreadySampled = true)
     }
 
+    /**
+     * Acknowledge, sample, settle — and exactly one full repaint, at the end.
+     *
+     * It used to be two: a full gather-and-paint to show `…`, then another to show
+     * the answer. The first one read the whole day, the whole commit history and
+     * the day's walks off disk to change one glyph, on the one path whose entire
+     * value is latency. The acknowledgment now replays the frame already on screen
+     * (see [TstepsWidgetUpdater.ackTap]) and the repaint below is the only pass.
+     */
     @VisibleForTesting
     internal suspend fun sampleAndRepaint(context: Context) {
-        // The numbers cannot move until the sample lands, so a plain repaint here
-        // would be pixel-identical and the tap would read as dead. The glyph says
-        // "heard you" on every tier, which `# last_sync` cannot (it is last in the
-        // transcript, so the common sizes cut it).
-        TstepsWidgetUpdater.updateAllSafely(context, syncing = true)
+        TstepsWidgetUpdater.ackTap(context)
         try {
             sampleNow(context)
         } catch (e: Exception) {
             // Fall through to the repaint regardless: a widget left wearing `…`
             // for good would be a worse lie than a number that did not move.
+        } finally {
+            // endTap BEFORE the repaint is requested, never after: a pass that
+            // starts from here on is then guaranteed to paint ↻ — including the
+            // one that swallows this request by being queued already.
+            TstepsWidgetUpdater.endTap()
+            TstepsWidgetUpdater.updateAllUninterruptibly(context)
         }
-        TstepsWidgetUpdater.updateAllSafely(context)
     }
 
     /**
@@ -151,25 +173,55 @@ class TstepsWidgetProvider : AppWidgetProvider() {
          */
         private const val SAMPLE_TIMEOUT_MS = 3_000L
 
-        fun hasWidgets(context: Context): Boolean =
-            AppWidgetManager.getInstance(context)
-                .getAppWidgetIds(ComponentName(context, TstepsWidgetProvider::class.java))
-                .isNotEmpty()
+        /**
+         * The whole broadcast, capped. The refresh intent carries
+         * `FLAG_RECEIVER_FOREGROUND`, which buys dispatch latency at the price of
+         * the 10s foreground-receiver deadline instead of 60s; this leaves room
+         * to finish the PendingResult inside it.
+         */
+        private const val BROADCAST_BUDGET_MS = 8_000L
+
+        /**
+         * Where the broadcast's work runs. IO, not Default: from end to end it is
+         * DataStore, Room and a WorkManager enqueue, and Default is sized for CPU
+         * work — a handful of blocking reads there can starve the pool.
+         */
+        @VisibleForTesting
+        internal var workContext: CoroutineContext = Dispatchers.IO
+
+        /**
+         * The last broadcast's work, so a test can await it instead of racing it.
+         * Written from onReceive (main looper) and never read in production.
+         */
+        @VisibleForTesting
+        internal var inFlight: Job? = null
+            private set
 
         /**
          * The rest of a sync pass after the tap already got its number: the day
-         * commit, the walk detector, Health Connect. KEEP swallows tap-spam — a
-         * second tap while one is pending piggybacks on it, and the part the user
-         * actually watches has already run inline. Expedited is safe without
-         * `getForegroundInfo` on minSdk 33 (the foreground-service fallback is a
-         * pre-S requirement).
+         * commit, the walk detector, Health Connect.
+         *
+         * REPLACE, not KEEP. KEEP was meant to let a second tap piggyback on a
+         * pending tail, but [StepSyncWorker] answers a bad pass with `retry()`,
+         * and a retrying unique work is *pending* — so KEEP handed every later
+         * tap to a job sitting out an exponential backoff that tops out at five
+         * hours. The part the user watches has already run inline either way;
+         * what is left is idempotent and belongs to the newest tap.
          */
-        fun enqueueTailSync(context: Context) {
+        fun enqueueTailSync(context: Context, alreadySampled: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<StepSyncWorker>()
+                // Safe without `getForegroundInfo` on minSdk 33 (the
+                // foreground-service fallback is a pre-S requirement).
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                // The tap read the counter milliseconds ago; a second read would
+                // return the same value and re-anchor on it for nothing.
+                .setInputData(workDataOf(StepSyncWorker.KEY_SKIP_SAMPLE to alreadySampled))
+                // Linear and short: the default exponential backoff is built for
+                // work that can wait, and none of this can wait five hours.
+                .setBackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(context)
-                .enqueueUniqueWork(MANUAL_SYNC_NAME, ExistingWorkPolicy.KEEP, request)
+                .enqueueUniqueWork(MANUAL_SYNC_NAME, ExistingWorkPolicy.REPLACE, request)
         }
     }
 }

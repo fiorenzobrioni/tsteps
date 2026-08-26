@@ -126,6 +126,35 @@ class StepRepository(
     suspend fun stepsOfDay(date: LocalDate): Long =
         hourlyDao.day(date.toString()).sumOf { it.steps }
 
+    // ── One-shot reads ────────────────────────────────────────────────────────
+    // The widget repaint is not a subscriber: it gathers once and paints once.
+    // It used to reach for the `observe*` Flows and take `.first()`, which spins
+    // up a Room invalidation observer per query only to tear it down — three
+    // times per pass, and the pass runs three times around a single ↻ tap.
+
+    /** Today's hourly buckets, for the totals and [Estimates.activeMinutes]. */
+    suspend fun hoursOfDay(date: LocalDate): List<HourlyStepsEntity> =
+        hourlyDao.day(date.toString())
+
+    /** Every committed day as (date, check) — the streak's whole input. */
+    suspend fun goalDays(): List<Pair<LocalDate, GoalCheckResult>> =
+        dayDao.goalDays().map { row ->
+            LocalDate.parse(row.date) to when (row.goalMet) {
+                null -> GoalCheckResult.SKIPPED
+                true -> GoalCheckResult.PASSED
+                false -> GoalCheckResult.FAILED
+            }
+        }
+
+    /** [date]'s most recent completed walk, or null. */
+    suspend fun latestSessionOfDay(date: LocalDate): SessionEntity? {
+        val zoneId = zone()
+        return sessionDao.latestCompletedBetween(
+            fromMillis = date.atStartOfDay(zoneId).toInstant().toEpochMilli(),
+            toMillis = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        )
+    }
+
     fun observeDay(date: LocalDate): Flow<List<HourlyStepsEntity>> =
         hourlyDao.observeDay(date.toString())
 
