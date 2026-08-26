@@ -25,7 +25,16 @@ class TrackerStateStore(private val dataStore: DataStore<Preferences>) {
         val bootCount = prefs[BootCount] ?: return null
         val lastCumulative = prefs[LastCumulative] ?: return null
         val lastTimestamp = prefs[LastTimestampMillis] ?: return null
-        return TrackerState(bootCount, lastCumulative, lastTimestamp)
+        return TrackerState(
+            bootCount = bootCount,
+            lastCumulative = lastCumulative,
+            lastTimestampMillis = lastTimestamp,
+            // Absent on an anchor written before the field existed. Falling back to
+            // the step timestamp is the old behaviour exactly, so the upgrade
+            // changes nothing until the next sample writes a real read time — and
+            // it never invents a freshness the install cannot vouch for.
+            lastReadMillis = prefs[LastReadMillis] ?: lastTimestamp
+        )
     }
 
     suspend fun write(state: TrackerState) {
@@ -33,6 +42,7 @@ class TrackerStateStore(private val dataStore: DataStore<Preferences>) {
             it[BootCount] = state.bootCount
             it[LastCumulative] = state.lastCumulative
             it[LastTimestampMillis] = state.lastTimestampMillis
+            it[LastReadMillis] = state.lastReadMillis
         }
     }
 
@@ -40,6 +50,7 @@ class TrackerStateStore(private val dataStore: DataStore<Preferences>) {
         private val BootCount = intPreferencesKey("boot_count")
         private val LastCumulative = longPreferencesKey("last_cumulative")
         private val LastTimestampMillis = longPreferencesKey("last_timestamp_millis")
+        private val LastReadMillis = longPreferencesKey("last_read_millis")
 
         fun create(context: Context) = TrackerStateStore(context.trackerDataStore)
     }

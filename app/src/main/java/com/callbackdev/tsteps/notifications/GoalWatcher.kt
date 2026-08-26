@@ -5,11 +5,9 @@ import com.callbackdev.tsteps.data.NotificationStateStore
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SettingsStore
 import com.callbackdev.tsteps.data.StepRepository
-import com.callbackdev.tsteps.domain.GoalCheckResult
 import com.callbackdev.tsteps.domain.Streaks
 import java.time.Clock
 import java.time.LocalDate
-import kotlinx.coroutines.flow.first
 import java.util.Locale
 
 /**
@@ -54,13 +52,7 @@ object GoalWatcher {
         // Mark BEFORE posting: a crash between the two costs one notification,
         // never a repeat.
         stateStore.markGoalNotified(today)
-        val history = repository.observeHistory().first().map { day ->
-            LocalDate.parse(day.date) to when (day.goalMet) {
-                null -> GoalCheckResult.SKIPPED
-                true -> GoalCheckResult.PASSED
-                false -> GoalCheckResult.FAILED
-            }
-        }
+        val history = repository.goalDays()
         post(
             StepsNotifications.goalReached(
                 steps = steps,

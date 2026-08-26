@@ -11,7 +11,21 @@ package com.callbackdev.tsteps.domain
 data class StepReading(
     val cumulativeSteps: Long,
     val bootCount: Int,
-    val timestampMillis: Long
+    /**
+     * When the steps in [cumulativeSteps] were *counted*. `STEP_COUNTER` is an
+     * on-change sensor: registering re-delivers the last event with its ORIGINAL
+     * timestamp, so on a still device this is however long ago the user last
+     * moved. That is exactly right for [StepAttribution] — the delta belongs in
+     * the hour it was walked — and exactly wrong as a measure of freshness.
+     */
+    val timestampMillis: Long,
+    /**
+     * When the counter was *read*, wall clock at sampling. Defaults to
+     * [timestampMillis] so a synthetic reading needs one number, but on real
+     * hardware the two differ by however long the user has been sitting still.
+     * This is the one the widget's `# last_sync` and `# stale` are made of.
+     */
+    val readAtMillis: Long = timestampMillis
 )
 
 /**
@@ -22,7 +36,14 @@ data class StepReading(
 data class TrackerState(
     val bootCount: Int,
     val lastCumulative: Long,
-    val lastTimestampMillis: Long
+    /** The instant the anchored steps were walked (see [StepReading.timestampMillis]). */
+    val lastTimestampMillis: Long,
+    /**
+     * The instant the counter was last read (see [StepReading.readAtMillis]).
+     * Defaults to [lastTimestampMillis]: that is what an anchor written before
+     * this field existed can honestly claim, and one sample replaces it.
+     */
+    val lastReadMillis: Long = lastTimestampMillis
 )
 
 /**
@@ -45,7 +66,8 @@ object StepTracker {
         val newState = TrackerState(
             bootCount = reading.bootCount,
             lastCumulative = reading.cumulativeSteps,
-            lastTimestampMillis = reading.timestampMillis
+            lastTimestampMillis = reading.timestampMillis,
+            lastReadMillis = reading.readAtMillis
         )
         // First reading ever: the cumulative value covers days we know nothing
         // about (steps since boot, before the app existed). Attributing them to

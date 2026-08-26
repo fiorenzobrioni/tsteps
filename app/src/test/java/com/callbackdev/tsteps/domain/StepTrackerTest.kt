@@ -52,6 +52,44 @@ class StepTrackerTest {
         assertEquals(120L, advance.deltaSteps)
     }
 
+    /**
+     * `STEP_COUNTER` is on-change: a still device hands back the event from the
+     * last step taken, hours old, with its original timestamp. That age belongs to
+     * the steps (so the delta lands in the hour it was walked) and NOT to the
+     * reading — the widget's freshness is measured against the second number, and
+     * the two used to be the same field.
+     */
+    @Test
+    fun `the read instant is anchored separately from the step instant`() {
+        val state = TrackerState(
+            bootCount = 7,
+            lastCumulative = 1_000L,
+            lastTimestampMillis = 100L,
+            lastReadMillis = 5_000L
+        )
+        val advance = StepTracker.advance(
+            state,
+            StepReading(
+                cumulativeSteps = 1_000L,
+                bootCount = 7,
+                // Not a step since; the sensor re-delivers the old event...
+                timestampMillis = 100L,
+                // ...but it was read just now, and that is what freshness means.
+                readAtMillis = 9_000L
+            )
+        )
+        assertEquals(0L, advance.deltaSteps)
+        assertEquals(100L, advance.newState.lastTimestampMillis)
+        assertEquals(9_000L, advance.newState.lastReadMillis)
+    }
+
+    /** One number for a synthetic reading; the default must not invent an age. */
+    @Test
+    fun `a reading without a read instant reads as taken when it was counted`() {
+        val advance = StepTracker.advance(null, reading(500L, ts = 7_000L))
+        assertEquals(7_000L, advance.newState.lastReadMillis)
+    }
+
     @Test
     fun `clock moving backwards collapses the interval to the reading instant`() {
         val state = TrackerState(bootCount = 7, lastCumulative = 1_000L, lastTimestampMillis = 900L)

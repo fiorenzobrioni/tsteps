@@ -46,10 +46,18 @@ class StepSyncWorker(
     }
 
     private suspend fun pass() {
-        val reader = ServiceLocator.stepSensorReader(applicationContext)
         val repository = ServiceLocator.stepRepository(applicationContext)
-        val reading = reader.readCurrent() ?: return
-        repository.ingest(reading)
+        // The ↻ tap reads the counter inline and then queues this pass for the
+        // rest; reading again milliseconds later returns the same value and
+        // re-anchors on it for nothing.
+        if (!inputData.getBoolean(KEY_SKIP_SAMPLE, false)) {
+            // A silent counter is not a reason to skip the commit safety net: the
+            // day below is finished whether or not this sample landed, and an
+            // early return here meant a phone that slept through midnight and woke
+            // to a quiet sensor committed nothing.
+            ServiceLocator.stepSensorReader(applicationContext).readCurrent()
+                ?.let { repository.ingest(it) }
+        }
         val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
         notifyDailyCommit(committed)
         GoalWatcher.evaluate(applicationContext)
@@ -79,5 +87,13 @@ class StepSyncWorker(
                 newest, settings.units, Locale.getDefault(), applicationContext.resources
             )
         )
+    }
+
+    companion object {
+        /**
+         * Input flag: the counter has just been read by the caller (the ↻ tap),
+         * so this pass runs everything *except* the sample.
+         */
+        const val KEY_SKIP_SAMPLE = "skip_sample"
     }
 }

@@ -96,6 +96,13 @@ data class StepSampleEntity(
     val steps: Long
 )
 
+/**
+ * A committed day reduced to its CI check: the date and whether it passed. Not an
+ * `@Entity` — a projection [DaySummaryDao.goalDays] returns, so the streak never
+ * pays for the columns it does not read.
+ */
+data class GoalDayRow(val date: String, val goalMet: Boolean?)
+
 @Dao
 interface HourlyStepsDao {
 
@@ -133,6 +140,17 @@ interface DaySummaryDao {
 
     @Query("SELECT * FROM day_summary ORDER BY date DESC")
     suspend fun all(): List<DaySummaryEntity>
+
+    /**
+     * Two columns, for callers that only need the check history:
+     * [com.callbackdev.tsteps.domain.Streaks] and the widget repaint. The widget
+     * ran `observeAll()` for this — a Flow, so an invalidation observer, plus every
+     * committed day's full row (steps, distance, kcal, goal…) carried across a
+     * render that reads two of them. Narrow and suspend instead of capped: a
+     * `LIMIT` would silently shorten a long streak, and the file must not lie.
+     */
+    @Query("SELECT date, goalMet FROM day_summary ORDER BY date DESC")
+    suspend fun goalDays(): List<GoalDayRow>
 
     /**
      * Insert-only on purpose: a commit is written once (see [DaySummaryEntity]).
@@ -175,6 +193,18 @@ interface SessionDao {
             "ORDER BY activeMillis DESC, startMillis DESC LIMIT 1"
     )
     fun observeLongest(): Flow<SessionEntity?>
+
+    /**
+     * Today's most recent completed walk, as one row — the widget's `# last walk`
+     * comment and nothing else. Same reasoning as [observeLongest]: the widget
+     * needs the walk, not the table it lives in.
+     */
+    @Query(
+        "SELECT * FROM session WHERE dismissedMillis IS NULL AND endMillis IS NOT NULL " +
+            "AND startMillis >= :fromMillis AND startMillis < :toMillis " +
+            "ORDER BY startMillis DESC LIMIT 1"
+    )
+    suspend fun latestCompletedBetween(fromMillis: Long, toMillis: Long): SessionEntity?
 
     /**
      * Every session the export writes (Fase 13), oldest first: tombstones out

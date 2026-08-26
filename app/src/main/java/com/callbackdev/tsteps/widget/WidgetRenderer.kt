@@ -93,22 +93,7 @@ object WidgetRenderer {
             R.id.widget_emoji,
             if (content.emoji != null) View.VISIBLE else View.GONE
         )
-        // The tap's only acknowledgment, and the one that reaches every tier: the
-        // `# last_sync` line is last in the transcript, so the sizes most people
-        // place never show it. Set on both branches — the glyph must come back.
-        views.setTextViewText(
-            R.id.widget_refresh,
-            context.getString(
-                if (syncing) R.string.widget_refresh_glyph_busy else R.string.widget_refresh_glyph
-            )
-        )
-        views.setTextColor(R.id.widget_refresh, if (syncing) palette.comment else palette.plain)
-        views.setContentDescription(
-            R.id.widget_refresh,
-            context.getString(
-                if (syncing) R.string.cd_widget_refresh_busy else R.string.cd_widget_refresh
-            )
-        )
+        bindRefreshGlyph(context, views, palette, syncing)
 
         if (tier is WidgetTier.Small) {
             views.setTextViewText(R.id.widget_small_value, content.smallValue.spannable(palette))
@@ -134,6 +119,32 @@ object WidgetRenderer {
         views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(context))
         views.setOnClickPendingIntent(R.id.widget_refresh, refreshIntent(context))
         return views
+    }
+
+    /**
+     * The tap's only acknowledgment, and the one that reaches every tier: the
+     * `# last_sync` line is last in the transcript, so the sizes most people place
+     * never show it. Bound on both branches — the glyph must come back.
+     */
+    private fun bindRefreshGlyph(
+        context: Context,
+        views: RemoteViews,
+        palette: WidgetPalette,
+        syncing: Boolean
+    ) {
+        views.setTextViewText(
+            R.id.widget_refresh,
+            context.getString(
+                if (syncing) R.string.widget_refresh_glyph_busy else R.string.widget_refresh_glyph
+            )
+        )
+        views.setTextColor(R.id.widget_refresh, if (syncing) palette.comment else palette.plain)
+        views.setContentDescription(
+            R.id.widget_refresh,
+            context.getString(
+                if (syncing) R.string.cd_widget_refresh_busy else R.string.cd_widget_refresh
+            )
+        )
     }
 
     /** Slots this tier binds — never more than its layout carries. */
@@ -162,7 +173,23 @@ object WidgetRenderer {
             }
         }
 
+    // Neither intent ever varies, and both are rebuilt for every tier of every
+    // render: six sizes × two intents = twelve trips to the ActivityManager to
+    // hand back the same two objects. Cached, because the ↻ acknowledgment is the
+    // one paint whose whole value is how little it does.
+    @Volatile
+    private var cachedOpenApp: PendingIntent? = null
+
+    @Volatile
+    private var cachedRefresh: PendingIntent? = null
+
     private fun openAppIntent(context: Context): PendingIntent =
+        cachedOpenApp ?: buildOpenAppIntent(context).also { cachedOpenApp = it }
+
+    private fun refreshIntent(context: Context): PendingIntent =
+        cachedRefresh ?: buildRefreshIntent(context).also { cachedRefresh = it }
+
+    private fun buildOpenAppIntent(context: Context): PendingIntent =
         PendingIntent.getActivity(
             context,
             0,
@@ -179,12 +206,18 @@ object WidgetRenderer {
         )
 
     /** ↻ = read the counter now: one expedited sample, never a schedule change. */
-    private fun refreshIntent(context: Context): PendingIntent =
+    private fun buildRefreshIntent(context: Context): PendingIntent =
         PendingIntent.getBroadcast(
             context,
             1,
             Intent(context, TstepsWidgetProvider::class.java)
-                .setAction(TstepsWidgetProvider.ACTION_REFRESH),
+                .setAction(TstepsWidgetProvider.ACTION_REFRESH)
+                // The background broadcast queue is serialized and can sit seconds
+                // behind whatever the system is dispatching; on the foreground one
+                // this lands immediately. That queue is the single biggest gap
+                // between the finger and the `…`. The price is the receiver's 10s
+                // deadline instead of 60s — see the provider's broadcast budget.
+                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 }

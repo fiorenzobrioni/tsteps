@@ -1,6 +1,7 @@
 package com.callbackdev.tsteps.widget
 
 import com.callbackdev.tsteps.data.UnitsSystem
+import com.callbackdev.tsteps.domain.TrackerState
 import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.ui.steps.StepsGlyphs
 import java.text.NumberFormat
@@ -64,7 +65,13 @@ data class WidgetData(
     val lastWalkActiveMinutes: Int? = null,
     /** Auto-detected start (Fase 11): the comment wears the `~` too. */
     val lastWalkApprox: Boolean = false,
-    /** The continuity anchor's timestamp — when the counter was last read. */
+    /**
+     * When the counter was last **read** ([TrackerState.lastReadMillis]), not when
+     * the steps it reported were walked. The two are not the same number and using
+     * the wrong one made this a measure of how long the user had been sitting
+     * still: a healthy widget wore `# stale` after 45 quiet minutes, and no ↻ tap
+     * could clear it because the next read returned the same old event.
+     */
     val lastSyncMillis: Long? = null
 )
 
@@ -93,9 +100,10 @@ object WidgetContentBuilder {
     const val STALE_MARKER = "  # stale"
 
     /**
-     * Sampling this old means something is wrong (jobs throttled hard, permission
+     * A *read* this old means something is wrong (jobs throttled hard, permission
      * revoked mid-flight): three sync periods absorbs ordinary Doze stretching,
-     * anything past it is worth flagging instead of posing as current.
+     * anything past it is worth flagging instead of posing as current. Sitting
+     * still is not one of those things — see [WidgetData.lastSyncMillis].
      */
     private val StaleAfter: Duration = Duration.ofMinutes(45)
 

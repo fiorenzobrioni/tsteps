@@ -277,6 +277,87 @@ La hint (`// prima volta? apri HELP.md`) è attiva di default e **non è un togg
 **Rifinitura della chiusura (26 ago, rilievo del committente, stessa modifica in tweather).** L'ultima riga di `## Perché ha questo aspetto` era «Se sei arrivato fin qui, sai già se fa per te»: non è imperativa in senso grammaticale, ma **emette un verdetto sul lettore**, e lo fa nell'ultima riga della pagina che esiste apposta per chi si è sentito perso. Divide chi legge in due categorie proprio dove il documento dovrebbe lasciare la porta aperta; sarebbe stata giusta nel README del repo o nella scheda dello store, dove si sta ancora decidendo se installare, non qui. Sostituita con una che **restituisce** invece di giudicare — «E se qualche parola qui sopra resta oscura, non importa: i passi li conta lo stesso» — vera per giunta: la metafora è decorazione, il contapassi funziona senza. La prima frase resta intatta, il registro secco è la voce dell'app e il difetto non era il tono.
 
 
+---
+
+## Fase 18 — Refresh del widget, riletto da zero (review completa, ago 2026)
+
+Il committente ha chiesto una review del refresh del widget — automatico e manuale — **guardando il codice per la prima volta**, senza farsi guidare da quello che la Fase 16 dice di aver già sistemato. È stata una richiesta azzeccata: la Fase 16 aveva ragione su ogni difetto che aveva trovato, e ne aveva mancato uno più grande di tutti quelli che aveva corretto, perché stava un livello sotto il widget.
+
+L'architettura di fondo regge e non è stata toccata: nessun `updatePeriodMillis`, nessun sensore continuo, il tap che legge il contatore dentro il broadcast invece di accodarlo, `goAsync()` consumato una volta sola, `onAppWidgetOptionsChanged` volutamente muto con la sizes map, `readCurrent` che aspetta il flush. Il contratto batteria della Fase 10 resta identico: qui non si aggiunge un solo campionamento, se ne **toglie** uno.
+
+### Il bug grosso: `# stale` misurava l'immobilità, non il sync
+
+`TYPE_STEP_COUNTER` è un sensore **on-change**: alla registrazione il framework riconsegna l'ultimo evento in cache **col suo timestamp originale**. Se non cammini da due ore, `readCurrent()` torna un reading timbrato due ore fa. L'ancora teneva quel numero solo, e il widget lo usava per due mestieri diversi:
+
+- `StepAttribution` ci mette il delta nell'ora in cui è stato camminato — e per quello il timestamp vecchio è **giusto**;
+- `# last_sync` e `# stale` ci misuravano la salute del campionamento — e per quello è **sbagliato**.
+
+Risultato: **45 minuti da fermo e il widget si dichiarava `# stale` in rosso, con tutto perfettamente funzionante**. Peggio, il tap ↻ non poteva ripararlo: la lettura successiva riconsegnava lo stesso evento vecchio, l'ancora si riscriveva identica, e il repaint finale era pixel per pixel quello di prima. La Fase 16 aveva dato al tap una voce (`…`) ma non un effetto visibile quando i passi non si muovono; questo è il motivo per cui non ce l'aveva.
+
+I test non lo vedevano perché `WidgetContentBuilderTest` inietta `lastSyncMillis` a mano: il difetto non era nel builder, era nel numero che gli veniva passato.
+
+- [x] `StepReading.readAtMillis` e `TrackerState.lastReadMillis`, distinti da `timestampMillis`/`lastTimestampMillis`. Default = l'istante dei passi, così un reading sintetico resta un numero solo e i test esistenti non cambiano
+- [x] `StepSensorReader.toReading()` timbra `readAtMillis` col wall clock del campionamento; `StepTracker.advance` lo porta nell'ancora; `TrackerStateStore` lo persiste come `last_read_millis`
+- [x] **Migrazione senza migrazione**: chiave assente = fallback su `last_timestamp_millis`, cioè esattamente il comportamento vecchio. Un aggiornamento non può far sembrare fresca un'installazione che non ne ha le prove, e il primo campione rimpiazza il ripiego
+- [x] `WidgetData.lastSyncMillis` legge `lastReadMillis`. La soglia `StaleAfter` resta 45 minuti: ora che misura la cosa giusta, tre periodi di sync sono la taratura corretta
+
+### Il tap, riscritto: un solo repaint invece di due
+
+Il tap faceva **due gather completi**: uno per accendere `…` e uno per mostrare la risposta. Il primo leggeva settings, ancora, tutta la giornata, **tutto lo storico dei commit** e le camminate del giorno — da disco — per cambiare un glifo, sull'unico percorso il cui valore è la latenza. Su processo freddo sono l'apertura di Room e due file DataStore prima che si muova un pixel.
+
+- [x] `TstepsWidgetUpdater.ackTap()` ridipinge **il frame già a schermo** col solo glifo cambiato: zero DataStore, zero Room, zero disco. Senza frame in cache (processo freddo, primo tap in assoluto) non fa niente e il pass di fine tap è la prima pittura
+- [x] **Non `partiallyUpdateAppWidget`**, che sembrerebbe la scelta naturale — ed è la deviazione dalla review, con la sua ragione: un partial update viene fuso solo se il suo layout id combacia con quello che l'host ha **attualmente inflato**, e con una sizes map quello è il tier che ha scelto il launcher. Sbagliare tier significa far reinflare all'host le viste parziali, cioè un widget vuoto. Rigiocare un frame intero costa una costruzione di stringhe ed è giusto su ogni tier
+- [x] `FLAG_RECEIVER_FOREGROUND` sull'intent di ↻: la coda broadcast di background è serializzata e può stare secondi dietro a quello che il sistema sta smistando. Era il divario più diretto fra il dito e il `…`. Il prezzo è il deadline del receiver a 10s invece di 60s, da cui il budget complessivo di 8s
+- [x] `withTimeout` su tutto il broadcast: sotto non c'era **niente** di limitato tranne il sensore (3s), e una lettura DataStore appesa avrebbe tenuto aperto il `PendingResult` fino a farsi uccidere dal sistema
+- [x] Il `finally` del tap **rilascia il glifo comunque** — timeout, sensore che lancia, qualunque cosa: un widget lasciato con `…` addosso è l'unico guasto che l'utente non può togliersi dalla home. Il repaint finale è `NonCancellable` per la stessa ragione
+- [x] `Dispatchers.IO` invece di `Dispatchers.Default`: da capo a fondo è DataStore, Room e un enqueue WorkManager, e `Default` è dimensionato sui core
+- [x] Le due `PendingIntent` sono in cache: non variano mai e venivano ricostruite per ogni tier di ogni render — sei size × due intent = dodici viaggi all'ActivityManager per riavere gli stessi due oggetti
+- [x] Feedback tattile (`selectableItemBackgroundBorderless`) sul `widget_refresh` dei tre layout: sommato al resto, il tap non aveva **nessuna** risposta finché non arrivava il glifo
+
+### La coda del tap: `REPLACE`, non `KEEP`
+
+`KEEP` doveva far accodare un secondo tap su una coda già pendente. Ma `StepSyncWorker` risponde a un pass storto con `retry()`, e **un work in retry è pendente**: `KEEP` consegnava ogni tap successivo a un job fermo in un backoff esponenziale che arriva a cinque ore. Invisibile a mano, perché la parte che l'utente guarda ha già girato inline; a perderci erano commit del giorno, detector e Health Connect.
+
+- [x] `ExistingWorkPolicy.REPLACE` + backoff `LINEAR` 30s. Quello che resta è idempotente e appartiene al tap più recente
+- [x] `StepSyncWorker.KEY_SKIP_SAMPLE`: il tap ha letto il contatore un istante fa, la coda non lo rilegge (era una seconda lettura che tornava lo stesso valore e riancorava per niente)
+- [x] Nello stesso punto, un difetto latente: `readCurrent() ?: return` **abortiva l'intero pass** se il contatore taceva — compreso il commit di rete di sicurezza. Un telefono che dorme oltre la mezzanotte e si sveglia con un sensore muto non committava niente. Ora l'ingest fallito non si porta via il resto
+
+### `TstepsWidgetUpdater`: da funzione che chiama chiunque a renderer single-flight
+
+Un repaint è gather-poi-pittura, e **tutti** i suoi chiamanti sono fire-and-forget: i due worker, il minute tick del tracking, il collector delle settings, l'uscita dall'app, il tap. Due in parallelo e il launcher tiene quello che ha **finito** per ultimo, che non è quello che è **partito** per ultimo: un pass lento poteva ridipingere il numero *precedente* al tap sopra quello che il tap aveva appena consegnato. Nessun mutex, nessun contatore di generazione: last-writer-wins senza ordine. Era il secondo generatore del sintomo «a volte il tap non funziona».
+
+- [x] Un pass alla volta (`renderMutex`) e al massimo uno in coda (`queued`): chi arriva mentre quello in coda aspetta è già coperto, perché quel pass non ha ancora letto niente. Otto chiamanti in contemporanea = due gather
+- [x] Lo slot in coda si rilascia **su ogni uscita**, cancellazione compresa: uno slot rimasto occupato da un pass mai partito avrebbe ingoiato in silenzio ogni repaint successivo, congelando il widget per sempre
+- [x] `syncing` non è più un parametro di un repaint ma **stato sticky** dell'updater (`ackTap`/`endTap`): come parametro, qualunque altro repaint capitato nel mezzo — il minute tick, un worker che atterra — spegneva il `…` in anticipo. Ora chi dipinge, dipinge il glifo che lo stato dice
+- [x] `endTap()` si chiama **prima** di chiedere il repaint, mai dopo: così un pass che parte da lì in avanti vede lo stato assestato, incluso quello che ingoia la richiesta essendo già in coda
+
+### Letture più strette (il gather girava tre volte per tap)
+
+- [x] `DaySummaryDao.goalDays()`: due colonne invece di `SELECT *` su tutta `day_summary`, e `suspend` invece di un `Flow` collezionato con `.first()` (che monta un invalidation observer di Room solo per smontarlo). **Non un `LIMIT`**: un tetto accorcerebbe in silenzio uno streak lungo, e il file non deve mentire
+- [x] `SessionDao.latestCompletedBetween()`: la camminata di `# last walk` come una riga, non come la tabella in cui vive — stessa logica di `observeLongest`
+- [x] `StepRepository.hoursOfDay/goalDays/latestSessionOfDay`: letture one-shot per chi non è un subscriber. Il repaint non lo è, e usava tre `observe*().first()` a pass
+- [x] `GoalWatcher` usa la stessa proiezione: aveva la stessa mappatura copiata a mano
+- [x] `TstepsWidgetProvider.hasWidgets` cancellata: era codice morto, e il guardiano vero è il controllo `ids.isEmpty()` dentro l'updater
+
+### Isolamento dei test (rilievo emerso durante il lavoro, e una strada sbagliata)
+
+I test nuovi guidano il **provider vero**: `ShadowAppWidgetManager.createWidget` consegna `APPWIDGET_UPDATE` e il provider risponde a un broadcast lanciando lavoro in background. Quel lavoro sopravviveva al test che l'aveva avviato, e cancellando lo scope in `tearDown` faceva fallire una classe successiva dentro `HealthConnectSync` — un pass che non c'entrava niente.
+
+- [x] I test widget svuotano il looper (Robolectric accoda il broadcast su un looper in pausa: senza `idle()` il `join()` corre **prima** che `onReceive` sia partito) e aspettano il lavoro che il piazzamento avvia, **in ciclo** perché un broadcast può accodarne un altro — in `setUp` e in `tearDown`, quest'ultimo **prima** che il grafo gli venga tolto da sotto
+- [x] Il widget si piazza con **nessun contatore**: senza sensore `reconcile` cancella invece di armare, e il piazzamento non fa girare inline un pass di sync completo che nessuno di quei test ha chiesto. Il contatore vero si installa subito dopo
+- [x] **Strada sbagliata, tenuta a verbale.** Il primo tentativo era azzerare anche `healthConnectSync` e `hcStateStore` in `ServiceLocator.overrideForTests`, visto che catturano lo store con cui sono costruiti. Sembra la correzione ovvia ed è la più elegante — **e rende instabile `TstepsNavigationTest`**: quel metodo lo chiama a ogni test, e ricreare quei singleton fa riemettere il loro flow a composizione già avviata, cioè una ricomposizione in mezzo alle assert (il sintomo classico, «il nodo c'è nell'albero unmerged ma non nel merged», su un metodo diverso ogni volta). Misurato invece che supposto: 0 fallimenti su 18 run del baseline contro ~4 su 29 con quella modifica, e 0 su 12 dopo averla tolta. Lo svuotamento in `tearDown` chiude la falla da solo — è la correzione giusta, e tocca solo i test che hanno il problema invece di cambiare il contratto di `overrideForTests` per tutti
+
+### Test (18 nuovi, 435 totali)
+
+- [x] `WidgetFreshnessTest` (nuovo): il tap su un telefono fermo avanza l'istante di lettura e **non** quello dei passi; end-to-end su un widget vero, due ore da fermi non producono `# stale`; e il marker scatta ancora per la cosa per cui esiste (nessuna lettura da tre ore)
+- [x] `WidgetUpdaterSingleFlightTest` (nuovo): otto chiamanti in sequenza fanno otto gather, otto in contemporanea molti meno; un pass che lancia non congela i successivi. Misurato **per confronto** e non contro un numero fisso: questi test guidano il provider reale su un looper Robolectric, dove il piazzamento del widget può lasciare un pass di troppo in volo — sposta entrambi i conteggi di uno, non chiude un divario da otto a due
+- [x] `WidgetRefreshTest` esteso da 4 a 12: il routing del broadcast (`ACTION_REFRESH` campiona, `APPWIDGET_UPDATE` no, un'azione estranea non avvia niente) — che non era mai stato testato, i test chiamavano `sampleAndRepaint` di suo e saltavano `onReceive` per intero; il glifo tenuto per tutto il tap e rilasciato dopo, anche quando il sensore lancia, e mai sotto zero con tap sovrapposti; la coda accodata col flag giusto e il secondo tap che la **sostituisce** invece di esserne ingoiato
+- [x] `StepTrackerTest` e `TrackerStateStoreTest`: i due istanti separati fino al disco, e l'ancora scritta prima che `last_read_millis` esistesse che si rilegge ancora
+- [x] Suite eseguita dodici volte di fila sul codice finale, e dodici sul baseline per avere un metro di paragone: i flake d'ordine si stanano contando, non guardando un run verde e dichiarando vittoria
+
+- [ ] Verifica su device del committente: (1) telefono fermo da un'ora — il widget **non** deve dire `# stale`, e il tap ↻ deve far avanzare `# last_sync` anche a zero passi nuovi; (2) tap ↻ subito dopo una camminata — il `…` deve comparire immediatamente, non dopo un attimo; (3) tap ripetuti veloci — nessun frame che torna indietro e il glifo che si assesta su ↻; (4) `adb shell dumpsys jobscheduler | grep step-sync-manual` dopo qualche tap, per vedere che la coda non si accumula
+
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

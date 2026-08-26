@@ -135,11 +135,19 @@ class StepSensorReader(context: Context) : StepSource {
     private fun SensorEvent.toReading(): StepReading {
         // event.timestamp is elapsed-realtime nanos; convert to wall clock so the
         // attribution can place the sample on the local calendar.
+        val now = System.currentTimeMillis()
         val ageMillis = (SystemClock.elapsedRealtimeNanos() - timestamp) / 1_000_000L
         return StepReading(
             cumulativeSteps = values[0].toLong(),
             bootCount = bootCount(),
-            timestampMillis = System.currentTimeMillis() - ageMillis
+            timestampMillis = now - ageMillis,
+            // The two are NOT the same number, and conflating them was a bug: this
+            // is an on-change sensor, so a still device hands back the event from
+            // the last step taken — hours old — with its original timestamp. That
+            // age belongs to the steps, not to the reading. `readAtMillis` is what
+            // the widget's freshness is measured against; `timestampMillis` is
+            // what the hourly attribution is measured against.
+            readAtMillis = now
         )
     }
 
