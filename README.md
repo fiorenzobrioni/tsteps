@@ -347,6 +347,7 @@ same stack as tweather minus the networking (there is none).
 | Days and sessions | Room (never pruned: a decade of days is tiny) |
 | Background work | one WorkManager job for the midnight rollover |
 | Live tracking | a foreground service, alive only during `$ tsteps track` |
+| The widget's refresh | a foreground service too, alive for one counter reading |
 
 `PLANNING.md` is the phased implementation log: every decision, and every
 deviation from the vision, is recorded there with the reason.

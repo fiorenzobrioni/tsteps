@@ -34,6 +34,7 @@
     <!-- Live tracking: channel name is chrome (localized); the notification body
          is terminal output built in code (English by design) -->
     <string name="notif_channel_tracking">Live tracking</string>
+    <string name="notif_channel_sample">Manual refresh</string>
     <string name="notif_channel_daily">Daily commit</string>
     <string name="notif_channel_goal">Goal reached</string>
     <!-- Titles are chrome (localized); bodies are terminal output built in code -->

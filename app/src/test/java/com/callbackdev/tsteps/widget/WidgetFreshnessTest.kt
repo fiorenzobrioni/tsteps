@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.content.Intent
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +21,7 @@ import com.callbackdev.tsteps.data.StepSource
 import com.callbackdev.tsteps.data.TrackerStateStore
 import com.callbackdev.tsteps.data.local.TstepsDatabase
 import com.callbackdev.tsteps.domain.StepReading
+import com.callbackdev.tsteps.tracking.SampleService
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -39,6 +41,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 
@@ -143,6 +146,21 @@ class WidgetFreshnessTest {
         LocalDateTime.parse(dateTime).atZone(rome).toInstant().toEpochMilli()
 
     /**
+     * One ↻ tap, taken where the platform actually answers one: the service the
+     * broadcast starts. Robolectric never lets a `startForegroundService` reach
+     * it, so the test drives the service directly.
+     */
+    private suspend fun runSample() {
+        val controller = Robolectric.buildService(
+            SampleService::class.java,
+            Intent(context, SampleService::class.java)
+        ).create()
+        controller.startCommand(0, 1)
+        settleProvider()
+        controller.destroy()
+    }
+
+    /**
      * The same clock the renderer stamps its frames with. Under Robolectric this
      * is not always `System.currentTimeMillis()`, and mixing the two would make a
      * reading taken "now" look decades stale.
@@ -166,7 +184,7 @@ class WidgetFreshnessTest {
             StepReading(3_800L, 7, millis("2026-08-18T07:30:00"), millis("2026-08-18T07:30:00"))
         )
 
-        TstepsWidgetProvider().sampleAndRepaint(context)
+        runSample()
 
         val anchor = anchorStore.read()!!
         // The steps belong to the hour they were walked...
@@ -276,6 +294,7 @@ class WidgetFreshnessTest {
         repeat(SETTLE_ROUNDS) {
             shadowOf(Looper.getMainLooper()).idle()
             TstepsWidgetProvider.inFlight?.join()
+            SampleService.inFlight?.join()
         }
         shadowOf(Looper.getMainLooper()).idle()
     }
