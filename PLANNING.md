@@ -406,10 +406,27 @@ VISION §7 diceva «foreground service solo durante il tracking manuale». Adess
 
 - [ ] Verifica su device del committente: (1) cammina con l'app chiusa, poi tap ↻ — il numero **deve** muoversi, e `# last_sync` avanzare; (2) telefono fermo da un'ora, tap ↻ — `# last_sync` avanza comunque e `# stale` si spegne; (3) tap ripetuti veloci — nessun frame che torna indietro, glifo che si assesta su ↻, nessuna notifica che compare; (4) `adb shell dumpsys activity services com.callbackdev.tsteps.debug` durante un tap, per vedere `SampleService` nascere e morire; (5) se una notifica «$ tsteps sync» dovesse comparire, il campione sta superando i dieci secondi ed è un dato in sé
 
+## Fase 20 — I registri l10n: la lingua segue la frase, non le barre (decisione di serie, ago 2026)
+
+Domanda del committente nata su tweather e valida per tutta la serie: la regola "il codice resta inglese" si può ammorbidire sui commenti, senza affogare la filosofia terminal/git? Sì, perché la vecchia formulazione confondeva il **canale** (`//`) con il **registro**: sotto quel simbolo convivevano `// GET /v1/...` (contenuto del file) e frasi il cui unico scopo è essere capite. Il verbale completo, con l'argomento, i casi di confine e quello che la decisione **non** è, sta in `../tweather/PLANNING.md` Fase 18. Qui la parte che riguarda tsteps.
+
+**La regola.** Il registro decide la lingua, non la punteggiatura che lo circonda. *Codice* sempre inglese: chiavi, nomi file, comandi `$`, chrome git (`commit`, `Author:`, `@@`, hash), check CI, livelli `ERROR:`/`WARN:`, marcatori di una parola (`# stale`), intestazioni dei file, licenze, URL. *Dati* localizzati. *Prosa* localizzata ovunque si trovi, **comprese le righe di commento che sono frasi**. Due test in quest'ordine: tradurlo romperebbe un lookup, un nome file, un copia-incolla o l'allineamento con una chiave stampata altrove? lo tradurrebbe `git`? Una riga può contenere due registri: si tengono i token e si traduce intorno.
+
+Il precedente è lo strumento stesso della metafora: `git status` sotto `LANG=it_IT` scrive "Sul branch main" e tiene `branch`, `commit`, `HEAD`. Lo split è esattamente questo, e finora tsteps era più inglese di git.
+
+**Cosa tocca qui, quando si implementerà.** ~80 letterali di commento (67 `//`, 13 `#`) e ~68 asserzioni di test che ne congelano il testo inglese. Non si toccano: gli hunk header `@@ 09:12..10:03 @@ walk` (sintassi git), le check line dell'obiettivo, `# stale` e `# last_sync` del widget, i comandi `$ tsteps track` e `$ tsteps init`, `# tsteps --today` nell'intestazione del widget.
+
+**L'allineamento è il costo vero.** L'italiano è più lungo del 15-20%, e i commenti *in colonna* vanno lasciati in pace: è la stessa ragione per cui `Stats` non è mai diventato `Statistiche` nella nav bar. Si traducono le righe intere, che vanno a capo per conto loro, e ogni riga tradotta si riguarda a 360dp prima di dirla fatta.
+
+- [x] `VISION.md §1.3` riscritta sui tre registri; `CLAUDE.md`, Note trasversali e intestazioni di `values/` + `values-it/strings.xml` allineate
+- [x] `README.md` di root **non toccato, deliberatamente**: la sua riga sulla l10n descrive l'app spedita, e nel codice i commenti sono ancora inglesi. Si aggiorna con l'implementazione
+- [ ] Implementazione: fase a sé, non una rifinitura opportunistica (la regola vale al 100% o non vale). Nella serie **thabit va per prima** — i suoi commenti sono già quasi tutti frasi rivolte al lettore — poi tsteps
+
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.
-- **Regola l10n**: il "codice" resta inglese (chiavi JSON, filenames, `//` comments, output terminale, hash, check CI); chrome e valori-dato localizzati IT/EN. `README.md` (la tab) è prosa: localizzata per intero.
+- **Regola l10n, tre registri** (Fase 20): decide il *registro*, non il canale. *Codice* sempre inglese (chiavi JSON, filenames, output terminale, hash, check CI, livelli `ERROR:`/`WARN:`, marcatori come `# stale`, intestazioni dei file); *dati* localizzati IT/EN; *prosa* localizzata ovunque si trovi — `README.md` (la tab), `HELP.md`, `$ tsteps init`, notifiche, accessibilità **e le righe di commento che sono frasi**. Una riga con due registri tiene i token e traduce intorno. Decisa, non ancora implementata.
 - **Niente rete**: se una feature futura chiede la permission INTERNET, non è una feature di tsteps.
 - **Ordine**: Fasi 1–2 sono il fondamento; la 2 può procedere in parallelo alla 1. Le fasi 3–5 dipendono da 1–2. La 6 sblocca la 11. Widget (10) dopo che dominio e settings sono stabili.
 - **Import da tweather**: i componenti si copiano adattando il package, mai linkando il repo; ogni divergenza che emerge (bug fixati qui, migliorie) va valutata per il backport a tweather.

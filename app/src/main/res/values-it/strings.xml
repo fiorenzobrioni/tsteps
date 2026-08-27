@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Italiano. Regola dei tre registri (VISION 1.3, PLANNING Fase 20): decide il
+     REGISTRO, non la punteggiatura che lo circonda.
+
+       CODICE -> sempre inglese: chiavi JSON, nomi file, comandi $, output
+                 terminale, chrome git (commit, Author:, @@, hash), check
+                 dell'obiettivo, hunk header, livelli (ERROR:, WARN:), marcatori di
+                 una parola (# stale, # last_sync), intestazioni dei file.
+       DATI   -> localizzati: giorni, tipi di sessione, valori e unità.
+       PROSA  -> localizzata ovunque si trovi: la tab README.md, HELP.md,
+                 $ tsteps init, notifiche, accessibilità E le righe di commento
+                 che sono frasi.
+
+     Una riga può contenere due registri: si tengono i token e si traduce intorno
+     (// ERROR: permesso negato). Decisa, NON ancora implementata: i commenti sono
+     ancora inglesi hardcoded nei sorgenti. -->
 <resources>
     <!-- Bottom navigation. "Editor" e "Log" anche in italiano (termini da IDE,
          stessa scelta di tweather); "Stats" resta perché "Statistiche" non sta
