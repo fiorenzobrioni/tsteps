@@ -205,7 +205,11 @@ object WidgetRenderer {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-    /** ↻ = read the counter now: one expedited sample, never a schedule change. */
+    /**
+     * ↻ = read the counter now: one sample, never a schedule change. The receiver
+     * on the other end only routes it — the read itself needs the foreground, so
+     * it happens in the service the receiver starts.
+     */
     private fun buildRefreshIntent(context: Context): PendingIntent =
         PendingIntent.getBroadcast(
             context,
@@ -214,9 +218,10 @@ object WidgetRenderer {
                 .setAction(TstepsWidgetProvider.ACTION_REFRESH)
                 // The background broadcast queue is serialized and can sit seconds
                 // behind whatever the system is dispatching; on the foreground one
-                // this lands immediately. That queue is the single biggest gap
-                // between the finger and the `…`. The price is the receiver's 10s
-                // deadline instead of 60s — see the provider's broadcast budget.
+                // this lands immediately. That queue sits between the finger and
+                // everything the tap does, the service start included. The price
+                // is the receiver's 10s deadline instead of 60s — see the
+                // provider's broadcast budget.
                 .addFlags(Intent.FLAG_RECEIVER_FOREGROUND),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )

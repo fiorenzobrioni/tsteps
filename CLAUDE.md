@@ -49,6 +49,7 @@ A fresh install opens on `$ tsteps init`: one screen, two answers (grant `ACTIVI
 ## Domain notes
 
 - Step source: hardware `TYPE_STEP_COUNTER` (cumulative since boot, batched); continuity anchors in DataStore survive reboots (see PLANNING Fase 2 — the classic pedometer bug, test it).
+- **A reading can only be taken in the foreground** (Fase 19): the counter is an *on-change* sensor, and since Android 9 an app that is not in the foreground receives no on-change event. The three places that get an answer are the main screen's live listener, `TrackingService`, and `SampleService` — the widget's ↻, which goes foreground for the second it takes. A background job may still ask (`StepSyncWorker` does) and usually hears nothing; nothing is lost, because the hardware counter keeps counting unattended and the next reading that lands carries the whole interval.
 - Midnight rollover WorkManager job commits the day (Room `day_summary`), runs the goal check, fires notifications, repaints the widget. DST/timezone changes are test cases.
-- Foreground service **only** during manual tracking (`$ tsteps track`); passive counting never runs a service.
+- Foreground service **only** for an explicit command: manual tracking (`$ tsteps track`), and one widget ↻ sample (`SampleService`, alive for that reading alone). Passive counting never runs a service and never keeps a listener registered.
 - Battery is a feature: no polling, no continuous sensors, no GPS in the core product (maps are parked indefinitely — VISION §6.4).

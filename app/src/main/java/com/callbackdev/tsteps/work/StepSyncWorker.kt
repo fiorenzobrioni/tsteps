@@ -14,10 +14,21 @@ import java.util.Locale
 import kotlinx.coroutines.CancellationException
 
 /**
- * The periodic sampler (`step-sync`, 15 min — WorkManager's floor). Reads one
- * counter value, ingests the delta, and commits any finished day as a safety net
- * for the midnight worker. All logic lives in the repository; the worker is glue,
+ * The periodic pass (`step-sync`, 15 min — WorkManager's floor): try the counter,
+ * ingest whatever comes back, and commit any finished day as a safety net for the
+ * midnight worker. All logic lives in the repository; the worker is glue,
  * mirroring tweather's worker-as-glue pattern.
+ *
+ * The sample here is **best effort and usually silence** — a job is not the
+ * foreground, and Android delivers no on-change event (which is what
+ * `TYPE_STEP_COUNTER` is) to an app that is not. It is still worth asking: the
+ * pass runs anyway for the commit, and the read costs nothing when it fails and
+ * lands for free when the platform happens to allow it. What the widget's ↻
+ * promises is served by [com.callbackdev.tsteps.tracking.SampleService], which is
+ * in the foreground and therefore actually gets an answer. Nothing is lost by a
+ * silent pass either way: the hardware counter is cumulative and keeps counting
+ * with nobody listening, so the next reading that does land carries every step in
+ * between.
  */
 class StepSyncWorker(
     appContext: Context,
@@ -47,9 +58,10 @@ class StepSyncWorker(
 
     private suspend fun pass() {
         val repository = ServiceLocator.stepRepository(applicationContext)
-        // The ↻ tap reads the counter inline and then queues this pass for the
-        // rest; reading again milliseconds later returns the same value and
-        // re-anchors on it for nothing.
+        // The ↻ tap reads the counter in its own service and then queues this
+        // pass for the rest; reading again milliseconds later returns the same
+        // value and re-anchors on it for nothing. A tap whose read came back
+        // empty clears the flag instead, and this pass is its second chance.
         if (!inputData.getBoolean(KEY_SKIP_SAMPLE, false)) {
             // A silent counter is not a reason to skip the commit safety net: the
             // day below is finished whether or not this sample landed, and an
@@ -91,8 +103,8 @@ class StepSyncWorker(
 
     companion object {
         /**
-         * Input flag: the counter has just been read by the caller (the ↻ tap),
-         * so this pass runs everything *except* the sample.
+         * Input flag: the counter has just been read by the caller (the ↻ tap's
+         * service), so this pass runs everything *except* the sample.
          */
         const val KEY_SKIP_SAMPLE = "skip_sample"
     }

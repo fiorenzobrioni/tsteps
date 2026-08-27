@@ -342,11 +342,12 @@ Recorded here so the reasoning survives:
 
 ## 7. Sensor & data strategy
 
-- **`TYPE_STEP_COUNTER`** (hardware, cumulative since boot, batched) is the primary source, read via periodic flushes — no wake locks, no foreground service for passive counting. `ACTIVITY_RECOGNITION` runtime permission, requested in context with a plain explanation.
+- **`TYPE_STEP_COUNTER`** (hardware, cumulative since boot, batched) is the primary source, read via periodic flushes — no wake locks, no listener kept registered for passive counting. `ACTIVITY_RECOGNITION` runtime permission, requested in context with a plain explanation.
+- **Where a reading can actually be taken** (Fase 19, learned on device): the counter is an *on-change* sensor, and since Android 9 an app that is not in the foreground receives no on-change event at all. So a reading happens in exactly three places — the main screen's live listener, the `$ tsteps track` service, and the widget's ↻, which starts a foreground service of its own for the second it takes. A background job may ask, and usually hears nothing; that costs no steps, because the hardware counter keeps counting with nobody listening and the next reading that lands carries everything in between.
 - **Reboot handling**: the counter resets at boot; persisted anchors (boot count + last cumulative value) reconstruct continuity. This is the classic pedometer bug — it gets its own tests.
 - **Midnight rollover**: a scheduled job closes the day, writes the `DaySummary` row, runs the goal check, fires the `daily_commit` notification, updates the widget. DST and timezone changes are test cases, not surprises.
 - **Fallback**: no step sensor → the app says so in the comment channel and degrades to manual sessions via accelerometer-free timing; it never shows a broken dashboard.
-- **Foreground service only during manual tracking**, with the `$ tsteps track` transcript as its notification. Killed at `^C`.
+- **A foreground service only for an explicit command**: manual tracking, with the `$ tsteps track` transcript as its notification, killed at `^C`; and one widget ↻ sample, alive for that sample alone (typically under a second, below the ten seconds after which the system would show its notification). Passive counting still runs none, registers no listener and holds no wake lock.
 - **Storage**: Room (`day_summary`, `session` tables — pruned never; a decade of days is trivially small), DataStore for settings and sensor anchors.
 - **No network. No INTERNET permission.** The CI badge for this in the README is the product's proudest line.
 - **Health Connect (later phase)**: write sessions + daily steps, read external data with source dedup, never expanding scope because a data type exists.

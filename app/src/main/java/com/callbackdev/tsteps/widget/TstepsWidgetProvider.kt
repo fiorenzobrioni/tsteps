@@ -7,16 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.VisibleForTesting
-import androidx.work.BackoffPolicy
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
-import androidx.work.workDataOf
-import com.callbackdev.tsteps.data.ServiceLocator
-import com.callbackdev.tsteps.work.StepSyncWorker
+import com.callbackdev.tsteps.tracking.SampleService
 import com.callbackdev.tsteps.work.SyncScheduler
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,11 +20,17 @@ import kotlinx.coroutines.withTimeout
  * The `tsteps --today` home widget. Deliberately passive on battery (tweather's
  * contract): no `updatePeriodMillis`, no polling of its own — it renders
  * persisted state and is repainted by whoever moves it (the sync workers, the
- * tracking service's minute tick, the app leaving the foreground). The ↻ glyph
- * is the only user-initiated sample, and it is served here in the broadcast
- * rather than queued, because a queued read arrives when the scheduler feels
- * like it. Simpler than its tweather parent on purpose: there are no cities, so
- * there is nothing to pin and no configuration activity.
+ * tracking service's minute tick, the app leaving the foreground). Simpler than
+ * its tweather parent on purpose: there are no cities, so there is nothing to pin
+ * and no configuration activity.
+ *
+ * The ↻ glyph is the only user-initiated sample, and this receiver does not take
+ * it: it hands the tap to [SampleService] and gets out of the way. `TYPE_STEP_COUNTER`
+ * reports **on change**, and Android delivers no on-change event to an app that
+ * is not in the foreground — a broadcast is not the foreground, so reading the
+ * counter here returned silence however carefully it was asked. The service is
+ * the platform's own answer, and starting it from inside `onReceive` is what
+ * keeps the tap inside the widget-interaction exemption that allows it.
  */
 class TstepsWidgetProvider : AppWidgetProvider() {
 
@@ -76,10 +74,13 @@ class TstepsWidgetProvider : AppWidgetProvider() {
         needsRender = false
         needsReconcile = false
         super.onReceive(context, intent)
-        val sample = intent.action == ACTION_REFRESH
+        if (intent.action == ACTION_REFRESH) {
+            tap(context)
+            return
+        }
         val render = needsRender
         val reconcile = needsReconcile
-        if (!sample && !render && !reconcile) return
+        if (!render && !reconcile) return
 
         // Nullable despite the platform signature: goAsync() only returns a result
         // while a real broadcast is being dispatched. The work still has to run.
@@ -92,16 +93,11 @@ class TstepsWidgetProvider : AppWidgetProvider() {
                 // until the system killed the app for not finishing.
                 withTimeout(BROADCAST_BUDGET_MS) {
                     if (reconcile) SyncScheduler.reconcile(appContext)
-                    if (sample) {
-                        runTap(appContext)
-                    } else if (render) {
-                        TstepsWidgetUpdater.updateAllSafely(appContext)
-                    }
+                    if (render) TstepsWidgetUpdater.updateAllSafely(appContext)
                 }
             } catch (e: Exception) {
                 // Includes the timeout above. An unhandled throw here would crash
-                // the app from a broadcast; the widget keeps what it was showing —
-                // except for the glyph, which runTap's own finally always settles.
+                // the app from a broadcast; the widget keeps what it was showing.
             } finally {
                 pendingResult?.finish()
             }
@@ -109,69 +105,37 @@ class TstepsWidgetProvider : AppWidgetProvider() {
     }
 
     /**
-     * The ↻ tap, start to finish: everything the user waits for, then the tail
-     * nobody watches. The split is also the seam the tests drive — a queued tail
-     * that runs synchronously (as it does under a test WorkManager) would hide
-     * whether the answer came from the tap or from the queue.
-     */
-    private suspend fun runTap(context: Context) {
-        sampleAndRepaint(context)
-        enqueueTailSync(context, alreadySampled = true)
-    }
-
-    /**
-     * Acknowledge, sample, settle — and exactly one full repaint, at the end.
+     * The ↻ tap, handed on **synchronously**. Not `goAsync()` and a coroutine: the
+     * exemption that lets a widget tap start a foreground service lasts as long as
+     * the broadcast is being dispatched, and work left running after `onReceive`
+     * returns lands outside it.
      *
-     * It used to be two: a full gather-and-paint to show `…`, then another to show
-     * the answer. The first one read the whole day, the whole commit history and
-     * the day's walks off disk to change one glyph, on the one path whose entire
-     * value is latency. The acknowledgment now replays the frame already on screen
-     * (see [TstepsWidgetUpdater.ackTap]) and the repaint below is the only pass.
+     * When the start does not happen — no permission, or a platform that refuses
+     * the exemption — nobody painted `…`, so nothing has to take it off; the
+     * widget is repainted anyway so a revoked permission reaches the glass
+     * instead of waiting for the next pass, and the queue still gets the tail.
      */
-    @VisibleForTesting
-    internal suspend fun sampleAndRepaint(context: Context) {
-        TstepsWidgetUpdater.ackTap(context)
-        try {
-            sampleNow(context)
-        } catch (e: Exception) {
-            // Fall through to the repaint regardless: a widget left wearing `…`
-            // for good would be a worse lie than a number that did not move.
-        } finally {
-            // endTap BEFORE the repaint is requested, never after: a pass that
-            // starts from here on is then guaranteed to paint ↻ — including the
-            // one that swallows this request by being queued already.
-            TstepsWidgetUpdater.endTap()
-            TstepsWidgetUpdater.updateAllUninterruptibly(context)
+    private fun tap(context: Context) {
+        if (SampleService.start(context)) return
+        val appContext = context.applicationContext
+        val pendingResult: BroadcastReceiver.PendingResult? = goAsync()
+        inFlight = CoroutineScope(workContext).launch {
+            try {
+                withTimeout(BROADCAST_BUDGET_MS) {
+                    SampleService.enqueueTailSync(appContext, alreadySampled = false)
+                    TstepsWidgetUpdater.updateAllSafely(appContext)
+                }
+            } catch (e: Exception) {
+                // Includes the timeout above. An unhandled throw here would crash
+                // the app from a broadcast; the widget keeps what it was showing.
+            } finally {
+                pendingResult?.finish()
+            }
         }
-    }
-
-    /**
-     * Reads the counter HERE rather than delegating the read to WorkManager: an
-     * expedited request degrades to an ordinary job once the quota is spent —
-     * that is what `RUN_AS_NON_EXPEDITED_WORK_REQUEST` means — and an app the
-     * user never opens sits in a standby bucket where an ordinary job can be
-     * deferred for minutes. That delay was the whole "the tap doesn't always
-     * work". One counter read is a single sensor event; it belongs in the tap.
-     */
-    private suspend fun sampleNow(context: Context) {
-        if (!SyncScheduler.hasPermission(context)) return
-        val reader = ServiceLocator.stepSensorReader(context)
-        if (!reader.isAvailable) return
-        val reading = reader.readCurrent(SAMPLE_TIMEOUT_MS) ?: return
-        ServiceLocator.stepRepository(context).ingest(reading)
     }
 
     companion object {
         const val ACTION_REFRESH = "com.callbackdev.tsteps.widget.REFRESH"
-
-        /** Distinct from the periodic job so a tap never disturbs its cycle. */
-        const val MANUAL_SYNC_NAME = "step-sync-manual"
-
-        /**
-         * Tighter than the workers' 5s default: a broadcast's budget is not a
-         * worker's, and the tail sync below covers a counter that stays silent.
-         */
-        private const val SAMPLE_TIMEOUT_MS = 3_000L
 
         /**
          * The whole broadcast, capped. The refresh intent carries
@@ -196,32 +160,5 @@ class TstepsWidgetProvider : AppWidgetProvider() {
         @VisibleForTesting
         internal var inFlight: Job? = null
             private set
-
-        /**
-         * The rest of a sync pass after the tap already got its number: the day
-         * commit, the walk detector, Health Connect.
-         *
-         * REPLACE, not KEEP. KEEP was meant to let a second tap piggyback on a
-         * pending tail, but [StepSyncWorker] answers a bad pass with `retry()`,
-         * and a retrying unique work is *pending* — so KEEP handed every later
-         * tap to a job sitting out an exponential backoff that tops out at five
-         * hours. The part the user watches has already run inline either way;
-         * what is left is idempotent and belongs to the newest tap.
-         */
-        fun enqueueTailSync(context: Context, alreadySampled: Boolean = false) {
-            val request = OneTimeWorkRequestBuilder<StepSyncWorker>()
-                // Safe without `getForegroundInfo` on minSdk 33 (the
-                // foreground-service fallback is a pre-S requirement).
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                // The tap read the counter milliseconds ago; a second read would
-                // return the same value and re-anchor on it for nothing.
-                .setInputData(workDataOf(StepSyncWorker.KEY_SKIP_SAMPLE to alreadySampled))
-                // Linear and short: the default exponential backoff is built for
-                // work that can wait, and none of this can wait five hours.
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS)
-                .build()
-            WorkManager.getInstance(context)
-                .enqueueUniqueWork(MANUAL_SYNC_NAME, ExistingWorkPolicy.REPLACE, request)
-        }
     }
 }

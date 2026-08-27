@@ -358,6 +358,54 @@ I test nuovi guidano il **provider vero**: `ShadowAppWidgetManager.createWidget`
 - [ ] Verifica su device del committente: (1) telefono fermo da un'ora — il widget **non** deve dire `# stale`, e il tap ↻ deve far avanzare `# last_sync` anche a zero passi nuovi; (2) tap ↻ subito dopo una camminata — il `…` deve comparire immediatamente, non dopo un attimo; (3) tap ripetuti veloci — nessun frame che torna indietro e il glifo che si assesta su ↻; (4) `adb shell dumpsys jobscheduler | grep step-sync-manual` dopo qualche tap, per vedere che la coda non si accumula
 
 
+## Fase 19 — Il refresh manuale funziona: il campione si prende in foreground (ago 2026)
+
+Il committente, dopo la Fase 18: «il refresh manuale del widget ancora non funziona. Temo che il widget faccia il refresh ma i dati dell'app non siano aggiornati, e che l'app si aggiorni solo quando si apre — quindi solo uscendo dall'app il widget si aggiorna». L'ipotesi era **giusta in pieno**, e indicava un livello ancora sotto quello dove la Fase 18 aveva scavato.
+
+### La diagnosi: non era il widget, era il sensore
+
+`TYPE_STEP_COUNTER` è un sensore **on-change**. Da Android 9 «un'app che gira in background non riceve eventi dai sensori in modalità on-change o one-shot», e il rimedio indicato dalla documentazione è uno solo: **un foreground service** ([Android 9 behavior changes](https://developer.android.com/about/versions/pie/android-9.0-changes-all)).
+
+Nel codice la correlazione era perfetta, e si vedeva senza device:
+
+- i due percorsi che **funzionano** — il listener live di `StepsViewModel` e `TrackingService` — usano `readings()` e girano in foreground (l'activity sullo schermo, il servizio di `$ tsteps track`);
+- i due percorsi che **non funzionano** — il tap ↻ dentro il broadcast e il campione di `StepSyncWorker` ogni 15 minuti — usano `readCurrent()` e girano in background.
+
+Cioè: **l'unico ingest che avveniva davvero era quello dell'app aperta.** Da lì tutto il resto del sintomo si spiega da sé. Il widget si aggiorna uscendo dall'app perché `onStop` ridipinge (Fase 16) con l'unico numero nuovo che esista. Il tap ↻ accendeva `…`, aspettava tre secondi il silenzio, e ridipingeva gli stessi numeri: non un bug del tap, un tap senza niente da consegnare. E `# stale`, che la Fase 18 ha insegnato a misurare la cosa giusta, misurava correttamente una cosa che nessun campione di background poteva più smentire.
+
+La Fase 16 e la Fase 18 avevano ragione su ogni difetto che hanno trovato — la coda expedited che slitta, il doppio gather del tap, `KEEP` sul lavoro in retry, il repaint senza ordine, i due istanti confusi nell'ancora. Erano tutti reali e sono tutti ancora corretti. Ma stavano tutti **a valle** di una lettura che non arrivava mai.
+
+### La correzione: `SampleService`
+
+Il tap ↻ non legge più il contatore dentro il broadcast. Il broadcast **instrada** e basta: fa partire `SampleService`, un foreground service `health` (lo stesso tipo del tracker, la stessa `ACTIVITY_RECOGNITION` che lo autorizza) che vive per un campione solo — registra, legge, ingerisce, ridipinge, si ferma.
+
+- [x] `tracking/SampleService.kt`: `startForeground` immediato, `ackTap` fuori dal main thread (dipingere è una chiamata binder al launcher), lettura con timeout 5s, ingest, `endTap` **prima** del repaint, repaint `NonCancellable`, coda del tail, `stopSelf(startId)`. Budget totale 9s, sotto i dieci secondi dopo i quali il sistema mostrerebbe la notifica del servizio: in pratica non si vede niente
+- [x] `stopSelf(startId)` e non `stopSelf()`: due tap veloci sono due start, e la forma nuda farebbe chiudere al primo che finisce anche la lettura del secondo
+- [x] Il servizio si ferma **prima** di `startForeground` se il permesso non c'è: una PendingIntent sopravvive al grant che la giustificava, e un servizio `health` senza `ACTIVITY_RECOGNITION` è una `SecurityException`
+- [x] `TstepsWidgetProvider` avvia il servizio **sincronicamente dentro `onReceive`**, mai da una coroutine che il broadcast si lascia dietro: l'esenzione che permette a un tap su widget di far partire un foreground service in background ([restrizioni Android 12](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start), «the user performs an action on a UI element related to your app... a widget») dura quanto il broadcast, e il lavoro spostato su un altro thread atterra fuori. `health` retto da `ACTIVITY_RECOGNITION` non è uno dei tipi *while-in-use* che perdono l'esenzione: la documentazione lo dice per nome
+- [x] Se l'avvio non avviene — permesso revocato, o un OEM che rifiuta l'esenzione — nessuno ha dipinto `…`, quindi non c'è niente da togliere: il provider ridipinge comunque (così un permesso revocato arriva sul vetro subito) e accoda lo stesso il tail. **Nessun secondo campionatore di riserva**: quello che si potrebbe fare lì è esattamente la lettura che sappiamo non funzionare
+- [x] `enqueueTailSync` e `MANUAL_SYNC_NAME` traslocano nel servizio, che è il loro posto ora; `runTap`/`sampleAndRepaint`/`sampleNow`/`SAMPLE_TIMEOUT_MS` cancellati dal provider — il tap non abita più lì
+- [x] Il flag della coda smette di mentire: `alreadySampled = true` solo se il campione è **atterrato**. Prima era sempre `true`, quindi una lettura muta si portava via anche il secondo tentativo del worker
+
+### Quello che resta com'è, e perché
+
+- [x] `StepSyncWorker` continua a **provarci** ogni 15 minuti. Non è un servizio e non può diventarlo senza rompere il contratto batteria; il pass gli serve comunque (commit del giorno, goal watcher, detector, Health Connect, repaint) e la lettura non costa niente quando fallisce e atterra gratis quando la piattaforma la concede. Il commento sulla classe adesso lo dice invece di lasciar credere che campioni sempre
+- [x] **Non si perde un passo** comunque vada: il contatore hardware è cumulativo e continua a contare senza nessuno in ascolto, quindi la prima lettura che atterra porta dentro tutto l'intervallo. Quello che il background si porta via è la *freschezza* e la precisione dell'attribuzione oraria, non i passi
+- [x] `# stale` (45 minuti) resta com'è. Dice il vero — «il numero che stai guardando è vecchio» — e per la prima volta il tap ↻ può davvero toglierlo. Se sul device si rivelasse un marker perennemente acceso, la taratura è una decisione del committente, non una da prendere qui
+
+### Deviazione dalla VISION, a verbale
+
+VISION §7 diceva «foreground service solo durante il tracking manuale». Adesso sono due, e la regola vera è quella che c'era sotto: **un servizio solo per un comando esplicito dell'utente**. Il ↻ è un comando esattamente come `$ tsteps track` — la differenza è che dura un secondo invece di una camminata. Il conteggio passivo continua a non avere servizi, a non tenere listener registrati e a non prendere wake lock: il contratto batteria della Fase 10 è intatto. VISION §7, `CLAUDE.md` e il `README.md` aggiornati di conseguenza.
+
+### Test (5 nuovi, 440 totali)
+
+- [x] `WidgetRefreshTest` riscritto attorno alla nuova divisione: il broadcast **instrada** (l'unica cosa che fa: `ACTION_REFRESH` fa partire il servizio, `APPWIDGET_UPDATE` no, un'azione estranea non avvia niente, e senza permesso non parte nulla ma il repaint e il tail ci sono lo stesso), il servizio **lavora** (legge da sé, contatore muto che non tocca l'albero, sensore assente, glifo che si assesta anche quando la lettura lancia)
+- [x] `theSampleIsTakenInTheForeground` / `aRefusedSampleNeverGoesForeground`: il foreground non è un dettaglio implementativo qui, **è** la correzione, quindi è fissato a test
+- [x] Il flag della coda a test da entrambi i lati: campione buono = una lettura sola in tutto il tap; campione muto = la coda ne fa una sua
+- [x] `WidgetFreshnessTest` guida il servizio invece del vecchio `sampleAndRepaint`: i due istanti dell'ancora restano quello che la Fase 18 li ha fatti diventare, dal reading fino ai pixel
+
+- [ ] Verifica su device del committente: (1) cammina con l'app chiusa, poi tap ↻ — il numero **deve** muoversi, e `# last_sync` avanzare; (2) telefono fermo da un'ora, tap ↻ — `# last_sync` avanza comunque e `# stale` si spegne; (3) tap ripetuti veloci — nessun frame che torna indietro, glifo che si assesta su ↻, nessuna notifica che compare; (4) `adb shell dumpsys activity services com.callbackdev.tsteps.debug` durante un tap, per vedere `SampleService` nascere e morire; (5) se una notifica «$ tsteps sync» dovesse comparire, il campione sta superando i dieci secondi ed è un dato in sé
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

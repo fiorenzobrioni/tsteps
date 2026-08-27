@@ -4,8 +4,9 @@
     <!-- Step counter sampling (Fase 2); minSdk 33 = single runtime-request path.
          tsteps has no INTERNET permission at all: the data never leaves the device. -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <!-- Manual tracking (Fase 6): the app's ONLY service, alive exactly as long
-         as a `$ tsteps track` session runs — never for passive counting. -->
+    <!-- The two services, both alive only for an explicit command: a
+         `$ tsteps track` session (Fase 6) and one widget ↻ sample (Fase 19).
+         Never for passive counting, which registers no listener at all. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <!-- The tracking notification is the service's visible face; declared here,
@@ -60,6 +61,17 @@
              an explicitly started fitness session, backed by ACTIVITY_RECOGNITION. -->
         <service
             android:name=".tracking.TrackingService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- The widget's ↻, and the only place Android hands out a counter
+             reading: TYPE_STEP_COUNTER reports on change, and an app that is not
+             in the foreground receives no on-change event at all. Alive for one
+             sample, started by a widget tap (its own exemption from the
+             background foreground-service ban). Same health type as the tracker,
+             backed by ACTIVITY_RECOGNITION. -->
+        <service
+            android:name=".tracking.SampleService"
             android:exported="false"
             android:foregroundServiceType="health" />
 
