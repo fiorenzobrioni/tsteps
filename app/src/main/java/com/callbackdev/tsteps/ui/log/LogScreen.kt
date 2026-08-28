@@ -61,9 +61,13 @@ fun LogScreen(
     val syntax = TstepsTheme.syntax
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
-    val lines = remember(state, activeFile, syntax, locale) {
+    // `resources` is a remember key, not just an argument: a per-app language
+    // change recreates the activity with new resources, and the file has to be
+    // rebuilt in the language it is now being read in.
+    val lines = remember(state, activeFile, syntax, locale, resources) {
         if (activeFile == LogEditorFile.WEEK) {
             return@remember WeekDiffDocument.build(
+                resources = resources,
                 comparison = state.weekDiff,
                 units = state.units,
                 locale = locale,
@@ -71,6 +75,7 @@ fun LogScreen(
             )
         }
         LogDocument.build(
+            resources = resources,
             today = state.today,
             days = state.days,
             expanded = state.expanded,

@@ -1,9 +1,11 @@
 package com.callbackdev.tsteps.ui.log
 
+import android.content.res.Resources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.GoalCheckResult
 import com.callbackdev.tsteps.domain.WeekComparison
@@ -45,6 +47,7 @@ import kotlin.math.roundToInt
 object WeekDiffDocument {
 
     fun build(
+        resources: Resources,
         comparison: WeekComparison?,
         units: UnitsSystem,
         locale: Locale,
@@ -58,14 +61,14 @@ object WeekDiffDocument {
             add(
                 commentLine(
                     if (week != null) {
-                        "// nothing to compare: week $week has no commits"
+                        "// " + resources.getString(R.string.note_week_no_commits, week.toString())
                     } else {
-                        "// nothing to compare: no history yet"
+                        "// " + resources.getString(R.string.note_week_no_history)
                     },
                     syntax
                 )
             )
-            add(commentLine("// two consecutive weeks are needed", syntax))
+            add(commentLine("// " + resources.getString(R.string.note_week_need_two), syntax))
             return@buildList
         }
 
@@ -78,8 +81,12 @@ object WeekDiffDocument {
             add(blank())
             add(
                 commentLine(
-                    "// week ${current.week} in progress: " +
-                        "${current.daysWithData} of ${WeekDiff.DAYS_IN_WEEK} days",
+                    "// " + resources.getString(
+                        R.string.note_week_in_progress,
+                        current.week.toString(),
+                        current.daysWithData,
+                        WeekDiff.DAYS_IN_WEEK
+                    ),
                     syntax
                 )
             )

@@ -1,5 +1,6 @@
 package com.callbackdev.tsteps.ui.steps
 
+import android.content.res.Resources
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.UnitsSystem
@@ -103,10 +105,18 @@ data class SessionControls(
  * a tappable `$` command in the error state, keys that appear or vanish with the
  * data they describe, and session entries that expand in place into their detail
  * object (tap to toggle — the editor's way of opening a collapsed node).
+ *
+ * It takes a [Resources] because since Fase 20 the `//` hints that are sentences
+ * are the reader's (VISION §1.3). That is a different answer from tweather's sky
+ * document, which takes its sentences in as strings: **that** builder promises no
+ * Android in it, and this one never did — it already speaks `SyntaxColors` and
+ * returns `CanvasLine`. Threading resources through it costs nothing the file was
+ * protecting, and it saves a second copy of the English.
  */
 object StepsDocument {
 
     fun build(
+        resources: Resources,
         snapshot: TodaySnapshot?,
         status: SensorStatus,
         units: UnitsSystem,
@@ -126,15 +136,15 @@ object StepsDocument {
     ): List<CanvasLine> = buildList {
         when (status) {
             SensorStatus.NO_SENSOR -> {
-                add(commentLine("// E: no step sensor on this device", syntax))
-                add(commentLine("// passive counting is unavailable", syntax))
+                add(commentLine("// E: " + resources.getString(R.string.note_no_sensor), syntax))
+                add(commentLine("// " + resources.getString(R.string.note_no_sensor_passive), syntax))
                 add(blank())
                 addAll(emptyDocument(snapshot?.date, syntax))
             }
 
             SensorStatus.NO_PERMISSION -> {
-                add(commentLine("// E: ACTIVITY_RECOGNITION permission not granted", syntax))
-                add(commentLine("// tsteps reads the step counter on-device: no GPS, no network", syntax))
+                add(commentLine("// E: " + resources.getString(R.string.note_no_permission), syntax))
+                add(commentLine("// " + resources.getString(R.string.note_on_device), syntax))
                 add(grantCommandLine(syntax, onGrantPermission, grantClickLabel))
                 add(blank())
                 addAll(emptyDocument(snapshot?.date, syntax))
@@ -142,6 +152,7 @@ object StepsDocument {
 
             SensorStatus.OK -> addAll(
                 dataDocument(
+                    resources,
                     snapshot ?: return@buildList, units, syntax, sessions,
                     expandedSessionIds, sessionMetric, zone, onToggleSession,
                     sessionToggleLabel, controls, externalSteps,
@@ -152,6 +163,7 @@ object StepsDocument {
     }
 
     private fun dataDocument(
+        resources: Resources,
         snapshot: TodaySnapshot,
         units: UnitsSystem,
         syntax: SyntaxColors,
@@ -189,7 +201,7 @@ object StepsDocument {
             add(
                 rawValueLine(
                     "goal", "null", comma = false, syntax, indent = 2,
-                    hint = "// tap to set $SUGGESTED_DAILY_GOAL_STEPS",
+                    hint = "// " + resources.getString(R.string.note_tap_set_goal, SUGGESTED_DAILY_GOAL_STEPS),
                     onClick = onAcceptGoal,
                     onClickLabel = acceptGoalLabel
                 )
@@ -203,14 +215,14 @@ object StepsDocument {
                 UnitFormat.distanceKey(units),
                 UnitFormat.distanceValue(snapshot.distanceMeters, units),
                 comma = true, syntax, indent = 2,
-                hint = "// estimated from stride length"
+                hint = "// " + resources.getString(R.string.note_estimated_stride)
             )
         )
         add(
             numberLine(
                 "active_min", snapshot.activeMinutes.toString(),
                 comma = snapshot.activeKcal != null, syntax, indent = 2,
-                hint = "// estimated at 100 steps/min"
+                hint = "// " + resources.getString(R.string.note_estimated_cadence)
             )
         )
         val kcal = snapshot.activeKcal
@@ -218,11 +230,11 @@ object StepsDocument {
             add(
                 numberLine(
                     "active_kcal", kcal.toInt().toString(), comma = false, syntax, indent = 2,
-                    hint = "// MET × weight × active time"
+                    hint = "// " + resources.getString(R.string.note_kcal_formula)
                 )
             )
         } else {
-            add(commentLine("// active_kcal: set profile.weight_kg to enable", syntax, indent = 2))
+            add(commentLine("// " + resources.getString(R.string.note_kcal_needs_weight), syntax, indent = 2))
         }
         add(punctLine("},", 1, syntax))
 
@@ -238,11 +250,12 @@ object StepsDocument {
 
         val hasExternal = externalSteps.isNotEmpty()
         addSessions(
+            resources,
             sessions, expandedSessionIds, hasGoal || hasExternal, units, sessionMetric,
             zone, syntax, onToggleSession, sessionToggleLabel, controls
         )
         if (hasExternal) {
-            addExternalSteps(externalSteps, trailingComma = hasGoal, syntax)
+            addExternalSteps(resources, externalSteps, trailingComma = hasGoal, syntax)
         }
         if (hasGoal) {
             add(numberLine("streak_days", snapshot.streakDays.toString(), comma = false, syntax, indent = 1))
@@ -261,6 +274,7 @@ object StepsDocument {
      * log's business and stays read-only.
      */
     private fun MutableList<CanvasLine>.addSessions(
+        resources: Resources,
         sessions: List<SessionItem>,
         expandedIds: Set<Long>,
         trailingComma: Boolean,
@@ -322,7 +336,7 @@ object StepsDocument {
                 add(
                     stringLine(
                         "start", startShown, comma = true, syntax, indent = 3,
-                        hint = "// tap to edit".takeIf { session.auto },
+                        hint = ("// " + resources.getString(R.string.note_tap_edit)).takeIf { session.auto },
                         onClick = { controls.onStartEdit(session) }.takeIf { session.auto },
                         onClickLabel = controls.editLabel(session).takeIf { session.auto }
                     )
@@ -340,7 +354,7 @@ object StepsDocument {
                 add(
                     stringLine(
                         "source", "auto", comma = true, syntax, indent = 3,
-                        hint = "// inferred — ~times are approximate"
+                        hint = "// " + resources.getString(R.string.note_inferred)
                     )
                 )
             }
@@ -359,7 +373,7 @@ object StepsDocument {
             session.avgCadenceSpm?.let {
                 add(numberLine("avg_cadence_spm", it.toString(), comma = false, syntax, indent = 3))
             }
-            addRemoveLine(session, syntax, controls)
+            addRemoveLine(resources, session, syntax, controls)
             add(punctLine(if (comma) "}," else "}", 2, syntax))
         }
         add(punctLine(if (trailingComma) "]," else "]", 1, syntax))
@@ -372,6 +386,7 @@ object StepsDocument {
      * already looking at what they are about to remove.
      */
     private fun MutableList<CanvasLine>.addRemoveLine(
+        resources: Resources,
         session: SessionItem,
         syntax: SyntaxColors,
         controls: SessionControls
@@ -385,7 +400,7 @@ object StepsDocument {
                     ) { append("[rm]") }
                     if (armed) {
                         withStyle(SpanStyle(color = syntax.diffDel)) {
-                            append("  // tap again to remove")
+                            append("  // " + resources.getString(R.string.note_tap_again_remove))
                         }
                     }
                 },
@@ -487,6 +502,7 @@ object StepsDocument {
      * block exists only while sync is on and something external was read.
      */
     private fun MutableList<CanvasLine>.addExternalSteps(
+        resources: Resources,
         origins: List<OriginSteps>,
         trailingComma: Boolean,
         syntax: SyntaxColors
@@ -497,7 +513,7 @@ object StepsDocument {
                     withStyle(SpanStyle(color = syntax.key)) { append("\"health_connect\"") }
                     withStyle(SpanStyle(color = syntax.comment)) { append(": {") }
                     withStyle(SpanStyle(color = syntax.comment.copy(alpha = 0.6f))) {
-                        append("  // other apps' steps — shown, never added")
+                        append("  // " + resources.getString(R.string.note_external_steps))
                     }
                 },
                 indent = 1

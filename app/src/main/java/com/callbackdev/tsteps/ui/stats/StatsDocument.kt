@@ -1,9 +1,11 @@
 package com.callbackdev.tsteps.ui.stats
 
+import android.content.res.Resources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.HeatmapGrid
 import com.callbackdev.tsteps.domain.Records
@@ -55,6 +57,7 @@ object StatsDocument {
     private val LevelAlphas = listOf(0.30f, 0.55f, 0.78f, 1f)
 
     fun build(
+        resources: Resources,
         grid: HeatmapGrid?,
         streak: StreakInfo?,
         averages: List<WindowAverages>,
@@ -79,8 +82,8 @@ object StatsDocument {
         }
 
         if (committedDays == 0) {
-            add(commentLine("// nothing committed yet — records and averages", syntax))
-            add(commentLine("// appear with the first day's commit", syntax))
+            add(commentLine("// " + resources.getString(R.string.note_stats_empty_1), syntax))
+            add(commentLine("// " + resources.getString(R.string.note_stats_empty_2), syntax))
             return@buildList
         }
 
@@ -161,7 +164,10 @@ object StatsDocument {
         }
 
         addAll(
-            md("*computed on read from $committedDays committed days*", syntax = syntax)
+            md(
+                "*" + resources.getString(R.string.note_stats_computed, committedDays) + "*",
+                syntax = syntax
+            )
         )
     }
 

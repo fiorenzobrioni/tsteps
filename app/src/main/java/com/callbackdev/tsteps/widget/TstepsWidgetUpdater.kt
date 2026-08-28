@@ -245,6 +245,7 @@ object TstepsWidgetUpdater {
         // answers that must agree for the frame to be coherent.
         val now = Instant.now()
         val zone = ZoneId.systemDefault()
+        val notes = widgetNotes(context.resources)
         manager.updateAppWidget(
             ids,
             WidgetRenderer.sizeMap(
@@ -256,7 +257,8 @@ object TstepsWidgetUpdater {
                         tier = tier,
                         zone = zone,
                         locale = Locale.getDefault(),
-                        now = now
+                        now = now,
+                        notes = notes
                     )
                 },
                 palette = frame.palette,

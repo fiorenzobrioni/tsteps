@@ -18,8 +18,17 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 
+@RunWith(RobolectricTestRunner::class)
 class StatsDocumentTest {
+
+    private val resources =
+        ApplicationProvider.getApplicationContext<Context>().resources
 
     private val syntax = ObsidianSyntax
     private val rome = ZoneId.of("Europe/Rome")
@@ -40,6 +49,7 @@ class StatsDocumentTest {
         units: UnitsSystem = UnitsSystem.METRIC,
         onOpenCommit: (LocalDate) -> Unit = {}
     ) = StatsDocument.build(
+        resources,
         grid, streak, averages, totals, bestDay, longestWalk, bestWeek, committedDays,
         units, Locale.ENGLISH, rome, syntax, onOpenCommit
     )
@@ -172,4 +182,31 @@ class StatsDocumentTest {
     fun `the footer says where the numbers come from`() {
         build().lineWith("*computed on read from 42 committed days*")
     }
+
+    /**
+     * Both halves of the seam on one screen: the `//` is the file's syntax and
+     * the renderer keeps it, the sentence behind it is the reader's. The footer
+     * comes along too — it is a sentence about the file, not a key in it.
+     */
+    @Test
+    @Config(qualifiers = "it")
+    fun `in Italian the marker stays and the sentence moves`() {
+        val empty = build(
+            streak = null, averages = emptyList(), bestDay = null,
+            longestWalk = null, bestWeek = null, committedDays = 0
+        )
+        empty.lineWith("// ancora nessun commit — record e medie")
+        assertTrue(empty.texts().none { it.contains("nothing committed yet") })
+
+        val full = build()
+        full.lineWith("*calcolato alla lettura su 42 giorni committati*")
+        // Everything else in the file is the computed record, and it does not
+        // move: the headings, the table columns, the tag names, the units that
+        // line up with them. stats.md has exactly two sentences and both are here.
+        full.lineWith("## contributions")
+        full.lineWith("| window | steps | distance | active |")
+        full.lineWith("| best-day")
+        full.lineWith("current: **6 days**")
+    }
+
 }

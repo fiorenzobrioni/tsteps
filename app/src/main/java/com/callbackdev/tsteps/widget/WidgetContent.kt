@@ -76,12 +76,42 @@ data class WidgetData(
 )
 
 /**
+ * The widget's few sentences, handed in so this builder can stay pure — no
+ * `Context`, no `Resources`, testable from a plain JVM test like the rest of it.
+ * [EN] is the fallback the updater never uses; `WidgetNotesTest` ties it to
+ * `values/strings.xml` word for word so the two copies cannot drift.
+ *
+ * Only sentences are here. The transcript's field names (`Steps`, `Dist`,
+ * `Streak`) are keys, the units beside the numbers (`min`, `days`, `km`) belong
+ * to the value's format, and `# last_sync:`/`# last walk:` are labels in the
+ * comment channel — all code, all English, all unchanged.
+ */
+data class WidgetNotes(
+    val sensorOff: String,
+    val sensorOffShort: String,
+    val noDataYet: String,
+    val noData: String,
+    val stepsToday: String
+) {
+    companion object {
+        val EN: WidgetNotes = WidgetNotes(
+            sensorOff = "sensor off — open tsteps",
+            sensorOffShort = "sensor off",
+            noDataYet = "no data yet — open tsteps",
+            noData = "no data",
+            stepsToday = "steps today"
+        )
+    }
+}
+
+/**
  * Pure mapping from persisted state to the terminal transcript the widget shows.
- * Keys, prompt and `#` comments are code and stay English (the widget is a
- * terminal window); the emoji is the brand's 👣, constant on purpose. Field
- * names are Capitalized like tweather's widget (device feedback: the two
- * widgets sit on the same home screen and must read as siblings) — the `#`
- * comments stay lowercase, they're comments.
+ * Keys, prompt, markers and the labelled `#` lines are code and stay English
+ * (the widget is a terminal window); its handful of sentences arrive as
+ * [WidgetNotes]. The emoji is the brand's 👣, constant on purpose. Field names
+ * are Capitalized like tweather's widget (device feedback: the two widgets sit
+ * on the same home screen and must read as siblings) — the `#` comments stay
+ * lowercase, they're comments.
  */
 object WidgetContentBuilder {
 
@@ -116,7 +146,8 @@ object WidgetContentBuilder {
         tier: WidgetTier,
         zone: ZoneId = ZoneId.systemDefault(),
         locale: Locale = Locale.ENGLISH,
-        now: Instant? = null
+        now: Instant? = null,
+        notes: WidgetNotes = WidgetNotes.EN
     ): WidgetContent {
         val prompt = TerminalLine(
             listOf(
@@ -130,20 +161,20 @@ object WidgetContentBuilder {
             return WidgetContent(
                 headerTitle = HEADER,
                 promptLine = prompt,
-                bodyLines = listOf(token("# sensor off — open tsteps", TokenRole.ALERT)),
+                bodyLines = listOf(token("# " + notes.sensorOff, TokenRole.ALERT)),
                 emoji = EMOJI,
                 smallValue = token("--", TokenRole.NUMBER),
-                smallLabel = token("# sensor off", TokenRole.ALERT)
+                smallLabel = token("# " + notes.sensorOffShort, TokenRole.ALERT)
             )
         }
         if (!data.hasEverSampled) {
             return WidgetContent(
                 headerTitle = HEADER,
                 promptLine = prompt,
-                bodyLines = listOf(comment("# no data yet — open tsteps")),
+                bodyLines = listOf(comment("# " + notes.noDataYet)),
                 emoji = EMOJI,
                 smallValue = token("--", TokenRole.NUMBER),
-                smallLabel = comment("# no data")
+                smallLabel = comment("# " + notes.noData)
             )
         }
 
@@ -212,7 +243,7 @@ object WidgetContentBuilder {
             smallLabel = if (hasGoal) {
                 token(StepsGlyphs.goalBar(data.todaySteps, data.goalSteps, BAR_WIDTH), TokenRole.PROMPT)
             } else {
-                token("steps today", TokenRole.PLAIN)
+                token(notes.stepsToday, TokenRole.PLAIN)
             }
         )
     }

@@ -17,8 +17,17 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 
+@RunWith(RobolectricTestRunner::class)
 class StepsDocumentTest {
+
+    private val resources =
+        ApplicationProvider.getApplicationContext<Context>().resources
 
     private val syntax = ObsidianSyntax
     private val rome = ZoneId.of("Europe/Rome")
@@ -68,6 +77,7 @@ class StepsDocumentTest {
         controls: SessionControls = SessionControls(),
         externalSteps: List<OriginSteps> = emptyList()
     ) = StepsDocument.build(
+        resources = resources,
         snapshot = snapshot,
         status = status,
         units = units,
@@ -347,4 +357,22 @@ class StepsDocumentTest {
         lines.lineWith("\"start\": \"~09:32\"").onClick!!.invoke()
         assertEquals(1L, editing?.id)
     }
+
+    /**
+     * The level is a token of the channel and the renderer puts it there, so an
+     * Italian reader still finds `E:` where a log level belongs — with the
+     * sentence after it in their own language. Keys never move: this is the one
+     * line in the file that holds both registers at once.
+     */
+    @Test
+    @Config(qualifiers = "it")
+    fun `in Italian the level stays in front of the translated sentence`() {
+        val lines = build(status = SensorStatus.NO_SENSOR)
+        lines.lineWith("// E: nessun sensore di passi su questo dispositivo")
+        assertTrue(lines.texts().none { it.contains("no step sensor") })
+        // And the JSON around it is untouched: keys are code in every language.
+        lines.lineWith("\"date\"")
+        lines.lineWith("\"steps\": null")
+    }
+
 }

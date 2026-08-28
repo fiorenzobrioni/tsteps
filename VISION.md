@@ -34,7 +34,17 @@ Full token set in tweather's `obsidian_syntax/DESIGN.md`; the Compose implementa
 
 ### 1.3 The localization rule
 
-English and Italian via the system per-app language picker (minSdk 33). The split is semantic: **code stays English** — JSON keys, filenames, `//` comments, terminal output, commit hashes and CI checks. **Chrome and data values are localized** — navigation labels, accessibility text, day names, session type names. A `README.md` fake file is prose, so it localizes fully, headings included.
+English and Italian via the system per-app language picker (minSdk 33). The split is semantic, and since Aug 2026 it is drawn by **register**, not by the punctuation around the string (series decision, recorded in full in tweather's `PLANNING.md` Fase 18):
+
+- **Code is always English.** JSON keys, filenames, `$` commands, terminal output, git chrome (`commit`, `Author:`, `@@`, hashes), CI checks and verdicts, log levels (`ERROR:`, `WARN:`), one-word markers (`# stale`), file banners, licenses, URLs. Test: if translating it would break a lookup, a filename, a copy-paste or the alignment with a key printed elsewhere, it is code.
+- **Data localizes**: day names, session type names, values and their units.
+- **Prose localizes wherever it appears** — the `README.md` day tab (fully, headings included), `HELP.md`, `$ tsteps init`, notifications, accessibility text, **and the comment lines that are sentences** (`// tap to add one`, `// hint: …`). The marker and the position on screen do not change: **the syntax is the fiction, the language is the reader's.**
+
+The precedent is the metaphor's own tooling. Under `LANG=it_IT`, `git status` prints "Sul branch main" and keeps `branch`, `commit`, `HEAD`; `gcc` localizes its diagnostics the same way. A file whose keywords are English and whose margin is in the reader's language is exactly what a localized toolchain looks like, so the register split makes the fiction *more* faithful, not less — the earlier wording ("`//` comments stay English") mistook the channel for the register and left the app more English than git itself.
+
+Two consequences worth stating. A line often holds both registers: keep the tokens and translate around them (`// ERROR: permesso negato`). And the rule applies **completely or not at all** — kept four times out of five it reads as a half-finished translation rather than as a design, which is why implementing it is a closed phase and never an opportunistic touch-up.
+
+*Implemented in `PLANNING.md` Fase 20.* The documents take a `Resources` and speak the sentence themselves — tsteps' builders never promised to be Android-free, so there is no second copy of the English to keep in sync. The two that stay pure hand their sentences in instead: `WidgetContentBuilder` receives a `WidgetNotes` (with `WidgetNotes.EN` tied to `values/strings.xml` by a test), and the two input parsers return a `@StringRes` id with the range as an argument, because the range is code. Three guards hold the line: `RegisterRuleTest` over every `note_*` at once, `CommentChannelSweepTest` over the sources, and one Italian test per surface asserting both halves of the seam.
 
 ### 1.4 Engineering ethos
 

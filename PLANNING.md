@@ -406,10 +406,63 @@ VISION §7 diceva «foreground service solo durante il tracking manuale». Adess
 
 - [ ] Verifica su device del committente: (1) cammina con l'app chiusa, poi tap ↻ — il numero **deve** muoversi, e `# last_sync` avanzare; (2) telefono fermo da un'ora, tap ↻ — `# last_sync` avanza comunque e `# stale` si spegne; (3) tap ripetuti veloci — nessun frame che torna indietro, glifo che si assesta su ↻, nessuna notifica che compare; (4) `adb shell dumpsys activity services com.callbackdev.tsteps.debug` durante un tap, per vedere `SampleService` nascere e morire; (5) se una notifica «$ tsteps sync» dovesse comparire, il campione sta superando i dieci secondi ed è un dato in sé
 
+## Fase 20 — I registri l10n: la lingua segue la frase, non le barre (decisione di serie, ago 2026)
+
+Domanda del committente nata su tweather e valida per tutta la serie: la regola "il codice resta inglese" si può ammorbidire sui commenti, senza affogare la filosofia terminal/git? Sì, perché la vecchia formulazione confondeva il **canale** (`//`) con il **registro**: sotto quel simbolo convivevano `// GET /v1/...` (contenuto del file) e frasi il cui unico scopo è essere capite. Il verbale completo, con l'argomento, i casi di confine e quello che la decisione **non** è, sta in `../tweather/PLANNING.md` Fase 18. Qui la parte che riguarda tsteps.
+
+**La regola.** Il registro decide la lingua, non la punteggiatura che lo circonda. *Codice* sempre inglese: chiavi, nomi file, comandi `$`, chrome git (`commit`, `Author:`, `@@`, hash), check CI, livelli `ERROR:`/`WARN:`, marcatori di una parola (`# stale`), intestazioni dei file, licenze, URL. *Dati* localizzati. *Prosa* localizzata ovunque si trovi, **comprese le righe di commento che sono frasi**. Due test in quest'ordine: tradurlo romperebbe un lookup, un nome file, un copia-incolla o l'allineamento con una chiave stampata altrove? lo tradurrebbe `git`? Una riga può contenere due registri: si tengono i token e si traduce intorno.
+
+Il precedente è lo strumento stesso della metafora: `git status` sotto `LANG=it_IT` scrive "Sul branch main" e tiene `branch`, `commit`, `HEAD`. Lo split è esattamente questo, e finora tsteps era più inglese di git.
+
+**Cosa tocca qui, quando si implementerà.** ~80 letterali di commento (67 `//`, 13 `#`) e ~68 asserzioni di test che ne congelano il testo inglese. Non si toccano: gli hunk header `@@ 09:12..10:03 @@ walk` (sintassi git), le check line dell'obiettivo, `# stale` e `# last_sync` del widget, i comandi `$ tsteps track` e `$ tsteps init`, `# tsteps --today` nell'intestazione del widget.
+
+**L'allineamento è il costo vero.** L'italiano è più lungo del 15-20%, e i commenti *in colonna* vanno lasciati in pace: è la stessa ragione per cui `Stats` non è mai diventato `Statistiche` nella nav bar. Si traducono le righe intere, che vanno a capo per conto loro, e ogni riga tradotta si riguarda a 360dp prima di dirla fatta.
+
+- [x] `VISION.md §1.3` riscritta sui tre registri; `CLAUDE.md`, Note trasversali e intestazioni di `values/` + `values-it/strings.xml` allineate
+- [x] `README.md` di root **non toccato, deliberatamente**: la sua riga sulla l10n descrive l'app spedita, e nel codice i commenti sono ancora inglesi. Si aggiorna con l'implementazione
+- [x] Implementazione: fase a sé, non una rifinitura opportunistica (la regola vale al 100% o non vale). Nella serie **thabit è andata per prima** — i suoi commenti erano già quasi tutti frasi rivolte al lettore — poi tweather (l'app di punta), tsteps per ultima
+- [x] `README.md` di root aggiornato: ora i commenti *sono* localizzati, quindi la riga sulla l10n descrive di nuovo l'app spedita
+
+### L'implementazione (ago 2026)
+
+**66 stringhe `note_*`** in `values/` + `values-it/`, parità verificata. L'architettura è **diversa da tweather e per una ragione detta**: i documenti di tsteps non hanno mai promesso di essere Android-free — prendono già `SyntaxColors` e restituiscono `CanvasLine` — mentre `SkyDocumentBuilder` di tweather dichiara «no Android, no clock». Qui quindi passa **`Resources`** direttamente (`StepsDocument`, `LogDocument`, `WeekDiffDocument`, `StatsDocument`, `TrackDocument` e i loro schermi), e i cinque test di documento sono passati a Robolectric. Nessuna copia dell'inglese in Kotlin, quindi nessun drift da sorvegliare. La ragione è scritta nel KDoc di `StepsDocument`, non solo qui.
+
+Le due eccezioni, e perché:
+
+- **`WidgetContentBuilder`** resta puro (niente `Context`: il launcher lo inflaziona in un contesto ristretto e il builder è testato da JVM liscia). Riceve `WidgetNotes`, con `WidgetNotes.EN` come fallback e `WidgetNotesTest` che lega il valore intero a `values/strings.xml` — confronta l'oggetto, non campo per campo, così una frase aggiunta domani è coperta il giorno che esiste.
+- **`parseNumericInput` e `SessionBoundsInput.parse`** restano puri: la frase viaggia come `@StringRes` + argomenti e la schermata la pronuncia. L'intervallo (`20..300 kg`, `HH:mm..HH:mm`) è un **argomento** perché è codice: si allinea col valore stampato nel file ed è copiabile.
+
+**`resources` è una chiave di `remember`**, non solo un parametro: un cambio di lingua per-app ricrea l'activity con `Resources` nuove e il file va ricostruito nella lingua in cui lo si sta leggendo adesso.
+
+**Tre guardie**, in ordine di quello che vedono:
+
+1. `RegisterRuleTest` legge le risorse: nessuna `note_*` porta il proprio marcatore o il proprio livello, tutte dicono qualcosa di diverso in italiano, i token sopravvivono alla traduzione. La lista è presa **per riflessione** su `R.string` (tweather la enumera a mano): quello che non si tiene aggiornato non si può dimenticare, e non c'è allowlist da riempire — a tsteps non è servita nessuna esenzione.
+2. `CommentChannelSweepTest` legge i **sorgenti**: qualunque letterale che porti un marcatore e legga come frase (tre parole minuscole di fila) fallisce. È la lezione di tweather, dove uno sweep a mano ancorava `//` all'inizio della stringa e si perdeva le continuazioni `append(",  // …")` — una la trovò il committente a occhio, su uno screenshot. Verificata rimettendo un offender: diventa rossa.
+3. Un test italiano **per superficie** (`stats.md`, `steps_history.diff`, `week.diff`, `steps_data.json`, il buffer di `track`) che asserisce *entrambe* le metà della cucitura: il marcatore e il livello restano davanti, la frase dietro si muove, e le colonne allineate non si spostano di un carattere.
+
+**Quattro cose trovate che non erano bug di traduzione** (il motivo per cui la fase valeva la pena):
+
+- `tracking… (^C to stop)` e `paused… (fg to resume)` stavano nello **stesso `when`** della riga che avevo già localizzato: mezzo tradotto, esattamente la classe di errore che il committente aveva preso in thabit su `stats.md`.
+- `note_week_in_progress` esisteva in `strings.xml` **e non era cablata**: la riga era ancora un letterale inglese. Lo sweep non la vedeva (l'interpolazione `${current.week}` spezza la corsa di parole); l'ha trovata il test italiano di `week.diff`. Le guardie servono in numero: nessuna delle tre da sola bastava.
+- I **verbi dei controlli di `$ tsteps track`** (`[ ^Z pause ]`, `[ fg resume ]`, `[ ^C stop ]`) erano inglesi. Ma la Fase 8 ha messo a verbale, dopo il feedback su device, che la parola sta lì *per spiegare il glifo*: una parola che deve spiegare `^Z` a chi non ce l'ha non spiega niente. Il glifo è il token e non si muove, la parola sì.
+- Il fallimento dell'export stampava `// ERROR: <messaggio dell'eccezione>` e basta. Ora dice in italiano che l'export è fallito e stampa dopo il messaggio della piattaforma come **prova**: lo stesso split che tweather fa in `sky.crontab` fra il verdetto e il numero. La prova è quasi sempre un errno che nessuno può tradurre.
+
+**Casi di confine decisi, con la ragione** (non «commenti», quindi non li prende nessuna regola meccanica):
+
+- **Le parole-unità accanto ai numeri restano inglesi** — `days`, `min`, `sessions`, `walks`, `steps` nel widget, nel corpo delle notifiche e nel tally dell'export. Primo test: si allineano con le chiavi stampate altrove (`streak_days`, `active_min`, l'array `days` del file esportato). Tradurre la parola in un posto e non la chiave nell'altro è il drift che la regola vieta.
+- **`stats.md` ha esattamente due frasi** (la nota di file vuoto e il footer `*calcolato alla lettura su N giorni committati*`) e si muovono. Tutto il resto del file è il **record calcolato**: titoli, colonne della tabella, nomi dei tag, `current:`/`longest:`/`since`. Tradurne una parte romperebbe l'allineamento delle colonne e lascerebbe il file mezzo inglese.
+- **`# last walk:` e `# last_sync:` del widget restano inglesi**: sono etichette col due punti nello stesso canale, gemelle. Tradurne una sola sarebbe di nuovo il mezzo lavoro.
+- **`^Z  paused` / `fg  resumed` nel transcript restano**: sono marcatori di una parola dietro un token di shell, la registrazione di un evento — la riga di *stato* del processo invece parla al lettore e si è tradotta.
+- **`profile, not measured` nel file esportato resta inglese**: l'export non deve cambiare significato con la lingua del telefono.
+- I messaggi di `require()` e i letterali dei `@Preview` restano inglesi: nessun utente li legge.
+
+**Verifiche**: 455 test verdi (da 440), lint pulita, release minificata (R8) installabile, parità EN/IT completa su tutte le stringhe traducibili (le cinque solo-EN sono `translatable="false"`: brand, chrome git, glifi), sweep dei sorgenti rieseguito con soglia a due parole e a parole maiuscole comprese — restano solo comandi, SQL, licenze, nomi propri e `@Preview`.
+
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.
-- **Regola l10n**: il "codice" resta inglese (chiavi JSON, filenames, `//` comments, output terminale, hash, check CI); chrome e valori-dato localizzati IT/EN. `README.md` (la tab) è prosa: localizzata per intero.
+- **Regola l10n, tre registri** (Fase 20): decide il *registro*, non il canale. *Codice* sempre inglese (chiavi JSON, filenames, output terminale, hash, check CI, livelli `ERROR:`/`WARN:`, marcatori come `# stale`, intestazioni dei file); *dati* localizzati IT/EN; *prosa* localizzata ovunque si trovi — `README.md` (la tab), `HELP.md`, `$ tsteps init`, notifiche, accessibilità **e le righe di commento che sono frasi**. Una riga con due registri tiene i token e traduce intorno. **Implementata nella Fase 20**: i documenti prendono `Resources` (tsteps non ha mai promesso di essere Android-free), il widget resta puro e riceve `WidgetNotes` con guardia anti-drift, e tre guardie — risorse, sorgenti, test italiani per superficie — impediscono che la regola torni a valere solo in parte.
 - **Niente rete**: se una feature futura chiede la permission INTERNET, non è una feature di tsteps.
 - **Ordine**: Fasi 1–2 sono il fondamento; la 2 può procedere in parallelo alla 1. Le fasi 3–5 dipendono da 1–2. La 6 sblocca la 11. Widget (10) dopo che dominio e settings sono stabili.
 - **Import da tweather**: i componenti si copiano adattando il package, mai linkando il repo; ogni divergenza che emerge (bug fixati qui, migliorie) va valutata per il backport a tweather.

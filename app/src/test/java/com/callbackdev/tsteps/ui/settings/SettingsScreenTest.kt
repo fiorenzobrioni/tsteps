@@ -305,12 +305,18 @@ class SettingsScreenTest {
         line("// nothing to export yet").assertIsDisplayed()
     }
 
+    /**
+     * The sentence is the reader's, the evidence is the platform's. What broke
+     * usually arrives as an errno or a class name that nothing can translate, so
+     * the line says what happened in words and prints the exception's own after
+     * it — the same split `sky.crontab` makes between a verdict and its number.
+     */
     @Test
     fun `a failed export reads like a compiler message`() {
         setContent(
             exportState = ExportState.Done(ExportResult.Failed("Downloads is not writable"))
         )
-        line("// ERROR: Downloads is not writable").assertIsDisplayed()
+        line("// ERROR: export failed — Downloads is not writable").assertIsDisplayed()
     }
 
     @Test

@@ -103,6 +103,7 @@ fun TrackScreen(
     onCycleType: () -> Unit = {}
 ) {
     val syntax = TstepsTheme.syntax
+    val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
     val zone = ZoneId.systemDefault()
 
@@ -123,8 +124,9 @@ fun TrackScreen(
                 onSelect = {}
             )
             if (state != null) {
-                val lines = remember(state, nowMillis, settings, syntax, stopArmed) {
+                val lines = remember(state, nowMillis, settings, syntax, stopArmed, resources) {
                     TrackDocument.build(
+                        resources = resources,
                         state = state,
                         nowMillis = nowMillis,
                         units = settings.units,
@@ -169,7 +171,7 @@ fun TrackScreen(
             } else {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "// no process running",
+                        text = "// " + stringResource(R.string.note_no_process),
                         style = MaterialTheme.typography.bodySmall,
                         color = syntax.comment,
                         modifier = Modifier.padding(16.dp)
@@ -183,9 +185,11 @@ fun TrackScreen(
 /**
  * The process controls: glyph AND word (`[ ^Z pause ]`) so the buttons explain
  * themselves — the shell glyphs stay for coherence, the word does the talking
- * (device feedback, recorded in PLANNING). FAB-sized targets; stop is the
- * screen's primary verb and, when armed, takes its one sanctioned glow in
- * diff-deletion red.
+ * (device feedback, recorded in PLANNING). Which is why the word is the one
+ * thing here that translates (Fase 20): a word whose whole job is to explain
+ * `^Z` explains nothing to a reader who does not have it. The glyph is the
+ * token and never moves. FAB-sized targets; stop is the screen's primary verb
+ * and, when armed, takes its one sanctioned glow in diff-deletion red.
  */
 @Composable
 private fun ProcessControls(
@@ -202,7 +206,11 @@ private fun ProcessControls(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         ProcessButton(
-            text = if (paused) "[ fg resume ]" else "[ ^Z pause ]",
+            text = if (paused) {
+                "[ fg " + stringResource(R.string.track_verb_resume) + " ]"
+            } else {
+                "[ ^Z " + stringResource(R.string.track_verb_pause) + " ]"
+            },
             modifier = Modifier.weight(1f),
             textColor = syntax.number,
             onClickLabel = stringResource(
@@ -211,7 +219,7 @@ private fun ProcessControls(
             onClick = onPauseResume
         )
         ProcessButton(
-            text = "[ ^C stop ]",
+            text = "[ ^C " + stringResource(R.string.track_verb_stop) + " ]",
             modifier = Modifier.weight(1.3f),
             textColor = if (stopArmed) syntax.diffDel else MaterialTheme.colorScheme.onSurface,
             borderColor = if (stopArmed) syntax.diffDel else syntax.border,

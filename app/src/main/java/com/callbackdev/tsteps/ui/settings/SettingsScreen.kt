@@ -3,11 +3,13 @@ package com.callbackdev.tsteps.ui.settings
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -377,11 +379,14 @@ fun SettingsScreen(
                 }
                 editing = null
             }
-            is NumericInput.Invalid -> inputError = result.error
+            is NumericInput.Invalid ->
+            inputError = "// ERROR: " +
+                resources.getString(result.id, *result.args.toTypedArray())
         }
     }
 
     val lines = buildSettingsLines(
+        resources = resources,
         settings = settings,
         syntax = syntax,
         actions = actions,
@@ -448,7 +453,14 @@ fun SettingsScreen(
 internal sealed interface NumericInput {
     data class Value(val value: Double) : NumericInput
     data object Cleared : NumericInput
-    data class Invalid(val error: String) : NumericInput
+
+    /**
+     * The sentence travels as a resource id and the renderer speaks it: the
+     * range itself (`20..300 kg`) is an argument because it is code — it lines
+     * up with the value printed in the file and is copy-pasteable — and the
+     * `// ERROR:` marker is the renderer's too, never part of the string.
+     */
+    data class Invalid(@StringRes val id: Int, val args: List<Any> = emptyList()) : NumericInput
 }
 
 /** Pure so the ranges and the empty-clears rule are unit-testable. */
@@ -456,7 +468,9 @@ internal fun parseNumericInput(field: NumericField, raw: String): NumericInput {
     val text = raw.trim().replace(',', '.')
     if (text.isEmpty()) return NumericInput.Cleared
     val number = text.toDoubleOrNull()
-        ?: return NumericInput.Invalid("// ERROR: not a number")
+        ?: return NumericInput.Invalid(R.string.note_err_not_a_number)
+    fun outOfRange(range: String) =
+        NumericInput.Invalid(R.string.note_err_expected_range, listOf(range))
     return when (field) {
         NumericField.GOAL ->
             if (number == number.toInt().toDouble() &&
@@ -464,16 +478,15 @@ internal fun parseNumericInput(field: NumericField, raw: String): NumericInput {
             ) {
                 NumericInput.Value(number)
             } else {
-                NumericInput.Invalid(
-                    "// ERROR: expected ${SettingsRanges.GOAL_STEPS.first}..${SettingsRanges.GOAL_STEPS.last}"
-                )
+                outOfRange("${SettingsRanges.GOAL_STEPS.first}..${SettingsRanges.GOAL_STEPS.last}")
             }
         NumericField.WEIGHT ->
             if (number in SettingsRanges.WEIGHT_KG) {
                 NumericInput.Value(number)
             } else {
-                NumericInput.Invalid(
-                    "// ERROR: expected ${SettingsRanges.WEIGHT_KG.start.toInt()}..${SettingsRanges.WEIGHT_KG.endInclusive.toInt()} kg"
+                outOfRange(
+                    "${SettingsRanges.WEIGHT_KG.start.toInt()}.." +
+                        "${SettingsRanges.WEIGHT_KG.endInclusive.toInt()} kg"
                 )
             }
         NumericField.HEIGHT ->
@@ -482,9 +495,7 @@ internal fun parseNumericInput(field: NumericField, raw: String): NumericInput {
             ) {
                 NumericInput.Value(number)
             } else {
-                NumericInput.Invalid(
-                    "// ERROR: expected ${SettingsRanges.HEIGHT_CM.first}..${SettingsRanges.HEIGHT_CM.last} cm"
-                )
+                outOfRange("${SettingsRanges.HEIGHT_CM.first}..${SettingsRanges.HEIGHT_CM.last} cm")
             }
         NumericField.STRIDE ->
             if (number == number.toInt().toDouble() &&
@@ -492,9 +503,7 @@ internal fun parseNumericInput(field: NumericField, raw: String): NumericInput {
             ) {
                 NumericInput.Value(number)
             } else {
-                NumericInput.Invalid(
-                    "// ERROR: expected ${SettingsRanges.STRIDE_CM.first}..${SettingsRanges.STRIDE_CM.last} cm"
-                )
+                outOfRange("${SettingsRanges.STRIDE_CM.first}..${SettingsRanges.STRIDE_CM.last} cm")
             }
     }
 }
@@ -502,6 +511,7 @@ internal fun parseNumericInput(field: NumericField, raw: String): NumericInput {
 internal fun formatWeight(weightKg: Double): String = "%.1f".format(Locale.ROOT, weightKg)
 
 private fun buildSettingsLines(
+    resources: Resources,
     settings: AppSettings,
     syntax: SyntaxColors,
     actions: SettingsActions,
@@ -537,7 +547,7 @@ private fun buildSettingsLines(
 
     add(keyOpenLine("editor", 1, syntax))
     add(boolLine("line_numbers", settings.editor.lineNumbers, comma = true,
-        hint = "// click to toggle", syntax = syntax,
+        hint = "// " + resources.getString(R.string.note_click_toggle), syntax = syntax,
         onClickLabel = changeLabel("line_numbers")) {
         actions.onLineNumbers(!settings.editor.lineNumbers)
     })
@@ -556,9 +566,9 @@ private fun buildSettingsLines(
         // With a goal set the hint says how to switch the check off; with none
         // it names the number the JSON is offering, so the two files agree.
         hint = if (settings.dailyGoalSteps > 0) {
-            "// 0 disables the check"
+            "// " + resources.getString(R.string.note_goal_disable)
         } else {
-            "// no check · $SUGGESTED_DAILY_GOAL_STEPS suggested"
+            "// " + resources.getString(R.string.note_goal_suggested, SUGGESTED_DAILY_GOAL_STEPS)
         },
         field = NumericField.GOAL,
         syntax = syntax,
@@ -579,7 +589,7 @@ private fun buildSettingsLines(
     // buys and how honest it can be about boundaries.
     add(keyOpenLine("sessions", 1, syntax))
     add(boolLine("auto_detect", settings.autoDetectSessions, comma = false,
-        hint = "// infers walks from the counter, ~15 min grid", syntax = syntax,
+        hint = "// " + resources.getString(R.string.note_auto_detect), syntax = syntax,
         onClickLabel = changeLabel("auto_detect")) {
         actions.onAutoDetect(!settings.autoDetectSessions)
     })
@@ -591,7 +601,7 @@ private fun buildSettingsLines(
         renderedValue = settings.weightKg?.let { formatWeight(it) } ?: "null",
         isNull = settings.weightKg == null,
         comma = true,
-        hint = "// empty hides active_kcal",
+        hint = "// " + resources.getString(R.string.note_weight_hides),
         field = NumericField.WEIGHT,
         syntax = syntax,
         changeLabel = changeLabel,
@@ -612,9 +622,11 @@ private fun buildSettingsLines(
         // The file must not lie: with a measured stride set, height no longer
         // feeds the distance estimate, and the hint has to say so.
         hint = if (settings.strideCm != null) {
-            "// unused: stride_cm overrides it"
+            "// " + resources.getString(R.string.note_height_unused)
         } else {
-            "// empty uses the 0.72 m stride"
+            // The stride itself is a measurement and comes through the sentence
+            // unchanged; only the words around it are the reader's.
+            "// " + resources.getString(R.string.note_stride_empty, "0.72 m")
         },
         field = NumericField.HEIGHT,
         syntax = syntax,
@@ -633,7 +645,7 @@ private fun buildSettingsLines(
         renderedValue = settings.strideCm?.toString() ?: "null",
         isNull = settings.strideCm == null,
         comma = false,
-        hint = "// measured stride, beats height_cm",
+        hint = "// " + resources.getString(R.string.note_stride_measured),
         field = NumericField.STRIDE,
         syntax = syntax,
         changeLabel = changeLabel,
@@ -729,14 +741,14 @@ private fun buildSettingsLines(
     add(punctLine("},", 1, syntax))
 
     add(keyOpenLine("notifications", 1, syntax))
-    add(notifStatusLine(notifState, syntax, notifLabel, onNotifLine))
+    add(notifStatusLine(resources, notifState, syntax, notifLabel, onNotifLine))
     add(boolLine("daily_commit", settings.notifications.dailyCommit, comma = true,
-        hint = "// the closed day's commit message", syntax = syntax,
+        hint = "// " + resources.getString(R.string.note_commit_message), syntax = syntax,
         onClickLabel = changeLabel("daily_commit")) {
         actions.onDailyCommit(!settings.notifications.dailyCommit)
     })
     add(boolLine("goal_check", settings.notifications.goalCheck, comma = false,
-        hint = "// once per day, when the check passes", syntax = syntax,
+        hint = "// " + resources.getString(R.string.note_goal_notify), syntax = syntax,
         onClickLabel = changeLabel("goal_check")) {
         actions.onGoalCheck(!settings.notifications.goalCheck)
     })
@@ -746,14 +758,14 @@ private fun buildSettingsLines(
     // are the plain-language explanation required BEFORE any permission request
     // — and where the HC rationale intents land.
     add(keyOpenLine("health_connect", 1, syntax))
-    add(commentLine("// on-device interop with other health apps — no network", syntax, indent = 2))
-    add(commentLine("// writes: hourly steps + walk sessions · reads: their steps", syntax, indent = 2))
-    add(commentLine("// external steps are shown, never added to yours", syntax, indent = 2))
+    add(commentLine("// " + resources.getString(R.string.note_hc_interop), syntax, indent = 2))
+    add(commentLine("// " + resources.getString(R.string.note_hc_writes), syntax, indent = 2))
+    add(commentLine("// " + resources.getString(R.string.note_hc_external), syntax, indent = 2))
     when (hcStatus.availability) {
         HcAvailability.UNAVAILABLE -> add(
             CodeLine(
                 AnnotatedString(
-                    "// E: Health Connect is not available on this device",
+                    "// E: " + resources.getString(R.string.note_hc_unavailable),
                     SpanStyle(color = syntax.diffDel)
                 ),
                 indent = 2
@@ -762,7 +774,7 @@ private fun buildSettingsLines(
         HcAvailability.UPDATE_REQUIRED -> add(
             CodeLine(
                 AnnotatedString(
-                    "// E: Health Connect needs an update — tap to open",
+                    "// E: " + resources.getString(R.string.note_hc_update),
                     SpanStyle(color = syntax.diffDel)
                 ),
                 indent = 2,
@@ -774,14 +786,19 @@ private fun buildSettingsLines(
             if (settings.healthConnect.sync) {
                 if (hcStatus.anyGranted) {
                     val verbs = listOfNotNull(
-                        "writes steps".takeIf { hcStatus.writeSteps },
-                        "writes sessions".takeIf { hcStatus.writeSessions },
-                        "reads other apps".takeIf { hcStatus.readSteps }
+                        resources.getString(R.string.note_hc_writes_steps)
+                            .takeIf { hcStatus.writeSteps },
+                        resources.getString(R.string.note_hc_writes_sessions)
+                            .takeIf { hcStatus.writeSessions },
+                        resources.getString(R.string.note_hc_reads_others)
+                            .takeIf { hcStatus.readSteps }
                     ).joinToString(" · ")
                     add(
                         CodeLine(
                             AnnotatedString(
-                                "// connected: $verbs",
+                                "// " + resources.getString(
+                                    R.string.note_hc_connected, verbs
+                                ),
                                 SpanStyle(color = syntax.comment.copy(alpha = 0.6f))
                             ),
                             indent = 2
@@ -791,7 +808,7 @@ private fun buildSettingsLines(
                     add(
                         CodeLine(
                             AnnotatedString(
-                                "// ERROR: no permission granted — tap to grant",
+                                "// ERROR: " + resources.getString(R.string.note_err_no_permission),
                                 SpanStyle(color = syntax.diffDel)
                             ),
                             indent = 2,
@@ -802,7 +819,7 @@ private fun buildSettingsLines(
                 }
             }
             add(boolLine("sync", settings.healthConnect.sync, comma = false,
-                hint = "// asks Health Connect first", syntax = syntax,
+                hint = "// " + resources.getString(R.string.note_hc_asks_first), syntax = syntax,
                 onClickLabel = changeLabel("sync")) {
                 actions.onHealthConnect(!settings.healthConnect.sync)
             })
@@ -840,7 +857,7 @@ private fun buildSettingsLines(
     // Fase 13: the archive as two commands, printing their own output right
     // below like any shell would. Non-destructive, so no confirm to arm.
     add(punctLine("", 0, syntax))
-    add(commentLine("// your data, yours to keep (written to Downloads/):", syntax))
+    add(commentLine("// " + resources.getString(R.string.note_export_intro), syntax))
     ExportFormat.entries.forEach { format ->
         add(
             CodeLine(
@@ -854,12 +871,12 @@ private fun buildSettingsLines(
             )
         )
     }
-    addAll(exportOutputLines(exportState, syntax))
+    addAll(exportOutputLines(resources, exportState, syntax))
 
     // Terminal prompt below the buffer: factory reset as a git command. First tap
     // arms it (confirm hint in diff-deletion red), second tap runs it.
     add(punctLine("", 0, syntax))
-    add(commentLine("// restore defaults (discards local changes):", syntax))
+    add(commentLine("// " + resources.getString(R.string.note_restore_defaults), syntax))
     add(
         CodeLine(
             text = buildAnnotatedString {
@@ -867,7 +884,7 @@ private fun buildSettingsLines(
                 append("git restore settings.config")
                 if (resetArmed) {
                     withStyle(SpanStyle(color = syntax.diffDel)) {
-                        append("  // tap again to confirm")
+                        append("  // " + resources.getString(R.string.note_tap_again))
                     }
                 }
             },
@@ -885,13 +902,14 @@ private fun buildSettingsLines(
  * answer, not a failure, so it stays a plain comment.
  */
 private fun exportOutputLines(
+    resources: Resources,
     state: ExportState,
     syntax: SyntaxColors
 ): List<CodeLine> = when (state) {
     ExportState.Idle -> emptyList()
     ExportState.Running -> listOf(
         CodeLine(
-            AnnotatedString("// writing…", SpanStyle(color = syntax.comment)),
+            AnnotatedString("// " + resources.getString(R.string.note_writing), SpanStyle(color = syntax.comment)),
             indent = 0
         )
     )
@@ -901,7 +919,7 @@ private fun exportOutputLines(
                 add(
                     CodeLine(
                         AnnotatedString(
-                            "// wrote Downloads/$name",
+                            "// " + resources.getString(R.string.note_wrote, name),
                             SpanStyle(color = syntax.diffAdd)
                         ),
                         indent = 0
@@ -921,7 +939,7 @@ private fun exportOutputLines(
         ExportResult.Empty -> listOf(
             CodeLine(
                 AnnotatedString(
-                    "// nothing to export yet",
+                    "// " + resources.getString(R.string.note_export_pending),
                     SpanStyle(color = syntax.comment)
                 ),
                 indent = 0
@@ -930,7 +948,8 @@ private fun exportOutputLines(
         is ExportResult.Failed -> listOf(
             CodeLine(
                 AnnotatedString(
-                    "// ERROR: ${result.message}",
+                    "// ERROR: " +
+                        resources.getString(R.string.note_export_failed, result.message),
                     SpanStyle(color = syntax.diffDel)
                 ),
                 indent = 0
@@ -1042,6 +1061,7 @@ private fun MutableList<CanvasLine>.addNumericLine(
  * states are tappable: grant, or the system app settings permanently denied.
  */
 private fun notifStatusLine(
+    resources: Resources,
     state: NotifLineState,
     syntax: SyntaxColors,
     onClickLabel: String,
@@ -1049,14 +1069,14 @@ private fun notifStatusLine(
 ): CodeLine {
     val (text, color) = when (state) {
         NotifLineState.Disabled ->
-            "// notifications disabled" to syntax.comment.copy(alpha = 0.6f)
+            "// " + resources.getString(R.string.note_notif_disabled) to syntax.comment.copy(alpha = 0.6f)
         NotifLineState.Armed ->
-            "// rides the midnight rollover and the step sync" to
+            "// " + resources.getString(R.string.note_notif_rides) to
                 syntax.comment.copy(alpha = 0.6f)
         NotifLineState.MissingPermission ->
-            "// ERROR: notifications permission missing — tap to grant" to syntax.diffDel
+            "// ERROR: " + resources.getString(R.string.note_err_notif_missing) to syntax.diffDel
         NotifLineState.DeniedPermanently ->
-            "// ERROR: denied — open system settings" to syntax.diffDel
+            "// ERROR: " + resources.getString(R.string.note_err_denied) to syntax.diffDel
     }
     val clickable = state == NotifLineState.MissingPermission ||
         state == NotifLineState.DeniedPermanently
