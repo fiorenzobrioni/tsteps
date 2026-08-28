@@ -6,6 +6,24 @@ All notable changes to tsteps are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The app now speaks Italian where it is talking to you, and keeps English where it
+  is showing you the file. What decides is the register, not the punctuation around
+  it: JSON keys, filenames, `$` commands, git chrome and the goal check lines stay
+  English, while every comment line that is a sentence follows the reader. A line
+  can hold both, and then the tokens stay put and the words around them move
+  (`// ERROR: esportazione fallita — Downloads is not writable`). This replaces the
+  old rule that kept every `//` comment English, which mistook the channel for the
+  register and left the app more English than `git` itself: under `LANG=it_IT`,
+  `git status` says "Sul branch main" and still never translates `commit`.
+- The `$ tsteps track` controls say `[ ^Z pausa ]` and `[ ^C ferma ]` in Italian.
+  The shell glyph is the token and never moves; the word beside it is there to
+  explain the glyph, so it has to be in a language the reader has.
+- A failed export now says what happened in your own language and prints the
+  system's error after it as the evidence: `// ERROR: esportazione fallita — …`.
+  What broke usually arrives as an errno that nothing can translate.
+
 ### Added
 
 - `$ tsteps init`: the first run now explains why the app needs the physical-activity

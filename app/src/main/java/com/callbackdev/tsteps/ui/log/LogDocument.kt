@@ -1,9 +1,11 @@
 package com.callbackdev.tsteps.ui.log
 
+import android.content.res.Resources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
 import com.callbackdev.tsteps.domain.SessionItem
@@ -50,6 +52,7 @@ object LogDocument {
     const val AUTHOR = "you@tsteps.app"
 
     fun build(
+        resources: Resources,
         today: UncommittedToday?,
         days: List<CommitDay>,
         expanded: Set<LocalDate>,
@@ -67,8 +70,8 @@ object LogDocument {
         val dayName = DateTimeFormatter.ofPattern("EEE", locale)
 
         if (today != null) {
-            add(commentLine("# On branch main", syntax))
-            add(commentLine("# Changes not yet committed (today)", syntax))
+            add(commentLine("# " + resources.getString(R.string.note_branch), syntax))
+            add(commentLine("# " + resources.getString(R.string.note_uncommitted), syntax))
             add(
                 commentLine(
                     "#   ${numbers.format(today.steps)} steps · " +
@@ -84,7 +87,7 @@ object LogDocument {
 
         if (days.isEmpty()) {
             add(blank())
-            add(commentLine("// no commits yet — the first day commits at midnight", syntax))
+            add(commentLine("// " + resources.getString(R.string.note_no_commits), syntax))
             return@buildList
         }
 

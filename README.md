@@ -374,9 +374,13 @@ JetBrains Mono everywhere, a 4px baseline grid, no drop shadows: depth comes fro
 The app icon is the series brand mark: two footprints mid-stride between curly
 braces, where tweather keeps its cloud.
 
-English and Italian, following the system per-app language. The rule is that
-"code" stays English (JSON keys, filenames, `//` comments, terminal output) while
-the chrome and the data values are translated.
+English and Italian, following the system per-app language. What decides the
+language is the register, not the punctuation around it. Code stays English: JSON
+keys, filenames, `$` commands, git chrome, the goal check lines. Data and prose
+follow the reader, and that includes the comment lines that are sentences: a `//`
+in front of an explanation is the file's syntax, not a claim about the language
+behind it. It is what a localized toolchain looks like (under `LANG=it_IT` `git
+status` says "Sul branch main" and still never translates `commit`).
 
 ---
 

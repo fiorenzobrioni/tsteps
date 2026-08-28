@@ -1,5 +1,6 @@
 package com.callbackdev.tsteps.ui.steps
 
+import com.callbackdev.tsteps.R
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -34,7 +35,9 @@ class SessionBoundsInputTest {
     @Test
     fun `anything that is not a range is rejected with the expected shape`() {
         val invalid = parse("09:32-10:18") as SessionBounds.Invalid
-        assertEquals("// ERROR: expected HH:mm..HH:mm", invalid.error)
+        assertEquals(R.string.note_err_expected_range, invalid.id)
+        // The shape is the hunk header's own syntax: an argument, never translated.
+        assertEquals(listOf(SessionBoundsInput.FORMAT), invalid.args)
         assertTrue(parse("") is SessionBounds.Invalid)
         assertTrue(parse("banana") is SessionBounds.Invalid)
     }
@@ -48,13 +51,13 @@ class SessionBoundsInputTest {
     @Test
     fun `the end must follow the start - no midnight crossing`() {
         val invalid = parse("10:18..09:32") as SessionBounds.Invalid
-        assertEquals("// ERROR: the end must follow the start", invalid.error)
+        assertEquals(R.string.note_err_end_before_start, invalid.id)
         assertTrue(parse("10:00..10:00") is SessionBounds.Invalid)
     }
 
     @Test
     fun `the end cannot sit in the future`() {
         val invalid = parse("11:00..13:00") as SessionBounds.Invalid
-        assertEquals("// ERROR: the end is in the future", invalid.error)
+        assertEquals(R.string.note_err_end_future, invalid.id)
     }
 }

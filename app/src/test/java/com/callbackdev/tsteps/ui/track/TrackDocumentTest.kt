@@ -15,8 +15,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 
+@RunWith(RobolectricTestRunner::class)
 class TrackDocumentTest {
+
+    private val resources =
+        ApplicationProvider.getApplicationContext<Context>().resources
 
     private val syntax = ObsidianSyntax
     private val rome = ZoneId.of("Europe/Rome")
@@ -45,6 +54,7 @@ class TrackDocumentTest {
         metric: SessionMetric = SessionMetric.SPEED,
         stopArmed: Boolean = false
     ) = TrackDocument.build(
+        resources,
         state, nowMillis, UnitsSystem.METRIC, metric, Locale.ENGLISH, rome, syntax, stopArmed
     )
 
@@ -99,4 +109,23 @@ class TrackDocumentTest {
         assertEquals(syntax.diffDel, confirm.text.spanStyles.first().item.color)
         assertTrue(lines.filterIsInstance<CodeLine>().none { it.text.text.contains("tracking…") })
     }
+
+    /**
+     * The shell tokens are what the reader has to press; the words around them
+     * are what tell them why. So `^C` and `fg` come through both languages
+     * unchanged and everything else moves.
+     */
+    @Test
+    @Config(qualifiers = "it")
+    fun `in Italian the shell tokens survive and the words move`() {
+        val running = build()
+        running.lineWith("$ tsteps track walk")
+        val status = running.lineWith("^C").text.text
+        assertTrue(status, status.contains("traccio…"))
+        assertTrue(status, !status.contains("tracking…"))
+
+        val armed = build(stopArmed = true).lineWith("// tocca di nuovo ^C per fermare")
+        assertTrue(armed.text.text.contains("^C"))
+    }
+
 }

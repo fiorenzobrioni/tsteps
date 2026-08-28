@@ -1,5 +1,6 @@
 package com.callbackdev.tsteps.ui.settings
 
+import com.callbackdev.tsteps.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,14 +21,20 @@ class SettingsInputTest {
         assertEquals(NumericInput.Value(175.0), parseNumericInput(NumericField.HEIGHT, "175"))
     }
 
+    /**
+     * The range travels as the sentence's argument, not baked into it: the
+     * numbers are code (they line up with the value the file prints) and the
+     * sentence around them is the reader's language, added by the screen.
+     */
     @Test
-    fun `out of range is rejected with the range in the error`() {
-        val goal = parseNumericInput(NumericField.GOAL, "100001")
-        assertTrue(goal is NumericInput.Invalid && goal.error.contains("0..100000"))
-        val weight = parseNumericInput(NumericField.WEIGHT, "10")
-        assertTrue(weight is NumericInput.Invalid && weight.error.contains("20..300"))
-        val height = parseNumericInput(NumericField.HEIGHT, "90")
-        assertTrue(height is NumericInput.Invalid && height.error.contains("100..250"))
+    fun `out of range is rejected with the range as the error's argument`() {
+        val goal = parseNumericInput(NumericField.GOAL, "100001") as NumericInput.Invalid
+        assertEquals(R.string.note_err_expected_range, goal.id)
+        assertEquals(listOf("0..100000"), goal.args)
+        val weight = parseNumericInput(NumericField.WEIGHT, "10") as NumericInput.Invalid
+        assertEquals(listOf("20..300 kg"), weight.args)
+        val height = parseNumericInput(NumericField.HEIGHT, "90") as NumericInput.Invalid
+        assertEquals(listOf("100..250 cm"), height.args)
     }
 
     @Test
@@ -38,8 +45,9 @@ class SettingsInputTest {
 
     @Test
     fun `garbage is not a number`() {
-        val result = parseNumericInput(NumericField.WEIGHT, "7f.2")
-        assertTrue(result is NumericInput.Invalid && result.error.contains("not a number"))
+        val result = parseNumericInput(NumericField.WEIGHT, "7f.2") as NumericInput.Invalid
+        assertEquals(R.string.note_err_not_a_number, result.id)
+        assertTrue(result.args.isEmpty())
     }
 
     @Test

@@ -24,6 +24,113 @@
      channel for the register. Decided, NOT yet implemented: the comment strings are
      still hardcoded English in the Kotlin sources. -->
 <resources>
+
+    <!-- THE COMMENT CHANNEL (Fase 20). The register rule: a comment line that is
+         a SENTENCE addressed to the reader is prose and localizes; a comment that
+         is a readout (a count, a time, a value list) or a marker is code and stays
+         English, wherever it sits. Tokens inside a localized line survive it: JSON
+         keys, file names, `ERROR:`, `E:`, `commit`, ranges and formats. What stays
+         English on purpose: the file banners, `// Last modified:`, `// active`,
+         the value lists (`// metric | imperial`), the licence, `# stale`,
+         `# last_sync:` and `# last walk:` (its sibling label), `// %02d..%02d`,
+         and `stats.md`'s headings, which are the file's structure. -->
+
+    <!-- steps_data.json -->
+    <string name="note_no_sensor">no step sensor on this device</string>
+    <string name="note_no_sensor_passive">passive counting is unavailable</string>
+    <string name="note_no_permission">ACTIVITY_RECOGNITION permission not granted</string>
+    <string name="note_on_device">tsteps reads the step counter on-device: no GPS, no network</string>
+    <string name="note_tap_set_goal">tap to set %1$d</string>
+    <string name="note_estimated_stride">estimated from stride length</string>
+    <string name="note_estimated_cadence">estimated at 100 steps/min</string>
+    <string name="note_kcal_formula">MET × weight × active time</string>
+    <string name="note_kcal_needs_weight">active_kcal: set profile.weight_kg to enable</string>
+    <string name="note_tap_edit">tap to edit</string>
+    <string name="note_inferred">inferred — ~times are approximate</string>
+    <string name="note_tap_again_remove">tap again to remove</string>
+    <string name="note_external_steps">other apps\' steps — shown, never added</string>
+
+    <!-- steps_history.diff and week.diff. `git status` translates its sentences
+         and keeps `branch`, `main` and `commit`: so does this. -->
+    <string name="note_branch">On branch main</string>
+    <string name="note_uncommitted">Changes not yet committed (today)</string>
+    <string name="note_no_commits">no commits yet — the first day commits at midnight</string>
+    <string name="note_week_no_commits">nothing to compare: week %1$s has no commits</string>
+    <string name="note_week_no_history">nothing to compare: no history yet</string>
+    <string name="note_week_need_two">two consecutive weeks are needed</string>
+    <string name="note_week_in_progress">week %1$s in progress: %2$d of %3$d days</string>
+
+    <!-- stats.md -->
+    <string name="note_stats_empty_1">nothing committed yet — records and averages</string>
+    <string name="note_stats_empty_2">appear with the first day\'s commit</string>
+    <string name="note_stats_computed">computed on read from %1$d committed days</string>
+
+    <!-- settings.config -->
+    <string name="note_click_toggle">click to toggle</string>
+    <string name="note_goal_disable">0 disables the check</string>
+    <string name="note_goal_suggested">no check · %1$d suggested</string>
+    <string name="note_auto_detect">infers walks from the counter, ~15 min grid</string>
+    <string name="note_weight_hides">empty hides active_kcal</string>
+    <string name="note_height_unused">unused: stride_cm overrides it</string>
+    <string name="note_stride_empty">empty uses the %1$s stride</string>
+    <string name="note_stride_measured">measured stride, beats height_cm</string>
+    <string name="note_commit_message">the closed day\'s commit message</string>
+    <string name="note_goal_notify">once per day, when the check passes</string>
+    <string name="note_hc_interop">on-device interop with other health apps — no network</string>
+    <string name="note_hc_writes">writes: hourly steps + walk sessions · reads: their steps</string>
+    <string name="note_hc_external">external steps are shown, never added to yours</string>
+    <string name="note_hc_unavailable">Health Connect is not available on this device</string>
+    <string name="note_hc_update">Health Connect needs an update — tap to open</string>
+    <!-- What Health Connect is actually doing right now, listed after
+         `// connected:`. Verbs, so the reader\'s. -->
+    <string name="note_hc_writes_steps">writes steps</string>
+    <string name="note_hc_writes_sessions">writes sessions</string>
+    <string name="note_hc_reads_others">reads other apps</string>
+
+    <string name="note_hc_connected">connected: %1$s</string>
+    <string name="note_hc_asks_first">asks Health Connect first</string>
+    <string name="note_err_no_permission">no permission granted — tap to grant</string>
+    <string name="note_export_intro">your data, yours to keep (written to Downloads/):</string>
+    <string name="note_tap_again">tap again to confirm</string>
+    <string name="note_export_pending">nothing to export yet</string>
+    <string name="note_writing">writing…</string>
+    <string name="note_wrote">wrote Downloads/%1$s</string>
+    <string name="note_export_failed">export failed — %1$s</string>
+    <string name="note_restore_defaults">restore defaults (discards local changes):</string>
+    <string name="note_notif_disabled">notifications disabled</string>
+    <string name="note_notif_rides">rides the midnight rollover and the step sync</string>
+    <string name="note_err_notif_missing">notifications permission missing — tap to grant</string>
+    <string name="note_err_denied">denied — open system settings</string>
+
+    <!-- What the reader typed wrong. `ERROR:` is the level and stays outside;
+         the ranges and the `HH:mm` pattern are formats and come through. -->
+    <string name="note_err_not_a_number">not a number</string>
+    <string name="note_err_expected_range">expected %1$s</string>
+    <string name="note_err_not_a_time">not a time of day</string>
+    <string name="note_err_end_before_start">the end must follow the start</string>
+    <string name="note_err_end_future">the end is in the future</string>
+
+    <!-- $ tsteps track -->
+    <string name="note_tap_stop">tap ^C again to stop</string>
+    <string name="note_tracking">tracking… (^C to stop)</string>
+    <string name="note_paused">paused… (fg to resume)</string>
+
+    <!-- The word beside each shell glyph on the track controls. The glyph is
+         the shell's (^Z, fg, ^C) and never moves; the word is there to explain
+         it (device feedback, PLANNING Fase 8), so it speaks the reader's
+         language or it explains nothing. -->
+    <string name="track_verb_pause">pause</string>
+    <string name="track_verb_resume">resume</string>
+    <string name="track_verb_stop">stop</string>
+    <string name="note_no_process">no process running</string>
+
+    <!-- The home widget -->
+    <string name="note_widget_no_data_yet">no data yet — open tsteps</string>
+    <string name="note_widget_no_data">no data</string>
+    <string name="note_widget_sensor_off_long">sensor off — open tsteps</string>
+    <string name="note_widget_sensor_off">sensor off</string>
+    <string name="note_widget_steps_today">steps today</string>
+
     <string name="app_name" translatable="false">tsteps</string>
 
     <!-- Bottom navigation -->

@@ -15,6 +15,109 @@
      (// ERROR: permesso negato). Decisa, NON ancora implementata: i commenti sono
      ancora inglesi hardcoded nei sorgenti. -->
 <resources>
+
+    <!-- IL CANALE DEI COMMENTI (Fase 20). Regola dei registri: una riga di
+         commento che è una FRASE rivolta al lettore è prosa e si localizza; un
+         commento che è una lettura (un conteggio, un orario, una lista di valori)
+         o un marcatore è codice e resta inglese, ovunque stia. I token dentro una
+         riga localizzata sopravvivono: chiavi JSON, nomi file, ERROR:, E:, commit,
+         intervalli e formati. Restano inglesi apposta: le intestazioni dei file,
+         // Last modified:, // active, le liste di valori, la licenza, # stale,
+         # last_sync: e # last walk: (l\'etichetta gemella), // %02d..%02d, e gli
+         heading di stats.md, che sono la struttura del file. -->
+
+    <!-- steps_data.json -->
+    <string name="note_no_sensor">nessun sensore di passi su questo dispositivo</string>
+    <string name="note_no_sensor_passive">il conteggio passivo non è disponibile</string>
+    <string name="note_no_permission">permesso ACTIVITY_RECOGNITION non concesso</string>
+    <string name="note_on_device">tsteps legge il contapassi sul dispositivo: niente GPS, niente rete</string>
+    <string name="note_tap_set_goal">tocca per impostare %1$d</string>
+    <string name="note_estimated_stride">stimata dalla lunghezza del passo</string>
+    <string name="note_estimated_cadence">stimati a 100 passi/min</string>
+    <string name="note_kcal_formula">MET × peso × tempo attivo</string>
+    <string name="note_kcal_needs_weight">active_kcal: imposta profile.weight_kg per attivarlo</string>
+    <string name="note_tap_edit">tocca per modificare</string>
+    <string name="note_inferred">dedotta — gli orari ~ sono approssimativi</string>
+    <string name="note_tap_again_remove">tocca di nuovo per rimuovere</string>
+    <string name="note_external_steps">i passi di altre app — mostrati, mai sommati</string>
+
+    <!-- steps_history.diff e week.diff. git status traduce le sue frasi e tiene
+         branch, main e commit: qui si fa lo stesso. -->
+    <string name="note_branch">Sul branch main</string>
+    <string name="note_uncommitted">Modifiche non ancora committate (oggi)</string>
+    <string name="note_no_commits">nessun commit — il primo giorno viene committato a mezzanotte</string>
+    <string name="note_week_no_commits">niente da confrontare: la settimana %1$s non ha commit</string>
+    <string name="note_week_no_history">niente da confrontare: non c\'è ancora storia</string>
+    <string name="note_week_need_two">servono due settimane consecutive</string>
+    <string name="note_week_in_progress">settimana %1$s in corso: %2$d giorni su %3$d</string>
+
+    <!-- stats.md -->
+    <string name="note_stats_empty_1">ancora nessun commit — record e medie</string>
+    <string name="note_stats_empty_2">compaiono col commit del primo giorno</string>
+    <string name="note_stats_computed">calcolato alla lettura su %1$d giorni committati</string>
+
+    <!-- settings.config -->
+    <string name="note_click_toggle">tocca per cambiare</string>
+    <string name="note_goal_disable">0 disattiva il check</string>
+    <string name="note_goal_suggested">nessun check · %1$d suggeriti</string>
+    <string name="note_auto_detect">deduce le camminate dal contapassi, griglia ~15 min</string>
+    <string name="note_weight_hides">vuoto nasconde active_kcal</string>
+    <string name="note_height_unused">inutilizzata: stride_cm ha la precedenza</string>
+    <string name="note_stride_empty">vuoto usa il passo da %1$s</string>
+    <string name="note_stride_measured">passo misurato, batte height_cm</string>
+    <string name="note_commit_message">il messaggio di commit del giorno chiuso</string>
+    <string name="note_goal_notify">una volta al giorno, quando il check passa</string>
+    <string name="note_hc_interop">scambio dati sul dispositivo con altre app di salute — niente rete</string>
+    <string name="note_hc_writes">scrive: passi orari + sessioni di camminata · legge: i loro passi</string>
+    <string name="note_hc_external">i passi esterni sono mostrati, mai sommati ai tuoi</string>
+    <string name="note_hc_unavailable">Health Connect non è disponibile su questo dispositivo</string>
+    <string name="note_hc_update">Health Connect va aggiornato — tocca per aprire</string>
+    <!-- Cosa sta facendo davvero Health Connect adesso, elencato dopo
+         `// connected:`. Sono verbi, quindi del lettore. -->
+    <string name="note_hc_writes_steps">scrive i passi</string>
+    <string name="note_hc_writes_sessions">scrive le sessioni</string>
+    <string name="note_hc_reads_others">legge le altre app</string>
+
+    <string name="note_hc_connected">connesso: %1$s</string>
+    <string name="note_hc_asks_first">chiede prima a Health Connect</string>
+    <string name="note_err_no_permission">nessun permesso concesso — tocca per concederlo</string>
+    <string name="note_export_intro">i tuoi dati, tuoi da tenere (scritti in Downloads/):</string>
+    <string name="note_tap_again">tocca di nuovo per confermare</string>
+    <string name="note_export_pending">non c\'è ancora niente da esportare</string>
+    <string name="note_writing">scrivo…</string>
+    <string name="note_wrote">scritto in Downloads/%1$s</string>
+    <string name="note_export_failed">esportazione fallita — %1$s</string>
+    <string name="note_restore_defaults">ripristina i valori predefiniti (scarta le modifiche locali):</string>
+    <string name="note_notif_disabled">notifiche disattivate</string>
+    <string name="note_notif_rides">va col cambio giorno di mezzanotte e la sincronizzazione dei passi</string>
+    <string name="note_err_notif_missing">manca il permesso per le notifiche — tocca per concederlo</string>
+    <string name="note_err_denied">negato — apri le impostazioni di sistema</string>
+
+    <!-- Cosa ha sbagliato a scrivere il lettore. ERROR: è il livello e resta
+         fuori; gli intervalli e il formato HH:mm passano attraverso. -->
+    <string name="note_err_not_a_number">non è un numero</string>
+    <string name="note_err_expected_range">atteso %1$s</string>
+    <string name="note_err_not_a_time">non è un\'ora del giorno</string>
+    <string name="note_err_end_before_start">la fine deve venire dopo l\'inizio</string>
+    <string name="note_err_end_future">la fine è nel futuro</string>
+
+    <!-- $ tsteps track -->
+    <string name="note_tap_stop">tocca di nuovo ^C per fermare</string>
+    <string name="note_tracking">traccio… (^C per fermare)</string>
+    <string name="note_paused">in pausa… (fg per riprendere)</string>
+
+    <string name="track_verb_pause">pausa</string>
+    <string name="track_verb_resume">riprendi</string>
+    <string name="track_verb_stop">ferma</string>
+    <string name="note_no_process">nessun processo in esecuzione</string>
+
+    <!-- Il widget -->
+    <string name="note_widget_no_data_yet">ancora nessun dato — apri tsteps</string>
+    <string name="note_widget_no_data">nessun dato</string>
+    <string name="note_widget_sensor_off_long">sensore spento — apri tsteps</string>
+    <string name="note_widget_sensor_off">sensore spento</string>
+    <string name="note_widget_steps_today">passi oggi</string>
+
     <!-- Bottom navigation. "Editor" e "Log" anche in italiano (termini da IDE,
          stessa scelta di tweather); "Stats" resta perché "Statistiche" non sta
          nella label-sm della nav senza troncarsi. -->

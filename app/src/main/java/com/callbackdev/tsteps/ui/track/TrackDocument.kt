@@ -1,9 +1,11 @@
 package com.callbackdev.tsteps.ui.track
 
+import android.content.res.Resources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.SessionMetric
 import com.callbackdev.tsteps.data.TrackingState
 import com.callbackdev.tsteps.data.TranscriptEntry
@@ -30,6 +32,7 @@ import java.util.Locale
 object TrackDocument {
 
     fun build(
+        resources: Resources,
         state: TrackingState,
         nowMillis: Long,
         units: UnitsSystem,
@@ -59,9 +62,9 @@ object TrackDocument {
         add(
             commentLine(
                 when {
-                    stopArmed -> "// tap ^C again to stop"
-                    session.paused -> "paused… (fg to resume)"
-                    else -> "tracking… (^C to stop)"
+                    stopArmed -> "// " + resources.getString(R.string.note_tap_stop)
+                    session.paused -> resources.getString(R.string.note_paused)
+                    else -> resources.getString(R.string.note_tracking)
                 },
                 syntax
             ).let { line ->

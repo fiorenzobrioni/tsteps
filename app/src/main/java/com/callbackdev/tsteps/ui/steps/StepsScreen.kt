@@ -183,7 +183,9 @@ fun StepsScreen(
                     editingSessionId = null
                     editError = null
                 }
-                is SessionBounds.Invalid -> editError = parsed.error
+                is SessionBounds.Invalid ->
+                    editError = "// ERROR: " +
+                        resources.getString(parsed.id, *parsed.args.toTypedArray())
             }
         },
         onCancelEdit = { editingSessionId = null },
@@ -227,6 +229,7 @@ fun StepsScreen(
         } ?: emptyList()
         head + when (activeFile) {
             MainEditorFile.JSON -> StepsDocument.build(
+                resources = resources,
                 snapshot = state.snapshot,
                 status = state.status,
                 units = state.units,

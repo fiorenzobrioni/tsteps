@@ -13,9 +13,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 
 /** `week.diff` line by line: the shape of the diff, and what it refuses to claim. */
+@RunWith(RobolectricTestRunner::class)
 class WeekDiffDocumentTest {
+
+    private val resources =
+        ApplicationProvider.getApplicationContext<Context>().resources
 
     private val syntax = ObsidianSyntax
     private val tuesday = LocalDate.parse("2026-08-18") // ISO week 34, day 2
@@ -39,6 +48,7 @@ class WeekDiffDocumentTest {
         days: List<WeekDay>? = days(),
         units: UnitsSystem = UnitsSystem.METRIC
     ) = WeekDiffDocument.build(
+        resources = resources,
         comparison = days?.let { WeekDiff.of(it, tuesday) },
         units = units,
         locale = Locale.ENGLISH,
@@ -185,6 +195,7 @@ class WeekDiffDocumentTest {
     @Test
     fun `a week straddling two months spells out both`() {
         val lines = WeekDiffDocument.build(
+            resources = resources,
             comparison = WeekDiff.of(
                 (0..6).map {
                     day(LocalDate.parse("2026-08-24").plusDays(it.toLong()).toString(), 7_000)
@@ -197,4 +208,24 @@ class WeekDiffDocumentTest {
         )
         lines.lineWith("+++ b/week 36   aug 31..sep 6")
     }
+
+    /**
+     * The week number is an argument, not part of the sentence: it is the same
+     * number the `+++` header prints, so it survives the translation unchanged.
+     * The header itself does not move at all — it is git's line and its columns
+     * are aligned against each other.
+     */
+    @Test
+    @Config(qualifiers = "it")
+    fun `in Italian the week number survives the translated sentence`() {
+        val lines = build()
+        val note = lines.filterIsInstance<CodeLine>()
+            .first { it.text.text.startsWith("// ") }.text.text
+        assertTrue(note, note.contains("settimana 34 in corso"))
+        assertTrue(note, note.contains("giorni"))
+        assertTrue(note, !note.contains("in progress"))
+        // git's own header, columns and all.
+        assertTrue(lines.texts().any { it.startsWith("+++ b/week 34") })
+    }
+
 }

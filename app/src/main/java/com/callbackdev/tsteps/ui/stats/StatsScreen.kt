@@ -60,8 +60,9 @@ fun StatsScreen(
     val syntax = TstepsTheme.syntax
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
-    val lines = remember(state, syntax, locale) {
+    val lines = remember(state, syntax, locale, resources) {
         StatsDocument.build(
+            resources = resources,
             grid = state.grid,
             streak = state.streak,
             averages = state.averages,

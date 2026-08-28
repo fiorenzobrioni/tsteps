@@ -14,8 +14,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
 
+@RunWith(RobolectricTestRunner::class)
 class LogDocumentTest {
+
+    private val resources =
+        ApplicationProvider.getApplicationContext<Context>().resources
 
     private val syntax = ObsidianSyntax
     private val rome = ZoneId.of("Europe/Rome")
@@ -75,6 +84,7 @@ class LogDocumentTest {
         sessionsByDate: Map<LocalDate, List<SessionItem>> = emptyMap(),
         onToggle: (LocalDate) -> Unit = {}
     ) = LogDocument.build(
+        resources = resources,
         today = today,
         days = days,
         expanded = expanded,
@@ -262,4 +272,22 @@ class LogDocumentTest {
         val lines = build(days = listOf(day("2026-08-17")), bestDay = best)
         lines.lineWith("(tag: best-day)")
     }
+
+    /**
+     * `git status` translates "On branch main" in every language it ships and
+     * never translates `commit` — which is the whole rule in one file. The `#`
+     * marker and the hash stay put; the sentences around them move.
+     */
+    @Test
+    @Config(qualifiers = "it")
+    fun `in Italian the git chrome stays and the prose moves`() {
+        val lines = build(days = listOf(day("2026-08-17", 11_204))).texts()
+        assertEquals("# Sul branch main", lines[0])
+        assertEquals("# Modifiche non ancora committate (oggi)", lines[1])
+        assertTrue(lines.none { it.contains("On branch main") })
+        // The commit header is git's own line: hash, author and all, it does not move.
+        assertTrue(lines.toString(), lines.any { it.startsWith("commit ") })
+        assertTrue(lines.toString(), lines.any { it.startsWith("Author:") })
+    }
+
 }

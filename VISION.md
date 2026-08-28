@@ -44,7 +44,7 @@ The precedent is the metaphor's own tooling. Under `LANG=it_IT`, `git status` pr
 
 Two consequences worth stating. A line often holds both registers: keep the tokens and translate around them (`// ERROR: permesso negato`). And the rule applies **completely or not at all** — kept four times out of five it reads as a half-finished translation rather than as a design, which is why implementing it is a closed phase and never an opportunistic touch-up.
 
-*Decided, not yet implemented in code: the comment strings in this repo are still hardcoded English (`PLANNING.md` Fase 20).*
+*Implemented in `PLANNING.md` Fase 20.* The documents take a `Resources` and speak the sentence themselves — tsteps' builders never promised to be Android-free, so there is no second copy of the English to keep in sync. The two that stay pure hand their sentences in instead: `WidgetContentBuilder` receives a `WidgetNotes` (with `WidgetNotes.EN` tied to `values/strings.xml` by a test), and the two input parsers return a `@StringRes` id with the range as an argument, because the range is code. Three guards hold the line: `RegisterRuleTest` over every `note_*` at once, `CommentChannelSweepTest` over the sources, and one Italian test per surface asserting both halves of the seam.
 
 ### 1.4 Engineering ethos
 
