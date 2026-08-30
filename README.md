@@ -20,7 +20,7 @@ JetBrains Mono everywhere: the two apps look like two files open in the same edi
 
 | `steps_data.json` | `steps_history.diff` | `stats.md` |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/main-json.jpg" width="250" alt="Today's steps rendered as syntax-highlighted JSON"> | <img src="docs/screenshots/log.jpg" width="250" alt="The day log as git history, one commit per day"> | <img src="docs/screenshots/stats.jpg" width="250" alt="The contribution graph, streaks and averages as a markdown file"> |
+| <img src="docs/screenshots/Screenshot_20260829_180754_tsteps.jpg" width="250" alt="Today's steps rendered as syntax-highlighted JSON"> | <img src="docs/screenshots/Screenshot_20260829_180927_tsteps.jpg" width="250" alt="The day log as git history, one commit per day"> | <img src="docs/screenshots/Screenshot_20260829_180939_tsteps.jpg" width="250" alt="The contribution graph, streaks and averages as a markdown file"> |
 
 ---
 
@@ -100,7 +100,7 @@ Sensor problems show up as `>` warning
 blockquotes. The active tab survives restarts, and `$ git restore settings.config`
 does not touch it: which file is open is editor state, not a setting.
 
-<img src="docs/screenshots/main-md.jpg" width="250" alt="The day as localized markdown prose, with the walks and week tables">
+<img src="docs/screenshots/Screenshot_20260829_180811_tsteps.jpg" width="250" alt="The day as localized markdown prose, with the walks and week tables">
 
 ### `steps_history.diff`: the log
 
@@ -174,9 +174,29 @@ The profile block feeds the estimates and nothing else. `weight_kg` is what
 turns calories on, `height_cm` derives your stride, and `stride_cm` overrides
 that derivation if you have measured your own: walk a known distance, divide,
 type the number. When it is set, the hint on `height_cm` says out loud that the
-line is no longer being used.
+line is no longer being used. `units.session_metric` chooses whether sessions
+show speed (`km/h`) or pace (`min/km`): one fact in two shapes, never both.
 
-<img src="docs/screenshots/settings.jpg" width="250" alt="Settings as an editable config file: goal, profile, units, theme profiles">
+<img src="docs/screenshots/Screenshot_20260829_180954_tsteps.jpg" width="250" alt="Settings as an editable config file: goal, profile, units, theme profiles">
+
+### `HELP.md`: the manual
+
+A second file behind the Settings tab bar: what the four tabs are, what the
+borrowed words mean (commit, working tree, diff, check, branch), where the
+numbers come from and why the app looks like this. Written for someone who does
+not read `git` for a living, and fully localized. A one-off
+`// new here? open HELP.md` line at the top of the editor points at it once and
+goes away as soon as the file has been opened.
+
+<img src="docs/screenshots/Screenshot_20260829_181002_tsteps.jpg" width="250" alt="HELP.md: the four tabs, the borrowed words, where the numbers come from">
+
+### `$ tsteps init`: the first run
+
+tsteps needs the physical-activity permission to count a single step. The first
+run explains why and asks for it as a terminal prompt (`$ tsteps init`), instead
+of leaving a cold system dialog to do it. Skipping is a real answer: you land on
+the document that already says the counter is off and offers the grant command.
+Installs that are already counting never see it.
 
 ### `$ tsteps track`: a walk, live
 
@@ -190,8 +210,6 @@ cadence into sessions marked `(auto)`. Their boundaries are honest approximation
 (`@@ ~09:30..~10:15 @@ walk (auto)`): you can edit them from inside the file with
 a terminal prompt, or remove the session with `[rm]`. The feature costs no extra
 sensing either way, and when it is off nothing is recorded and nothing runs.
-
-<img src="docs/screenshots/main-recording.jpg" width="250" alt="A live tracking session as a terminal process, with pause and stop as control sequences">
 
 ---
 
