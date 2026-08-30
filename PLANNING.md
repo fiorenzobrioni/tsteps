@@ -230,7 +230,7 @@ Quattro proposte del committente (ago 2026) passate al filtro della VISION prima
   - **`@@ goal_checks @@ -7` a settimana senza check ancora girati**: dichiarava sette check persi quando non ne era stato misurato nemmeno uno. A `checksRun == 0` il delta sparisce (l'hunk resta, coi glifi che dicono già tutto)
   - **La riga con la clausola di onestà era la più lunga del file** (53 caratteri, la prima a finire fuori schermo su un telefono stretto): `// week 34 is still being written: 2 of 7 days so far` → `// week 34 in progress: 2 of 7 days` (35). Accorciate anche le due righe dello stato vuoto
   - **`515 min` nel totale settimana del README**: `UnitFormat.activeSpan` ora porta anche il resto (`8 h 35 min` per una settimana, `58 h` per i totali di sempre, `47 min` per un giorno), un solo helper per entrambi i punti
-- [ ] Verifica su device del committente: la riga `"goal": null` tappabile su installazione pulita, `stride_cm` su una camminata misurata, i totali dopo qualche giorno di storia, la tab `week.diff` a cavallo di un lunedì
+- [x] Verifica su device del committente: la riga `"goal": null` tappabile su installazione pulita, `stride_cm` su una camminata misurata, i totali dopo qualche giorno di storia, la tab `week.diff` a cavallo di un lunedì — **fatta** (29 ago 2026, giro di verifica pre-2.0.0)
 
 ## Fase 16 — Il widget aggiornato quando serve (feedback su device, ago 2026)
 
@@ -243,7 +243,7 @@ Due sintomi dal committente: «il tap sulla freccia di refresh non aggiorna semp
 - [x] **`readCurrent` aspetta che il flush abbia svuotato la FIFO** (`SensorEventListener2` + `onFlushCompleted`) e tiene l'evento più recente, invece di deregistrarsi al primo e buttare via il batch appena chiesto. Il commento diceva «registering always delivers the current value promptly»: vero per il fatto che *un* valore arriva, non per il fatto che sia quello di adesso — su un contatore batchato il valore consegnato alla registrazione è quello dell'ultima consegna all'AP. Il `flush()` c'era già, la sua risposta non veniva ascoltata. Il valore migliore visto resta valido anche se il flush non completa entro il timeout: meglio un campione buono che un silenzio che il widget indosserebbe come `# stale`
 - [x] **`ServiceLocator.stepSensorReader` tipizzato `StepSource`** (l'interfaccia, non l'implementazione): è ciò che i worker, il tap e il servizio consumano davvero, ed è l'unico modo di far provare a un test un contatore muto o un sensore che lancia
 - [x] Test (7 nuovi, 401 totali — il conteggio della Fase 15 era sfasato di uno, qui verificato contando i `@Test` e i risultati del run): `WidgetRefreshTest` (Robolectric + Room reale: il tap legge il contatore da sé e il delta finisce nell'albero di lavoro, contatore muto che non tocca niente, permesso negato e sensore assente che non arrivano nemmeno alla lettura), `StepSyncWorkerTest` (contatore muto = pass riuscito, pass che lancia = `retry()` e non `failure()`), `WidgetRendererTest` esteso (il glifo indossa il tap su tutti e tre i tier, coi due colori, e torna al suo posto)
-- [ ] Verifica su device del committente: tap ↻ a telefono fermo dopo una camminata (il numero deve muoversi subito, e il glifo lampeggiare `…`), apri-cammina-esci con l'app in foreground (il widget deve avere il numero dell'uscita, non quello dell'apertura), e la controprova dello standby bucket con `adb shell am get-standby-bucket com.callbackdev.tsteps.debug`
+- [x] Verifica su device del committente: tap ↻ a telefono fermo dopo una camminata (il numero deve muoversi subito, e il glifo lampeggiare `…`), apri-cammina-esci con l'app in foreground (il widget deve avere il numero dell'uscita, non quello dell'apertura), e la controprova dello standby bucket con `adb shell am get-standby-bucket com.callbackdev.tsteps.debug` — **fatta** (29 ago 2026, giro di verifica pre-2.0.0)
 
 ---
 
@@ -272,7 +272,7 @@ La hint (`// prima volta? apri HELP.md`) è attiva di default e **non è un togg
 - [x] La hint viaggia fra i tab: `openHelp` nel `Workspace`, consumato da `SettingsScreen`
 - [x] Stringhe EN/IT: init, hint e `help_md` come `<string-array>` (una `<item>` per riga renderizzata: un a-capo vero dentro una risorsa Android viene schiacciato a spazio)
 - [x] Test (16 nuovi, 417 totali): i cinque stati della migrazione, le due risposte dell'init e il permesso negato, il documento di `HELP.md` con i suoi heading e la striscia dei tab, la hint che apre il file, il flag nel workspace store; il test di navigazione ora inietta il `FirstRunStore` (la decisione fra init e workspace dev'essere il suo input, non quello che ha lasciato su disco il test precedente)
-- [ ] Verifica su device del committente: installazione pulita (init → concedi → i passi partono; init → salta → il documento con `// E:` e il comando di grant) e **aggiornamento sopra l'app attuale, dove init non deve comparire**
+- [x] Verifica su device del committente: installazione pulita (init → concedi → i passi partono; init → salta → il documento con `// E:` e il comando di grant) e **aggiornamento sopra l'app attuale, dove init non deve comparire** — **fatta** (29 ago 2026, giro di verifica pre-2.0.0)
 
 **Rifinitura della chiusura (26 ago, rilievo del committente, stessa modifica in tweather).** L'ultima riga di `## Perché ha questo aspetto` era «Se sei arrivato fin qui, sai già se fa per te»: non è imperativa in senso grammaticale, ma **emette un verdetto sul lettore**, e lo fa nell'ultima riga della pagina che esiste apposta per chi si è sentito perso. Divide chi legge in due categorie proprio dove il documento dovrebbe lasciare la porta aperta; sarebbe stata giusta nel README del repo o nella scheda dello store, dove si sta ancora decidendo se installare, non qui. Sostituita con una che **restituisce** invece di giudicare — «E se qualche parola qui sopra resta oscura, non importa: i passi li conta lo stesso» — vera per giunta: la metafora è decorazione, il contapassi funziona senza. La prima frase resta intatta, il registro secco è la voce dell'app e il difetto non era il tono.
 
@@ -355,7 +355,7 @@ I test nuovi guidano il **provider vero**: `ShadowAppWidgetManager.createWidget`
 - [x] `StepTrackerTest` e `TrackerStateStoreTest`: i due istanti separati fino al disco, e l'ancora scritta prima che `last_read_millis` esistesse che si rilegge ancora
 - [x] Suite eseguita dodici volte di fila sul codice finale, e dodici sul baseline per avere un metro di paragone: i flake d'ordine si stanano contando, non guardando un run verde e dichiarando vittoria
 
-- [ ] Verifica su device del committente: (1) telefono fermo da un'ora — il widget **non** deve dire `# stale`, e il tap ↻ deve far avanzare `# last_sync` anche a zero passi nuovi; (2) tap ↻ subito dopo una camminata — il `…` deve comparire immediatamente, non dopo un attimo; (3) tap ripetuti veloci — nessun frame che torna indietro e il glifo che si assesta su ↻; (4) `adb shell dumpsys jobscheduler | grep step-sync-manual` dopo qualche tap, per vedere che la coda non si accumula
+- [x] Verifica su device del committente: (1) telefono fermo da un'ora — il widget **non** deve dire `# stale`, e il tap ↻ deve far avanzare `# last_sync` anche a zero passi nuovi; (2) tap ↻ subito dopo una camminata — il `…` deve comparire immediatamente, non dopo un attimo; (3) tap ripetuti veloci — nessun frame che torna indietro e il glifo che si assesta su ↻; (4) `adb shell dumpsys jobscheduler | grep step-sync-manual` dopo qualche tap, per vedere che la coda non si accumula — **fatta** (29 ago 2026, giro di verifica pre-2.0.0)
 
 
 ## Fase 19 — Il refresh manuale funziona: il campione si prende in foreground (ago 2026)
@@ -404,7 +404,7 @@ VISION §7 diceva «foreground service solo durante il tracking manuale». Adess
 - [x] Il flag della coda a test da entrambi i lati: campione buono = una lettura sola in tutto il tap; campione muto = la coda ne fa una sua
 - [x] `WidgetFreshnessTest` guida il servizio invece del vecchio `sampleAndRepaint`: i due istanti dell'ancora restano quello che la Fase 18 li ha fatti diventare, dal reading fino ai pixel
 
-- [ ] Verifica su device del committente: (1) cammina con l'app chiusa, poi tap ↻ — il numero **deve** muoversi, e `# last_sync` avanzare; (2) telefono fermo da un'ora, tap ↻ — `# last_sync` avanza comunque e `# stale` si spegne; (3) tap ripetuti veloci — nessun frame che torna indietro, glifo che si assesta su ↻, nessuna notifica che compare; (4) `adb shell dumpsys activity services com.callbackdev.tsteps.debug` durante un tap, per vedere `SampleService` nascere e morire; (5) se una notifica «$ tsteps sync» dovesse comparire, il campione sta superando i dieci secondi ed è un dato in sé
+- [x] Verifica su device del committente: (1) cammina con l'app chiusa, poi tap ↻ — il numero **deve** muoversi, e `# last_sync` avanzare; (2) telefono fermo da un'ora, tap ↻ — `# last_sync` avanza comunque e `# stale` si spegne; (3) tap ripetuti veloci — nessun frame che torna indietro, glifo che si assesta su ↻, nessuna notifica che compare; (4) `adb shell dumpsys activity services com.callbackdev.tsteps.debug` durante un tap, per vedere `SampleService` nascere e morire; (5) se una notifica «$ tsteps sync» dovesse comparire, il campione sta superando i dieci secondi ed è un dato in sé — **fatta** (29 ago 2026, giro di verifica pre-2.0.0)
 
 ## Fase 20 — I registri l10n: la lingua segue la frase, non le barre (decisione di serie, ago 2026)
 
@@ -458,6 +458,24 @@ Le due eccezioni, e perché:
 
 **Verifiche**: 455 test verdi (da 440), lint pulita, release minificata (R8) installabile, parità EN/IT completa su tutte le stringhe traducibili (le cinque solo-EN sono `translatable="false"`: brand, chrome git, glifi), sweep dei sorgenti rieseguito con soglia a due parole e a parole maiuscole comprese — restano solo comandi, SQL, licenze, nomi propri e `@Preview`.
 
+
+## Fase 21 — v2.0.0 su GitHub (ago 2026)
+
+Il giro sul device del committente (29 ago 2026) ha chiuso in un colpo le **cinque** caselle che questo file teneva aperte dalla Fase 15 alla 19 — la riga `"goal": null` su installazione pulita, la falcata misurata, `week.diff` a cavallo di un lunedì, e le due batterie sul refresh del widget che le Fasi 18 e 19 avevano lasciato in attesa di un telefono vero. Con lui sono arrivati gli screenshot in `docs/screenshots/`.
+
+**Perché 2.0.0 e non 1.1.0.** Vale qui la stessa ragione scritta nella Fase 19 di tweather: senza un'API pubblica il numero non certifica un contratto, dice a chi aggiorna quanto è cambiato quello che si trova davanti. Dalla 1.0.0 tsteps ha preso un **file nuovo nei Log** (`week.diff`, che è una tab in più), `## Records` nel `README.md`, un **primo avvio** che prima non esisteva (`$ tsteps init`), `HELP.md`, e soprattutto due cose che cambiano il comportamento quotidiano dell'app invece di aggiungersi accanto: il **refresh del widget riscritto da zero** (Fasi 18 e 19 — il campione preso in foreground, che è la correzione per cui il tap ↻ funziona davvero a app chiusa) e la **regola dei tre registri** della Fase 20, che cambia la lingua in cui l'app parla a chi la legge in italiano.
+
+**Il percorso di aggiornamento**, che è l'unica cosa che una release può rompere in silenzio:
+
+- Lo **schema dell'export passa a 2** (Fase 15, `stride_m`), ed è un campo derivato in più su un file che si scrive da capo a ogni export: nessuna riscrittura di dati esistenti, nessun archivio vecchio da convertire.
+- Gli **ancoraggi di continuità in DataStore** sopravvivono all'aggiornamento come sopravvivono a un riavvio: `last_read_millis` scritto dalla Fase 18 è nullable e l'ancora scritta prima che esistesse si rilegge ancora (c'è il test, in `TrackerStateStoreTest`).
+- `FirstRunStore.migrate(used)` (Fase 17) è ciò che impedisce alla 2.0.0 di mostrare `$ tsteps init` a chi conta i passi da mesi: `used` è vero se l'app ha già il permesso **oppure** ha mai ancorato una lettura.
+- **La firma non cambia**: stessa chiave della 1.0.0, quindi l'APK si installa sopra senza perdere storia né impostazioni.
+
+- [x] `versionCode` 1 → **2**, `versionName` **2.0.0** in `app/build.gradle.kts`
+- [x] `CHANGELOG.md`: `[Unreleased]` — già scritta fase per fase — diventa `[2.0.0] — 2026-08-30`, col link al tag in fondo accanto a quello della 1.0.0
+- [x] Le cinque caselle di verifica su device chiuse (Fasi 15, 16, 17, 18, 19)
+- [x] Suite e lint rieseguiti prima del tag: **455 test verdi**, lint **0 errori** (37 warning, la baseline del repo), e la release minificata R8 ricompilata — l'unico posto dove un problema di R8 si vede prima che lo veda il workflow
 
 ## Note trasversali
 
