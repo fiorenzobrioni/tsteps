@@ -4,7 +4,7 @@ All notable changes to tsteps are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0] — 2026-08-30
 
 ### Changed
 
@@ -101,4 +101,5 @@ First release. Everything below is new.
   JSON keys, filenames and terminal output stay English like real code; prose and
   data values translate.
 
+[2.0.0]: https://github.com/fiorenzobrioni/tsteps/releases/tag/v2.0.0
 [1.0.0]: https://github.com/fiorenzobrioni/tsteps/releases/tag/v1.0.0
