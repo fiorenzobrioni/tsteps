@@ -58,10 +58,11 @@ class StepsReadmeTest {
             bestDay = LocalDate.parse("2026-07-12") to 14_823L,
             longestWalk = walk().copy(activeMillis = 92 * 60_000L, distanceMeters = 6_600.0),
             bestWeek = Records.BestWeek(2026, 33, 52_340)
-        )
+        ),
+        grantRoute: GrantRoute = GrantRoute.Ask
     ) = StepsReadme.build(
         snapshot, status, sessions, history, records,
-        UnitsSystem.METRIC, rome, Locale.ENGLISH, resources
+        UnitsSystem.METRIC, rome, Locale.ENGLISH, resources, grantRoute
     )
 
     private fun List<String>.lineWith(sub: String): String {
@@ -125,6 +126,33 @@ class StepsReadmeTest {
             .lineWith("> ⚠️ Missing permission to read the step counter")
         build(status = SensorStatus.NO_SENSOR)
             .lineWith("> ⚠️ No step sensor on this device")
+    }
+
+    @Test
+    fun `the missing-permission warning says where the tap goes`() {
+        assertEquals(
+            "> ⚠️ Missing permission to read the step counter. Tap to grant it.",
+            build(status = SensorStatus.NO_PERMISSION).lineWith("Missing permission")
+        )
+        assertEquals(
+            "> ⚠️ Missing permission to read the step counter. " +
+                "Grant it in the system settings.",
+            build(status = SensorStatus.NO_PERMISSION, grantRoute = GrantRoute.SystemSettings)
+                .lineWith("Missing permission")
+        )
+    }
+
+    @Test
+    fun `the warning the screen hangs the tap on is the one the document prints`() {
+        // The screen matches the line by identity (StepsScreen), so the two must
+        // agree character for character in both routes.
+        GrantRoute.entries.forEach { route ->
+            assertEquals(
+                StepsReadme.permissionWarning(resources, route),
+                build(status = SensorStatus.NO_PERMISSION, grantRoute = route)
+                    .lineWith("Missing permission")
+            )
+        }
     }
 
     @Test

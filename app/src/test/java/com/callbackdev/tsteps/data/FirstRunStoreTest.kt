@@ -79,4 +79,38 @@ class FirstRunStoreTest {
 
         assertEquals(FirstRun.Done, store.state.first())
     }
+
+    /** Fase 22: the fact `shouldShowRequestPermissionRationale` cannot supply. */
+    @Test
+    fun `an install has not been asked for the sensor permission until it is`() =
+        runBlocking {
+            val store = store()
+            assertEquals(false, store.sensorPermissionAsked.first())
+
+            store.markSensorPermissionAsked()
+
+            assertEquals(true, store.sensorPermissionAsked.first())
+        }
+
+    /** A grant resets the system's refusal, so it has to reset this too. */
+    @Test
+    fun `a grant forgets the ask`() = runBlocking {
+        val store = store()
+        store.markSensorPermissionAsked()
+
+        store.clearSensorPermissionAsked()
+
+        assertEquals(false, store.sensorPermissionAsked.first())
+    }
+
+    /** It is a fact of its own: neither answer touches the init decision. */
+    @Test
+    fun `the ask and the init answer are independent`() = runBlocking {
+        val store = store()
+        store.migrate(used = false)
+
+        store.markSensorPermissionAsked()
+
+        assertEquals(FirstRun.Pending, store.state.first())
+    }
 }

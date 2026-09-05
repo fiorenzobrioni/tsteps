@@ -72,6 +72,7 @@ class StepsDocumentTest {
         expandedIds: Set<Long> = emptySet(),
         sessionMetric: SessionMetric = SessionMetric.SPEED,
         onGrant: (() -> Unit)? = null,
+        grantRoute: GrantRoute = GrantRoute.Ask,
         onAcceptGoal: (() -> Unit)? = null,
         onToggleSession: (Long) -> Unit = {},
         controls: SessionControls = SessionControls(),
@@ -86,6 +87,7 @@ class StepsDocumentTest {
         expandedSessionIds = expandedIds,
         sessionMetric = sessionMetric,
         zone = rome,
+        grantRoute = grantRoute,
         onGrantPermission = onGrant,
         grantClickLabel = "grant",
         onAcceptGoal = onAcceptGoal,
@@ -199,6 +201,29 @@ class StepsDocumentTest {
         // The data below is an honest null, not a fake zero.
         assertEquals(syntax.comment, lines.lineWith("\"steps\"").colorOf("null"))
         assertTrue(lines.texts().none { it.contains("\"count\"") })
+    }
+
+    @Test
+    fun `a permission refused for good says so above the grant command`() {
+        var fixed = false
+        val lines = build(
+            status = SensorStatus.NO_PERMISSION,
+            onGrant = { fixed = true },
+            grantRoute = GrantRoute.SystemSettings
+        )
+        val error = lines.lineWith("// ERROR: denied — open system settings")
+        assertEquals(syntax.diffDel, error.colorOf("denied"))
+        // The command keeps its name — `grant` is the intent — and keeps the tap.
+        val command = lines.lineWith("tsteps grant activity-recognition")
+        assertNotNull(command.onClick)
+        command.onClick!!.invoke()
+        assertTrue(fixed)
+    }
+
+    @Test
+    fun `the askable route says nothing extra`() {
+        val lines = build(status = SensorStatus.NO_PERMISSION)
+        assertTrue(lines.texts().none { it.contains("open system settings") })
     }
 
     @Test

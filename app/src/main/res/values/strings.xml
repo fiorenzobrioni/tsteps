@@ -146,6 +146,7 @@
 
     <!-- Accessibility -->
     <string name="cd_grant_activity_recognition">Grant permission to read the step counter</string>
+    <string name="cd_open_permission_settings">Open the system settings to grant permission to read the step counter</string>
     <string name="cd_accept_suggested_goal">Set the suggested daily step goal</string>
     <string name="cd_start_track">Start a tracked walk</string>
     <string name="cd_open_track">Open the running session</string>
@@ -202,7 +203,8 @@
     <string name="readme_goal_none">No goal set.</string>
     <string name="readme_streak">Current streak: %1$d days</string>
     <string name="readme_warn_no_sensor">\u26a0\ufe0f No step sensor on this device</string>
-    <string name="readme_warn_no_permission">\u26a0\ufe0f Missing permission to read the step counter</string>
+    <string name="readme_warn_no_permission">\u26a0\ufe0f Missing permission to read the step counter. Tap to grant it.</string>
+    <string name="readme_warn_no_permission_denied">\u26a0\ufe0f Missing permission to read the step counter. Grant it in the system settings.</string>
     <string name="readme_t_start">Start</string>
     <string name="readme_t_min">Min</string>
     <string name="readme_t_steps">Steps</string>

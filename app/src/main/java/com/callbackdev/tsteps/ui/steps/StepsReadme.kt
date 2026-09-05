@@ -46,6 +46,25 @@ data class DayRecords(
 
 object StepsReadme {
 
+    /**
+     * The `## Status` blockquote a missing permission prints — the one line of this
+     * document that is also a control, and the reason it is a function of its own:
+     * the screen hangs the tap on the line this returns rather than on a line it
+     * recognised by reading the text back (Fase 22).
+     *
+     * It says what the tap will do because it is prose and the reader is being asked
+     * to act; the JSON says the same thing in its own register, with the `$ tsteps
+     * grant` command carrying the tap and a `// ERROR:` line above it when the route
+     * is the settings app.
+     */
+    fun permissionWarning(resources: Resources, grantRoute: GrantRoute): String = "> " +
+        resources.getString(
+            when (grantRoute) {
+                GrantRoute.Ask -> R.string.readme_warn_no_permission
+                GrantRoute.SystemSettings -> R.string.readme_warn_no_permission_denied
+            }
+        )
+
     fun build(
         snapshot: TodaySnapshot?,
         status: SensorStatus,
@@ -55,7 +74,8 @@ object StepsReadme {
         units: UnitsSystem,
         zone: ZoneId,
         locale: Locale,
-        resources: Resources
+        resources: Resources,
+        grantRoute: GrantRoute = GrantRoute.Ask
     ): List<String> = buildList {
         fun s(id: Int, vararg args: Any): String = resources.getString(id, *args)
         val numbers = NumberFormat.getIntegerInstance(locale)
@@ -83,7 +103,7 @@ object StepsReadme {
         add("## ${s(R.string.readme_h_status)}")
         when (status) {
             SensorStatus.NO_SENSOR -> add("> ${s(R.string.readme_warn_no_sensor)}")
-            SensorStatus.NO_PERMISSION -> add("> ${s(R.string.readme_warn_no_permission)}")
+            SensorStatus.NO_PERMISSION -> add(permissionWarning(resources, grantRoute))
             SensorStatus.OK -> if (snapshot != null) {
                 val goal = snapshot.goalSteps
                 if (goal > 0) {
