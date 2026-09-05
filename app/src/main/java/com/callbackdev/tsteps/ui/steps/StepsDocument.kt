@@ -78,6 +78,24 @@ enum class SensorStatus {
 }
 
 /**
+ * Where the tap on the missing-permission line can still land (Fase 22) — the two
+ * answers `settings.config`'s notification line has had since Fase 11, given to the
+ * editor's own permission so the two surfaces behave the same way.
+ *
+ * Which one applies is a question only an Activity can answer, so the screen decides
+ * it and the documents merely print what it decided. [SystemSettings] is the case
+ * that used to be a dead tap: the system has stopped putting the dialog up, and
+ * `launch()` returns denied without anything appearing on screen.
+ */
+enum class GrantRoute {
+    /** The system will still ask: the tap opens the permission dialog. */
+    Ask,
+
+    /** Refused for good: the tap opens the app's page in the system settings. */
+    SystemSettings
+}
+
+/**
  * Today's session verbs (Fase 11), bundled so [StepsDocument.build] stays
  * readable: which session has `[rm]` armed, which one is editing its
  * boundaries through the terminal prompt, and the callbacks each control fires.
@@ -125,6 +143,7 @@ object StepsDocument {
         expandedSessionIds: Set<Long> = emptySet(),
         sessionMetric: SessionMetric = SessionMetric.SPEED,
         zone: ZoneId = ZoneId.systemDefault(),
+        grantRoute: GrantRoute = GrantRoute.Ask,
         onGrantPermission: (() -> Unit)? = null,
         grantClickLabel: String? = null,
         onAcceptGoal: (() -> Unit)? = null,
@@ -145,6 +164,20 @@ object StepsDocument {
             SensorStatus.NO_PERMISSION -> {
                 add(commentLine("// E: " + resources.getString(R.string.note_no_permission), syntax))
                 add(commentLine("// " + resources.getString(R.string.note_on_device), syntax))
+                // The command below keeps its name in both routes — `grant` is the
+                // intent, and which surface grants it is the system's business — but
+                // a line that is about to open the settings app says so first, in the
+                // same words `settings.config` uses for a permission refused for good.
+                if (grantRoute == GrantRoute.SystemSettings) {
+                    add(
+                        CodeLine(
+                            AnnotatedString(
+                                "// ERROR: " + resources.getString(R.string.note_err_denied),
+                                SpanStyle(color = syntax.diffDel)
+                            )
+                        )
+                    )
+                }
                 add(grantCommandLine(syntax, onGrantPermission, grantClickLabel))
                 add(blank())
                 addAll(emptyDocument(snapshot?.date, syntax))

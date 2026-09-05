@@ -4,6 +4,31 @@ All notable changes to tsteps are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- `HELP.md` now always wraps its lines, whatever `word_wrap` says in
+  `settings.config`, and its status bar says `wrap` so you can see that it does. Its
+  paragraphs run past 300 characters and the setting is off by default: reading the
+  file meant dragging sideways through every sentence. This is what a real editor
+  does too, wrapping by language rather than globally. The `README.md` tab still
+  follows the setting: its tables are padded to their column widths, and wrapping
+  them would take the alignment apart.
+
+### Fixed
+
+- The missing-permission warning in the `README.md` tab is now the same control as
+  the `$ tsteps grant activity-recognition` command in `steps_data.json`: tapping it
+  asks for the permission. It used to say the same thing as the JSON and do nothing
+  at all when tapped, which is a file lying about what it offers.
+- Tapping the grant command now always lands somewhere. Once a reader has refused
+  the permission twice, Android stops putting its dialog up and the request returns
+  refused without anything appearing on screen: both files now say
+  `denied — open system settings` first and open the app's own page instead. This is
+  the state machine `settings.config`'s notification line has had all along, given
+  to the permission the editor asks for.
+
 ## [2.0.0] — 2026-08-30
 
 ### Changed

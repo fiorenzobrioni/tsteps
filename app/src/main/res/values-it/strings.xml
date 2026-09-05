@@ -132,6 +132,7 @@
 
     <!-- Accessibilità -->
     <string name="cd_grant_activity_recognition">Concedi il permesso di leggere il contapassi</string>
+    <string name="cd_open_permission_settings">Apri le impostazioni di sistema per concedere il permesso di leggere il contapassi</string>
     <string name="cd_accept_suggested_goal">Imposta l\u2019obiettivo giornaliero suggerito</string>
     <string name="cd_start_track">Avvia una camminata tracciata</string>
     <string name="cd_open_track">Apri la sessione in corso</string>
@@ -176,7 +177,8 @@
     <string name="readme_goal_none">Nessun obiettivo impostato.</string>
     <string name="readme_streak">Streak corrente: %1$d giorni</string>
     <string name="readme_warn_no_sensor">\u26a0\ufe0f Nessun sensore di passi su questo dispositivo</string>
-    <string name="readme_warn_no_permission">\u26a0\ufe0f Manca il permesso per leggere il contapassi</string>
+    <string name="readme_warn_no_permission">\u26a0\ufe0f Manca il permesso per leggere il contapassi. Tocca per concederlo.</string>
+    <string name="readme_warn_no_permission_denied">\u26a0\ufe0f Manca il permesso per leggere il contapassi. Concedilo nelle impostazioni di sistema.</string>
     <string name="readme_t_start">Inizio</string>
     <string name="readme_t_min">Min</string>
     <string name="readme_t_steps">Passi</string>

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.callbackdev.tsteps.data.AppSettings
+import com.callbackdev.tsteps.data.FirstRunStore
 import com.callbackdev.tsteps.data.SUGGESTED_DAILY_GOAL_STEPS
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.data.SessionMetric
@@ -80,6 +81,7 @@ class StepsViewModel(
     private val source: StepSource,
     private val hasPermission: () -> Boolean,
     private val workspaceStore: WorkspaceStore? = null,
+    private val firstRunStore: FirstRunStore? = null,
     trackingManager: TrackingManager? = null,
     private val hcStateStore: HcStateStore? = null,
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -115,6 +117,23 @@ class StepsViewModel(
 
     fun dismissHelpHint() {
         viewModelScope.launch { workspaceStore?.dismissHelpHint() }
+    }
+
+    /**
+     * Whether the `ACTIVITY_RECOGNITION` dialog has ever been on screen (Fase 22).
+     * The screen needs it to tell "the system will ask" from "the system has stopped
+     * asking", which is the difference between a tap that opens a dialog and a tap
+     * that does nothing at all.
+     */
+    val permissionAsked: StateFlow<Boolean> =
+        (firstRunStore?.sensorPermissionAsked ?: flow { emit(false) })
+            // Eagerly, like the other two: the grant line is drawn on the first
+            // frame and must already know where its tap goes.
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Recorded when the dialog is launched, not when it answers. */
+    fun markPermissionAsked() {
+        viewModelScope.launch { firstRunStore?.markSensorPermissionAsked() }
     }
 
     private val permissionGranted = MutableStateFlow(hasPermission())
@@ -159,7 +178,12 @@ class StepsViewModel(
      * settings) and after the in-file grant command returns.
      */
     fun refreshPermission() {
-        permissionGranted.value = hasPermission()
+        val granted = hasPermission()
+        permissionGranted.value = granted
+        // A grant wipes the record of the ask, because the system wipes its own
+        // refusal along with it: whatever happens after a revoke starts from zero,
+        // dialog included. Idempotent — DataStore skips a write that changes nothing.
+        if (granted) viewModelScope.launch { firstRunStore?.clearSensorPermissionAsked() }
     }
 
     /**
@@ -301,6 +325,7 @@ class StepsViewModel(
                     source = ServiceLocator.stepSensorReader(app),
                     hasPermission = { SyncScheduler.hasPermission(app) },
                     workspaceStore = ServiceLocator.workspaceStore(app),
+                    firstRunStore = ServiceLocator.firstRunStore(app),
                     trackingManager = ServiceLocator.trackingManager(app),
                     hcStateStore = ServiceLocator.hcStateStore(app),
                     onSessionsMutated = { ServiceLocator.healthConnectSync(app).sync() }

@@ -1,6 +1,11 @@
 package com.callbackdev.tsteps.ui.steps
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -19,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,16 +78,50 @@ fun StepsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // The only thing that can answer `shouldShowRequestPermissionRationale` — null
+    // in a preview, which is why the route below falls back to asking rather than
+    // assuming the worst.
+    val activity = LocalActivity.current
+    val permissionAsked by viewModel.permissionAsked.collectAsStateWithLifecycle()
+
+    // Bumped on every resume, so the two answers below are re-read rather than
+    // remembered: the permission can change in system settings while we're paused,
+    // in both directions, and so can the rationale that goes with it.
+    var permissionEpoch by remember { mutableIntStateOf(0) }
+    // `shouldShowRequestPermissionRationale` is true only between the first denial
+    // and the second. Its `false` is the ambiguous answer — never asked, or asked and
+    // refused for good — which is exactly why the install records the ask itself.
+    val grantRoute = remember(permissionEpoch, permissionAsked, activity) {
+        val systemStillAsks = activity?.shouldShowRequestPermissionRationale(
+            Manifest.permission.ACTIVITY_RECOGNITION
+        ) == true
+        if (!permissionAsked || systemStillAsks) GrantRoute.Ask else GrantRoute.SystemSettings
+    }
+
+    // Read at launch time and not in the callback: `markPermissionAsked` is already
+    // on its way to DataStore, and the flow above may have flipped before the answer
+    // comes back.
+    var askedBeforeLaunch by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) {
+    ) { granted ->
+        permissionEpoch++
         viewModel.refreshPermission()
         // Grant flips the "should the background jobs exist" answer.
         SyncScheduler.reconcile(context)
+        // A refusal that leaves the rationale exactly where it was means no dialog
+        // was ever put on screen: an install that had already said no twice before it
+        // started recording the ask — every install older than this change. The tap
+        // still has to land somewhere, so it lands where the permission can be given.
+        val stillNothingToShow = activity?.shouldShowRequestPermissionRationale(
+            Manifest.permission.ACTIVITY_RECOGNITION
+        ) == false
+        if (!granted && !askedBeforeLaunch && stillNothingToShow) {
+            context.openAppSystemSettings()
+        }
     }
-    // Re-check on every resume: the permission can change in system settings
-    // while we're paused, in both directions.
     LifecycleResumeEffect(Unit) {
+        permissionEpoch++
         viewModel.refreshPermission()
         SyncScheduler.reconcile(context)
         onPauseOrDispose { }
@@ -95,8 +135,16 @@ fun StepsScreen(
         trackingActive = tracking != null,
         trackingPaused = tracking?.session?.paused == true,
         onSelectFile = viewModel::selectFile,
+        grantRoute = grantRoute,
         onGrantPermission = {
-            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            when (grantRoute) {
+                GrantRoute.SystemSettings -> context.openAppSystemSettings()
+                GrantRoute.Ask -> {
+                    askedBeforeLaunch = permissionAsked
+                    viewModel.markPermissionAsked()
+                    permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                }
+            }
         },
         onToggleSession = viewModel::toggleSession,
         onAcceptGoal = viewModel::acceptSuggestedGoal,
@@ -123,6 +171,8 @@ fun StepsScreen(
     trackingActive: Boolean = false,
     trackingPaused: Boolean = false,
     onSelectFile: (MainEditorFile) -> Unit = {},
+    /** Where a tap on the missing-permission line lands — see [GrantRoute]. */
+    grantRoute: GrantRoute = GrantRoute.Ask,
     onGrantPermission: () -> Unit = {},
     onToggleSession: (Long) -> Unit = {},
     onAcceptGoal: () -> Unit = {},
@@ -134,7 +184,12 @@ fun StepsScreen(
     onOpenHelp: () -> Unit = {}
 ) {
     val syntax = TstepsTheme.syntax
-    val grantLabel = stringResource(R.string.cd_grant_activity_recognition)
+    val grantLabel = stringResource(
+        when (grantRoute) {
+            GrantRoute.Ask -> R.string.cd_grant_activity_recognition
+            GrantRoute.SystemSettings -> R.string.cd_open_permission_settings
+        }
+    )
     val acceptGoalLabel = stringResource(R.string.cd_accept_suggested_goal)
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
@@ -216,7 +271,7 @@ fun StepsScreen(
     val hint = if (showHelpHint) stringResource(R.string.help_hint) else null
     val lines = remember(
         state, syntax, activeFile, locale, armedRemoveId, editingSessionId, editValue,
-        editError, hint
+        editError, hint, grantRoute
     ) {
         val head = hint?.let {
             listOf(
@@ -238,6 +293,7 @@ fun StepsScreen(
                 expandedSessionIds = state.expandedSessions,
                 sessionMetric = state.sessionMetric,
                 zone = state.zone,
+                grantRoute = grantRoute,
                 onGrantPermission = onGrantPermission,
                 grantClickLabel = grantLabel,
                 onAcceptGoal = onAcceptGoal,
@@ -249,8 +305,8 @@ fun StepsScreen(
                 controls = controls,
                 externalSteps = state.externalSteps
             )
-            MainEditorFile.README -> buildMarkdownLines(
-                StepsReadme.build(
+            MainEditorFile.README -> {
+                val markdown = StepsReadme.build(
                     snapshot = state.snapshot,
                     status = state.status,
                     sessions = state.sessions,
@@ -259,10 +315,24 @@ fun StepsScreen(
                     units = state.units,
                     zone = state.zone,
                     locale = locale,
-                    resources = resources
-                ),
-                syntax
-            )
+                    resources = resources,
+                    grantRoute = grantRoute
+                )
+                // The `## Status` warning is the one line of this document that is
+                // also a control (Fase 22): the JSON offers the fix as a `$` command,
+                // and until now the README said the same thing and did nothing when
+                // tapped. Matched against the line the builder hands back rather than
+                // against text read off the rendered document.
+                val warning = StepsReadme.permissionWarning(resources, grantRoute)
+                    .takeIf { state.status == SensorStatus.NO_PERMISSION }
+                buildMarkdownLines(markdown, syntax).mapIndexed { i, line ->
+                    if (markdown[i] == warning) {
+                        line.copy(onClick = onGrantPermission, onClickLabel = grantLabel)
+                    } else {
+                        line
+                    }
+                }
+            }
         }
     }
     // One scroll position per file (tweather): switching tab must not land
@@ -383,6 +453,19 @@ private val FabClearance = 96.dp
 /** The plain (tilde-free) start time — what accessibility labels speak. */
 private fun sessionStart(session: SessionItem, state: StepsUiState): String =
     UnitFormat.clockTime(session.startMillis, state.zone)
+
+/**
+ * Permanently denied permissions can only be granted back from the app's page —
+ * the same detour `settings.config`'s notification line has taken since Fase 11.
+ */
+private fun Context.openAppSystemSettings() {
+    startActivity(
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+    )
+}
 
 private fun previewSnapshot() = TodaySnapshot(
     date = LocalDate.parse("2026-08-18"),

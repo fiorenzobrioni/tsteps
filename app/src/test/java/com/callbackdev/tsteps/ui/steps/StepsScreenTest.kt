@@ -1,5 +1,6 @@
 package com.callbackdev.tsteps.ui.steps
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
@@ -48,11 +49,17 @@ class StepsScreenTest {
     private fun setContent(
         state: StepsUiState,
         onGrant: () -> Unit = {},
-        activeFile: MainEditorFile = MainEditorFile.JSON
+        activeFile: MainEditorFile = MainEditorFile.JSON,
+        grantRoute: GrantRoute = GrantRoute.Ask
     ) {
         compose.setContent {
             TstepsTheme {
-                StepsScreen(state = state, activeFile = activeFile, onGrantPermission = onGrant)
+                StepsScreen(
+                    state = state,
+                    activeFile = activeFile,
+                    grantRoute = grantRoute,
+                    onGrantPermission = onGrant
+                )
             }
         }
     }
@@ -87,6 +94,36 @@ class StepsScreenTest {
             .performClick()
         assertTrue(granted)
         compose.onNodeWithText("sensor: off").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the README warning is the same control as the grant command`() {
+        var granted = false
+        setContent(
+            StepsUiState(snapshot = snapshot(), status = SensorStatus.NO_PERMISSION),
+            onGrant = { granted = true },
+            activeFile = MainEditorFile.README
+        )
+        compose.onNode(
+            hasText("Missing permission to read the step counter", substring = true) and
+                hasClickAction()
+        ).assertIsDisplayed().performClick()
+        assertTrue(granted)
+    }
+
+    @Test
+    fun `a permission refused for good sends both files to the system settings`() {
+        setContent(
+            StepsUiState(snapshot = snapshot(), status = SensorStatus.NO_PERMISSION),
+            grantRoute = GrantRoute.SystemSettings
+        )
+        compose.onNodeWithText("// ERROR: denied — open system settings").assertIsDisplayed()
+        // Same control, a different destination — and a screen reader is told which.
+        assertEquals(
+            "Open the system settings to grant permission to read the step counter",
+            compose.onNode(hasText("$ tsteps grant activity-recognition") and hasClickAction())
+                .fetchSemanticsNode().config[SemanticsActions.OnClick].label
+        )
     }
 
     @Test

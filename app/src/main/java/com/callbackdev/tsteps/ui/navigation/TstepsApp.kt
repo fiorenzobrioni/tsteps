@@ -105,7 +105,13 @@ private fun FirstRunSetup(firstRunStore: FirstRunStore) {
         }
     }
     InitScreen(
-        onGrant = { permission.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
+        onGrant = {
+            // Recorded here as well as in the editor: this is where most installs
+            // first put the dialog up, and the editor's grant line reads the same
+            // fact back to know whether tapping it can still open anything.
+            scope.launch { firstRunStore.markSensorPermissionAsked() }
+            permission.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        },
         onSkip = { scope.launch { firstRunStore.markInitDone() } },
         permissionDenied = permissionDenied
     )

@@ -478,6 +478,122 @@ Il giro sul device del committente (29 ago 2026) ha chiuso in un colpo le **cinq
 - [x] Suite e lint rieseguiti prima del tag: **455 test verdi**, lint **0 errori** (37 warning, la baseline del repo), e la release minificata R8 ricompilata — l'unico posto dove un problema di R8 si vede prima che lo veda il workflow
 - [x] **`release.yml` prende il corpo della release dal `CHANGELOG.md`.** Il workflow si affidava al solo `generate_release_notes`, che elenca commit e PR dal tag precedente: un verbale di *chi ha spinto cosa*, non di cosa è cambiato per chi installa. Ora un passo estrae la sezione del tag e la passa come `body_path`, e le note generate da GitHub restano sotto. La sezione si cerca per **prefisso letterale** e non per regex — i punti di `2.0.0` in una regex matcherebbero qualunque carattere — e si chiude sul primo `## [` successivo **o** sul blocco dei link in fondo, che altrimenti finirebbe nel corpo dell'ultima sezione del file. Un tag senza sezione non fa fallire la release: scrive un `::warning::` e lascia le note generate da sole, perché fra la prosa e l'APK firmato è la prosa a poter aspettare. Vale da qui in avanti, non solo per questa release
 
+## Fase 22 — Il permesso mancante si concede da dove lo si legge (feedback su device, set 2026)
+
+Segnalazione del committente, con screenshot: nella tab `README.md` la riga rossa
+`> ⚠️ Manca il permesso per leggere il contapassi` **non fa niente se la tocchi**,
+mentre in `settings.config` il commento rosso sul permesso delle notifiche lo chiede
+davvero. Due superfici della stessa app che dicono la stessa cosa e si comportano in
+due modi diversi: quella che sa cosa fare non è quella che il lettore sta guardando.
+
+Due difetti distinti dietro una sola segnalazione, e il secondo era quello grosso.
+
+**1. Il `README.md` non offriva niente.** La riga di `## Status` era prosa e basta:
+`buildMarkdownLines` rende ogni riga senza `onClick`, e il rimedio esisteva solo
+nell'altra tab (il comando `$ tsteps grant activity-recognition`). Ora quella riga è
+un controllo: `StepsReadme.permissionWarning()` restituisce la riga esatta che il
+documento stampa e lo schermo ci appende sopra il tap, **per identità e non
+riconoscendo il testo a valle** — un `contains("permesso")` avrebbe funzionato fino
+alla prima riscrittura della frase. È l'unica riga del documento che sia anche un
+controllo, e per questo è una funzione a sé invece di una stringa in mezzo al
+`buildList`. La frase dice anche dove porta il tap (`Tocca per concederlo.`): è
+prosa, e a un lettore a cui si chiede di agire si dice cosa succede.
+
+**2. Anche nel JSON il tap poteva non fare niente — ed era il caso del committente.**
+Dopo il secondo rifiuto Android non mostra più il dialogo: `launch()` torna
+*denied* senza che compaia nulla. Il comando c'era, il tap partiva, sullo schermo non
+succedeva niente. `settings.config` questo caso ce l'ha dalla Fase 12
+(`NotifLineState.DeniedPermanently` → pagina dell'app nelle impostazioni); il
+permesso che l'editor chiede non ce l'aveva. Ora entrambi i file conoscono
+[`GrantRoute`], due valori: `Ask` apre il dialogo, `SystemSettings` apre la pagina
+dell'app. Il comando **non cambia nome** (`grant` è l'intenzione, quale superficie la
+esaudisca lo decide il sistema) ma sopra compare la riga
+`// ERROR: negato — apri le impostazioni di sistema`, con le stesse parole che usa
+`settings.config`, e l'etichetta per lo screen reader cambia con la destinazione.
+
+**Il fatto che il sistema non sa dire.** `shouldShowRequestPermissionRationale`
+risponde `true` **solo fra il primo rifiuto e il secondo**: il suo `false` vale sia
+«mai chiesto» sia «rifiutato per sempre», che sono esattamente i due casi da
+distinguere. Quindi lo ricorda l'installazione: terza chiave in `FirstRunStore`
+(`sensor_permission_asked`), scritta **al lancio del dialogo e non alla risposta** —
+`markSensorPermissionAsked()` sta già viaggiando verso DataStore quando il callback
+torna, e leggerla lì darebbe il valore sbagliato. Sta lì e non in `WorkspaceStore`
+per la stessa ragione delle altre due: non è lo stato di una sessione dell'editor, è
+qualcosa che è successo all'installazione. La marca anche `$ tsteps init`, che è dove
+la maggior parte delle installazioni mette su il dialogo per la prima volta.
+
+**Ma non è un contatore: si azzera a ogni concessione.** Android resetta il proprio
+rifiuto quando un permesso viene concesso e poi revocato dalle impostazioni, e
+un'installazione che continuasse a ricordare «già chiesto» manderebbe quel lettore
+alla pagina di sistema per un dialogo che il sistema mostrerebbe volentieri.
+`refreshPermission()` la cancella ogni volta che vede il permesso concesso (DataStore
+salta la scrittura che non cambia niente, quindi il resume non costa nulla).
+
+**Le installazioni più vecchie della fase** non hanno quel fatto registrato: se
+avevano già rifiutato due volte, il primo tap partirebbe a vuoto. Non parte: se il
+rifiuto torna **lasciando il rationale dov'era** vuol dire che nessun dialogo è mai
+comparso, e il callback apre le impostazioni al posto suo. Il valore pre-lancio è
+catturato apposta, perché è l'unico modo di distinguere quel caso da un secondo
+rifiuto vero (dove il rationale passa da `true` a `false`) — che invece non va
+strattonato da nessuna parte: ha appena detto di no.
+
+**Deliberatamente non toccato**: la riga delle notifiche di `settings.config`. Il suo
+permesso si chiede dallo stesso schermo che disegna la riga, quindi entro la sessione
+la macchina a stati sa già cosa è successo e non c'è niente da far sopravvivere al
+processo. Il permesso del sensore no: viene chiesto al primo avvio, in un altro
+schermo, magari settimane prima.
+
+**Verifiche**: 464 test verdi (da 455), lint pulita. Nuovi: le due frasi del
+`README.md` per rotta e il fatto che siano *la stessa riga* su cui lo schermo appende
+il tap (`StepsReadmeTest`), la riga d'errore e il comando ancora tappabile nel JSON
+(`StepsDocumentTest`), il tap del `README.md` che arriva a `onGrantPermission` e
+l'etichetta di accessibilità che cambia rotta (`StepsScreenTest`), la terza chiave e
+il suo azzeramento (`FirstRunStoreTest`).
+
+- [ ] Da verificare su device: rifiutare due volte e controllare che il tap — su
+      entrambe le tab — apra la pagina dell'app, e che dopo la concessione da lì il
+      contatore riparta al rientro nell'app
+
+## Fase 22b — `HELP.md` va sempre a capo (chiesta dal committente, 5 set 2026)
+
+`word_wrap` è `false` di default, e `HELP.md` ha paragrafi da 300 caratteri: il test
+che ho scritto prima della modifica dice quanto costava, **2680dp di riga su uno
+schermo da 320dp**. Otto schermate di trascinamento laterale per leggere una frase, in
+quello che è l'unico documento rivolto a chi l'app non la sa ancora leggere.
+
+**Non è un'eccezione alla finzione dell'editor: è la cosa più da editor dell'app.** Un
+editor vero va a capo *per linguaggio*, e `"[markdown]": { "editor.wordWrap": "on" }`
+è l'override che ha in configurazione mezza categoria di chi usa VS Code. Il file
+adesso passa `options = LocalEditorOptions.current.copy(wordWrap = true)` a
+`CodeCanvas`, che quel parametro lo aveva già.
+
+**Dove passa il confine, e perché non è «i file markdown».** È `HELP.md` e basta,
+perché è l'unico file dell'app che sia *solo* prosa. La tab `README.md` continua a
+seguire l'impostazione: le sue tabelle sono riempite fino alla larghezza delle colonne
+(Fase 11c di tweather, e le colonne allineate che i test italiani della Fase 20
+sorvegliano carattere per carattere) e mandarle a capo smonterebbe l'allineamento.
+Qui non c'è niente da allineare.
+
+**Si muove solo il wrap, non `line_numbers`**: quella è una preferenza su come al
+lettore piace guardare un file, e questo resta un file.
+
+**E il file lo dice.** La status bar guadagna `wrap` accanto a `ro`: è lo stesso tipo
+di fatto — un modo che questo file ha e il suo vicino no — ed è dove un editor vero le
+mette (`:set wrap` di vim sta lì). Senza, un lettore con `word_wrap: false` che vede
+questa schermata andare a capo può solo concludere che l'interruttore è rotto. Marcatore
+di una parola, quindi resta inglese come `ro` e `UTF-8`.
+
+**Un effetto che vale la pena mettere a verbale**: andando a capo il documento diventa
+più alto, e i titoli dopo il primo paragrafo partono fuori schermo. I test che li
+asseritvano sul posto ora ci scorrono sopra come farebbe un lettore. È il baratto
+giusto: scorrere in verticale è naturale, trascinare in orizzontale dentro una frase no.
+
+**Verifiche**: 466 test verdi (da 464), lint pulita. Il test della larghezza è stato
+scritto **prima** della modifica e visto fallire: senza, misura 2680dp contro 320dp.
+
+- [ ] Da verificare su device: `HELP.md` con `word_wrap: false` in `settings.config`,
+      e che la status bar `⎇ config | ro | wrap | UTF-8` stia su uno schermo da 360dp
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.
