@@ -1,11 +1,21 @@
 package com.callbackdev.tsteps.ui.settings
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.width
+import com.callbackdev.tsteps.ui.components.EditorOptions
+import com.callbackdev.tsteps.ui.components.LocalEditorOptions
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,10 +34,14 @@ class HelpScreenTest {
 
     private var selected = -1
 
-    private fun setScreen() {
+    private fun setScreen(wordWrap: Boolean = false) {
         compose.setContent {
             TstepsTheme {
-                HelpScreen(onSelectFile = { selected = it })
+                CompositionLocalProvider(
+                    LocalEditorOptions provides EditorOptions(wordWrap = wordWrap)
+                ) {
+                    HelpScreen(onSelectFile = { selected = it })
+                }
             }
         }
     }
@@ -37,8 +51,13 @@ class HelpScreenTest {
         setScreen()
 
         compose.onNodeWithText("# tsteps").assertExists()
-        compose.onNodeWithText("## The four tabs").assertExists()
-        compose.onNodeWithText("## The borrowed words").assertExists()
+        // Scrolled to rather than asserted in place: the file wraps (below), so its
+        // paragraphs are several lines tall and the later headings start off-screen.
+        listOf("## The four tabs", "## The borrowed words").forEach { heading ->
+            compose.onNode(hasScrollToNodeAction())
+                .performScrollToNode(hasText(heading))
+            compose.onNodeWithText(heading).assertExists()
+        }
     }
 
     @Test
@@ -46,6 +65,32 @@ class HelpScreenTest {
         setScreen()
 
         compose.onNodeWithText("HELP.md").assertIsSelected()
+    }
+
+    /**
+     * Fase 22b: the one file that wraps whatever `settings.config` says. Its
+     * paragraphs run to 300+ characters, and panning sideways through a sentence is
+     * not reading — this is the surface addressed to somebody who cannot read the
+     * app yet, so it is the one that cannot ask them to work for the words.
+     */
+    @Test
+    fun `the document wraps even with word_wrap off`() {
+        setScreen(wordWrap = false)
+
+        val paragraph = compose.onNodeWithText("A step counter that", substring = true)
+            .getUnclippedBoundsInRoot()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        assertTrue(
+            "the paragraph is ${paragraph.width}, the screen ${screen.width}",
+            paragraph.width <= screen.width
+        )
+    }
+
+    @Test
+    fun `the status bar declares the mode the file has of its own`() {
+        setScreen(wordWrap = false)
+
+        compose.onNodeWithText("wrap").assertExists()
     }
 
     @Test

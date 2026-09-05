@@ -554,6 +554,46 @@ il suo azzeramento (`FirstRunStoreTest`).
       entrambe le tab — apra la pagina dell'app, e che dopo la concessione da lì il
       contatore riparta al rientro nell'app
 
+## Fase 22b — `HELP.md` va sempre a capo (chiesta dal committente, 5 set 2026)
+
+`word_wrap` è `false` di default, e `HELP.md` ha paragrafi da 300 caratteri: il test
+che ho scritto prima della modifica dice quanto costava, **2680dp di riga su uno
+schermo da 320dp**. Otto schermate di trascinamento laterale per leggere una frase, in
+quello che è l'unico documento rivolto a chi l'app non la sa ancora leggere.
+
+**Non è un'eccezione alla finzione dell'editor: è la cosa più da editor dell'app.** Un
+editor vero va a capo *per linguaggio*, e `"[markdown]": { "editor.wordWrap": "on" }`
+è l'override che ha in configurazione mezza categoria di chi usa VS Code. Il file
+adesso passa `options = LocalEditorOptions.current.copy(wordWrap = true)` a
+`CodeCanvas`, che quel parametro lo aveva già.
+
+**Dove passa il confine, e perché non è «i file markdown».** È `HELP.md` e basta,
+perché è l'unico file dell'app che sia *solo* prosa. La tab `README.md` continua a
+seguire l'impostazione: le sue tabelle sono riempite fino alla larghezza delle colonne
+(Fase 11c di tweather, e le colonne allineate che i test italiani della Fase 20
+sorvegliano carattere per carattere) e mandarle a capo smonterebbe l'allineamento.
+Qui non c'è niente da allineare.
+
+**Si muove solo il wrap, non `line_numbers`**: quella è una preferenza su come al
+lettore piace guardare un file, e questo resta un file.
+
+**E il file lo dice.** La status bar guadagna `wrap` accanto a `ro`: è lo stesso tipo
+di fatto — un modo che questo file ha e il suo vicino no — ed è dove un editor vero le
+mette (`:set wrap` di vim sta lì). Senza, un lettore con `word_wrap: false` che vede
+questa schermata andare a capo può solo concludere che l'interruttore è rotto. Marcatore
+di una parola, quindi resta inglese come `ro` e `UTF-8`.
+
+**Un effetto che vale la pena mettere a verbale**: andando a capo il documento diventa
+più alto, e i titoli dopo il primo paragrafo partono fuori schermo. I test che li
+asseritvano sul posto ora ci scorrono sopra come farebbe un lettore. È il baratto
+giusto: scorrere in verticale è naturale, trascinare in orizzontale dentro una frase no.
+
+**Verifiche**: 466 test verdi (da 464), lint pulita. Il test della larghezza è stato
+scritto **prima** della modifica e visto fallire: senza, misura 2680dp contro 320dp.
+
+- [ ] Da verificare su device: `HELP.md` con `word_wrap: false` in `settings.config`,
+      e che la status bar `⎇ config | ro | wrap | UTF-8` stia su uno schermo da 360dp
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

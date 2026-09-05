@@ -13,7 +13,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.ui.components.CodeCanvas
+import com.callbackdev.tsteps.ui.components.EditorOptions
 import com.callbackdev.tsteps.ui.components.EditorTabs
+import com.callbackdev.tsteps.ui.components.LocalEditorOptions
 import com.callbackdev.tsteps.ui.components.StatusBarDivider
 import com.callbackdev.tsteps.ui.components.TerminalStatusBar
 import com.callbackdev.tsteps.ui.components.buildMarkdownLines
@@ -31,6 +33,16 @@ import com.callbackdev.tsteps.ui.theme.TstepsTheme
  *
  * Prose, so fully localized, headings included: the same rule the `README.md` day
  * tab follows. The words in `code spans` are the app's own file and key names.
+ *
+ * **Always wrapped, whatever `settings.config` says** (Fase 22b). Not an exception
+ * to the editor fiction but the most editor-like thing in the app: a real one wraps
+ * by language, and `"[markdown]": { "editor.wordWrap": "on" }` is the override half
+ * of VS Code carries. The line falls where it does because this file is the only one
+ * that is *only* prose — the `README.md` tab keeps following the setting, because
+ * its tables are padded to their column widths and wrapping them would take the
+ * alignment apart. Here there is nothing to align and paragraphs run past 300
+ * characters: panning sideways through a sentence is not reading, and this is the
+ * one document addressed to somebody who cannot read the app yet.
  */
 @Composable
 fun HelpScreen(
@@ -53,12 +65,21 @@ fun HelpScreen(
             CodeCanvas(
                 lines = lines,
                 state = canvasState,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                // Only the wrap is overridden: `line_numbers` is a preference about
+                // how the reader likes to look at a file, and this file is still one.
+                options = LocalEditorOptions.current.copy(wordWrap = true)
             )
             TerminalStatusBar {
                 Text("⎇ config")
                 StatusBarDivider()
                 Text("ro") // read-only: the only file in the app you cannot edit
+                StatusBarDivider()
+                // Beside `ro` because it is the same kind of fact: a mode this file
+                // has and its neighbour does not. A one-word marker, so it stays
+                // English — and it is why a reader with `word_wrap: false` is not
+                // left wondering whether the setting has stopped working.
+                Text("wrap")
                 StatusBarDivider()
                 Text("UTF-8")
             }

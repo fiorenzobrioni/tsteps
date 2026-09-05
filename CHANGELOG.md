@@ -6,6 +6,16 @@ All notable changes to tsteps are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `HELP.md` now always wraps its lines, whatever `word_wrap` says in
+  `settings.config`, and its status bar says `wrap` so you can see that it does. Its
+  paragraphs run past 300 characters and the setting is off by default: reading the
+  file meant dragging sideways through every sentence. This is what a real editor
+  does too, wrapping by language rather than globally. The `README.md` tab still
+  follows the setting: its tables are padded to their column widths, and wrapping
+  them would take the alignment apart.
+
 ### Fixed
 
 - The missing-permission warning in the `README.md` tab is now the same control as
