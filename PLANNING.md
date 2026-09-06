@@ -659,6 +659,35 @@ di cui parla.
       tap-to-skip a metà stampa, «Rimuovi animazioni» in Accessibilità, TalkBack, e che le
       quattro righe più le risposte ci stiano su uno schermo da 360×640
 
+## Fase 23b — Il primo avvio, riletto sul telefono (device, 6 set 2026)
+
+Decisione di serie: stessa modifica in tweather (Fase 27b, dove sta il verbale completo)
+e thabit (Fase 19b). Trovate proprio qui, provando l'app.
+
+**Era troppo veloce.** Cinquecento caratteri al secondo, sessione finita in un secondo e
+mezzo: non si legge come una cosa che si sta scrivendo, si legge come un tremolio — il
+testo arriva più in fretta di quanto l'occhio lo insegua, e il cursore, che è l'unico
+motivo per cui l'animazione esiste, non lo si vede muovere. Metà velocità
+(`PrintMsPerChar = 4`), il comando a `PromptMsPerChar = 45` (una mano vera fa circa
+ventidue caratteri al secondo) e un respiro di 40 ms dopo ogni riga stampata. La corsa
+passa da 1,5 s a circa 3 s.
+
+**Il budget del test diventa un intervallo**, `2_000..4_000` ms: «sotto i due secondi»
+era il guardiano che aveva permesso il tremolio, e un tetto senza pavimento sorveglia una
+sola delle due cose che possono andare storte.
+
+**La schermata finiva sotto le barre di sistema**: la tab `tsteps.sh` sotto l'orologio, la
+barra di stato del terminale sotto la pillola dei gesti. Non è un difetto della Fase 23 —
+`InitScreen` non ha mai applicato gli inset, e il workspace lo fa dal giorno in cui esiste.
+La Column prende lo stesso `statusBarsPadding()` del workspace, e la `TerminalStatusBar`,
+che qui è l'elemento più in basso (nel workspace non lo è mai), si prende l'inset dei
+gesti come se lo prende `EditorNavBar`.
+
+**Verifiche**: suite verde, lint 0 errori.
+
+- [ ] Da verificare su device: la nuova velocità, e che tab e barra di stato stiano dentro
+      le loro barre di sistema (navigazione a gesti e a tre bottoni)
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

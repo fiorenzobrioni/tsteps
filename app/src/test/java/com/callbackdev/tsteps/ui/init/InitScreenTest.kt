@@ -158,20 +158,29 @@ class InitScreenTest {
     }
 
     /**
-     * The budget, in both languages. The copy is free to grow — but not past the
-     * point where a first-run screen starts costing the reader time, and Italian is
-     * the longer of the two. This is the test that has to be argued with before the
-     * intro becomes a carousel by accretion.
+     * The budget, in both languages — and a **range** since Fase 27b.
+     *
+     * The ceiling is the old reason: the copy is free to grow, but not past the point
+     * where a first-run screen starts costing the reader time. This is the test to
+     * argue with before the intro becomes a carousel by accretion.
+     *
+     * The floor is the device's answer. At five hundred characters a second the whole
+     * session was over in a second and a half, and that does not read as writing — it
+     * reads as a flicker, which is the "fuffa" the animation exists to avoid. "Under
+     * two seconds" was the guard that had allowed it, so the guard now has two ends.
+     * Italian is the longer of the two languages and both are checked.
      */
+    private val budgetMs = 2_000L..4_000L
+
     @Test
-    fun `the whole session prints in under two seconds`() {
-        assertTrue("English: ${sessionMs(context)}ms", sessionMs(context) < 2_000)
+    fun `the whole session prints inside its budget`() {
+        assertTrue("English: ${sessionMs(context)}ms", sessionMs(context) in budgetMs)
     }
 
     @Test
     @Config(qualifiers = "+it")
-    fun `the italian session prints in under two seconds too`() {
-        assertTrue("Italian: ${sessionMs(context)}ms", sessionMs(context) < 2_000)
+    fun `the italian session prints inside its budget too`() {
+        assertTrue("Italian: ${sessionMs(context)}ms", sessionMs(context) in budgetMs)
     }
 
     private fun sessionMs(context: Context): Long = Typist(

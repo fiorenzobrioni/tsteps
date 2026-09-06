@@ -19,6 +19,10 @@ class TypistTest {
 
     private val cursor = AnnotatedString(BlockCursor)
 
+    // Every beat here is written out rather than defaulted: these tests are about
+    // the timeline's arithmetic, and the defaults are the screen's taste in rhythm
+    // (they moved once already, on a device round).
+
     private fun line(text: String, indent: Int = 0, onClick: (() -> Unit)? = null) =
         CodeLine(AnnotatedString(text), indent, onClick)
 
@@ -26,7 +30,7 @@ class TypistTest {
     private val typist = Typist(
         listOf(
             TypedLine(line("$ tsteps init"), msPerChar = 10, pauseAfterMs = 100),
-            TypedLine(line("# ready"), msPerChar = 5)
+            TypedLine(line("# ready"), msPerChar = 5, pauseAfterMs = 0)
         )
     )
 
@@ -96,9 +100,9 @@ class TypistTest {
     fun `a blank line costs nothing and still appears`() {
         val withGap = Typist(
             listOf(
-                TypedLine(line("#"), msPerChar = 10),
-                TypedLine(line("")),
-                TypedLine(line("> skip"), msPerChar = 10)
+                TypedLine(line("#"), msPerChar = 10, pauseAfterMs = 0),
+                TypedLine(line(""), pauseAfterMs = 0),
+                TypedLine(line("> skip"), msPerChar = 10, pauseAfterMs = 0)
             )
         )
 

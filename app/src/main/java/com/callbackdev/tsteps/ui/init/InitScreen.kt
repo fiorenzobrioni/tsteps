@@ -1,7 +1,10 @@
 package com.callbackdev.tsteps.ui.init
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -71,10 +74,27 @@ fun InitScreen(
         onSkip = onSkip
     )
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize()) {
+        // The insets the workspace has applied since it existed, and this screen
+        // never did: it is not a Scaffold and has no nav bar, so the tab strip sat
+        // under the clock and the terminal bar under the gesture pill (device,
+        // Fase 27b). Same `statusBarsPadding()` as the workspace's own root Column.
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
             EditorTabs(fileNames = listOf(SetupFile), activeIndex = 0, onSelect = {})
             TypedTranscript(script = script, modifier = Modifier.weight(1f))
-            TerminalStatusBar {
+            TerminalStatusBar(
+                // Bottom-most element of this screen, unlike in the workspace where
+                // EditorNavBar is: so it takes the gesture bar's inset the way that
+                // bar does — the strip's colour reaches the edge, the text sits above
+                // the pill. Painted here because the padding has to be INSIDE the
+                // background, and the component applies its own after the modifier.
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .navigationBarsPadding()
+            ) {
                 Text("⎇ setup")
                 StatusBarDivider()
                 Text("1/1")
@@ -160,13 +180,13 @@ private fun MutableList<TypedLine>.option(
     add(printed(comment(note, syntax, indent = 1), pauseAfterMs = StanzaPauseMs))
 }
 
-private fun printed(line: CodeLine, pauseAfterMs: Int = 0): TypedLine =
+private fun printed(line: CodeLine, pauseAfterMs: Int = LinePauseMs): TypedLine =
     TypedLine(line, msPerChar = PrintMsPerChar, pauseAfterMs = pauseAfterMs)
 
 private fun comment(text: String, syntax: SyntaxColors, indent: Int = 0): CodeLine =
     CodeLine(AnnotatedString("# $text", SpanStyle(color = syntax.comment)), indent)
 
-private fun blank(): TypedLine = TypedLine(CodeLine(AnnotatedString("")))
+private fun blank(): TypedLine = TypedLine(CodeLine(AnnotatedString("")), pauseAfterMs = 0)
 
 @Preview(showBackground = true, backgroundColor = 0xFF10141A)
 @Composable
