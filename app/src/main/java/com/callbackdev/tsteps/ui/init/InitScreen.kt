@@ -1,8 +1,10 @@
 package com.callbackdev.tsteps.ui.init
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -14,10 +16,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.callbackdev.tsteps.R
-import com.callbackdev.tsteps.ui.components.CanvasLine
-import com.callbackdev.tsteps.ui.components.CodeCanvas
 import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.EditorTabs
 import com.callbackdev.tsteps.ui.components.StatusBarDivider
@@ -40,6 +39,12 @@ import com.callbackdev.tsteps.ui.theme.TstepsTheme
  * Two answers, not three: tsteps has one thing to grant. Skipping is an answer too
  * — the document behind already says the counter is off and offers the grant.
  *
+ * Since Fase 23 the transcript **prints itself** rather than being already there:
+ * see [TypedTranscript] for the two speeds, the tap that ends it and the two
+ * accessibility switches that never start it. The four `#` lines above the choices
+ * grew with it — a session that takes a second and a half to print can afford to
+ * say what the app *is* before saying what it needs, and a still screen could not.
+ *
  * Localized, unlike the terminal output elsewhere in the app: the same exception
  * the `README.md` day tab already makes. The fiction is carried by the shape — the
  * prompt, the `>` choices, the `#` notes — not by the language, and this is the one
@@ -54,10 +59,12 @@ fun InitScreen(
     permissionDenied: Boolean = false
 ) {
     val syntax = TstepsTheme.syntax
-    val lines = buildInitLines(
+    val script = buildInitScript(
         syntax = syntax,
         intro = stringResource(R.string.init_intro),
+        files = stringResource(R.string.init_files),
         privacy = stringResource(R.string.init_privacy),
+        ask = stringResource(R.string.init_ask),
         grant = stringResource(R.string.init_option_grant),
         grantNote = stringResource(R.string.init_option_grant_note),
         skip = stringResource(R.string.init_option_skip),
@@ -67,15 +74,27 @@ fun InitScreen(
         onSkip = onSkip
     )
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize()) {
+        // The insets the workspace has applied since it existed, and this screen
+        // never did: it is not a Scaffold and has no nav bar, so the tab strip sat
+        // under the clock and the terminal bar under the gesture pill (device,
+        // Fase 27b). Same `statusBarsPadding()` as the workspace's own root Column.
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
             EditorTabs(fileNames = listOf(SetupFile), activeIndex = 0, onSelect = {})
-            CodeCanvas(
-                lines = lines,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                showIndentGuides = false
-            )
-            TerminalStatusBar {
+            TypedTranscript(script = script, modifier = Modifier.weight(1f))
+            TerminalStatusBar(
+                // Bottom-most element of this screen, unlike in the workspace where
+                // EditorNavBar is: so it takes the gesture bar's inset the way that
+                // bar does — the strip's colour reaches the edge, the text sits above
+                // the pill. Painted here because the padding has to be INSIDE the
+                // background, and the component applies its own after the modifier.
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .navigationBarsPadding()
+            ) {
                 Text("⎇ setup")
                 StatusBarDivider()
                 Text("1/1")
@@ -87,10 +106,19 @@ fun InitScreen(
 /** The "file" this screen opens: a session, not a document — hence the shell name. */
 internal const val SetupFile = "tsteps.sh"
 
-internal fun buildInitLines(
+/**
+ * The transcript as a pure value, with the time each line takes to arrive.
+ *
+ * The command is the only line typed at a hand's speed; everything else is the
+ * program answering. The beats are where a real session breathes — after the
+ * command, and between one offered answer and the next.
+ */
+internal fun buildInitScript(
     syntax: SyntaxColors,
     intro: String,
+    files: String,
     privacy: String,
+    ask: String,
     grant: String,
     grantNote: String,
     skip: String,
@@ -98,28 +126,37 @@ internal fun buildInitLines(
     denied: String?,
     onGrant: () -> Unit,
     onSkip: () -> Unit
-): List<CanvasLine> = buildList {
+): List<TypedLine> = buildList {
     add(
-        CodeLine(
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = syntax.comment)) { append("$ ") }
-                withStyle(SpanStyle(color = syntax.string)) { append("tsteps init") }
-            }
+        typed(
+            CodeLine(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = syntax.comment)) { append("$ ") }
+                    withStyle(SpanStyle(color = syntax.string)) { append("tsteps init") }
+                }
+            )
         )
     )
     add(blank())
-    add(comment(intro, syntax))
-    add(comment(privacy, syntax))
+    add(printed(comment(intro, syntax)))
+    add(printed(comment(files, syntax)))
+    add(printed(comment(privacy, syntax)))
+    add(printed(comment(ask, syntax), pauseAfterMs = StanzaPauseMs))
     denied?.let {
         add(blank())
-        add(CodeLine(AnnotatedString(it, SpanStyle(color = syntax.diffDel))))
+        add(
+            printed(
+                CodeLine(AnnotatedString(it, SpanStyle(color = syntax.diffDel))),
+                pauseAfterMs = StanzaPauseMs
+            )
+        )
     }
     option(grant, grantNote, syntax, onGrant)
     option(skip, skipNote, syntax, onSkip)
 }
 
 /** `> choice` plus its `#` note: one tap target, the note says what it costs. */
-private fun MutableList<CanvasLine>.option(
+private fun MutableList<TypedLine>.option(
     label: String,
     note: String,
     syntax: SyntaxColors,
@@ -127,22 +164,37 @@ private fun MutableList<CanvasLine>.option(
 ) {
     add(blank())
     add(
-        CodeLine(
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = syntax.comment)) { append("> ") }
-                withStyle(SpanStyle(color = syntax.key)) { append(label) }
-            },
-            onClick = onClick,
-            onClickLabel = label
+        typed(
+            CodeLine(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = syntax.comment)) { append("> ") }
+                    withStyle(SpanStyle(color = syntax.key)) { append(label) }
+                },
+                onClick = onClick,
+                onClickLabel = label
+            )
         )
     )
-    add(comment(note, syntax, indent = 1))
+    add(printed(comment(note, syntax, indent = 1), pauseAfterMs = StanzaPauseMs))
 }
+
+/**
+ * A **prompt** line at a hand's speed, with a beat after it: the `$` command and each
+ * `>` answer. They are the turns of the session — the places where somebody types and
+ * where the session then waits — and giving them one rhythm is what stops the whole
+ * transcript arriving as a single breath after the command (device, Fase 23b/23c).
+ */
+private fun typed(line: CodeLine): TypedLine =
+    TypedLine(line, msPerChar = PromptMsPerChar, pauseAfterMs = PromptPauseMs)
+
+/** Output: the `#` lines the session prints between one turn and the next. */
+private fun printed(line: CodeLine, pauseAfterMs: Int = LinePauseMs): TypedLine =
+    TypedLine(line, msPerChar = PrintMsPerChar, pauseAfterMs = pauseAfterMs)
 
 private fun comment(text: String, syntax: SyntaxColors, indent: Int = 0): CodeLine =
     CodeLine(AnnotatedString("# $text", SpanStyle(color = syntax.comment)), indent)
 
-private fun blank(): CodeLine = CodeLine(AnnotatedString(""))
+private fun blank(): TypedLine = TypedLine(CodeLine(AnnotatedString("")), pauseAfterMs = 0)
 
 @Preview(showBackground = true, backgroundColor = 0xFF10141A)
 @Composable
