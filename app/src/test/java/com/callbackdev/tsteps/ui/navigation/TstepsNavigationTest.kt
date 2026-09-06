@@ -7,6 +7,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.callbackdev.tsteps.data.ServiceLocator
+import com.callbackdev.tsteps.ui.init.SetupFile
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import com.callbackdev.tsteps.ui.track.TrackOpenRequest
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -87,12 +88,21 @@ class TstepsNavigationTest {
         }
     }
 
-    /** Fase 17: a fresh install is asked for the permission before it gets a workspace. */
+    /**
+     * Fase 17: a fresh install is asked for the permission before it gets a
+     * workspace.
+     *
+     * The session is identified by its tab and not by the `$ tsteps init` line:
+     * since Fase 23 the transcript prints itself and keeps its last line in sight,
+     * so on a screen too short for it — which Robolectric's default device is — the
+     * command has honestly scrolled off the top. The tab is the file, and the file
+     * is the fact this test is about.
+     */
     @Test
     fun `a fresh install lands on tsteps init`() {
         setApp(used = false)
 
-        compose.onNodeWithText("tsteps init", substring = true).assertExists()
+        compose.onNodeWithText(SetupFile).assertExists()
         compose.onNodeWithText("steps_data.json").assertDoesNotExist()
     }
 

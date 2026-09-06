@@ -216,11 +216,16 @@
     <string name="readme_rec_longest_walk">Longest walk: **%1$d min** \u00b7 %2$s (%3$s)</string>
     <string name="readme_rec_best_week">Best week: **%1$s steps** (week %2$d)</string>
     <string name="readme_footer">Computed on device \u00b7 %1$d committed days</string>
-    <!-- `$ tsteps init` (Fase 17). Prose for someone seeing the app for the first
-         time, so LOCALIZED - the same exception the README.md day tab makes. The
-         command and the file names are code and stay as they are. -->
-    <string name="init_intro">tsteps counts your steps with the phone\'s own sensor.</string>
+    <!-- `$ tsteps init` (Fase 17; the transcript prints itself since Fase 23).
+         Prose for someone seeing the app for the first time, so LOCALIZED - the same
+         exception the README.md day tab makes. The command and the file names are
+         code and stay as they are. The four lines above the choices say what the app
+         IS before what it needs: a session that takes a second and a half to print
+         can afford them, a still screen could not. -->
+    <string name="init_intro">tsteps counts your steps with the phone\'s own sensor, and looks like a code editor.</string>
+    <string name="init_files">Today is a JSON file, every day before it is a commit in a diff, the weeks are a coloured grid.</string>
     <string name="init_privacy">No network, no account, no GPS: nothing ever leaves the phone.</string>
+    <string name="init_ask">To count a single step it needs one permission.</string>
     <string name="init_option_grant">turn on the step counter</string>
     <string name="init_option_grant_note">physical activity permission, Android asks you first</string>
     <string name="init_option_skip">skip</string>

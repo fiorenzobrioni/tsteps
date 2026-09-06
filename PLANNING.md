@@ -594,6 +594,71 @@ scritto **prima** della modifica e visto fallire: senza, misura 2680dp contro 32
 - [ ] Da verificare su device: `HELP.md` con `word_wrap: false` in `settings.config`,
       e che la status bar `⎇ config | ro | wrap | UTF-8` stia su uno schermo da 360dp
 
+## Fase 23 — Il primo avvio si scrive da solo (chiesta dal committente, 6 set 2026)
+
+Decisione di serie: stessa modifica in tweather (Fase 27, dove sta il verbale completo) e
+thabit (Fase 19). `$ tsteps init` era già una sessione di terminale, era solo la
+**fotografia** di una — e il `█`, il glifo che dice «la macchina è *qui*, adesso», non
+aveva un posto dove stare.
+
+**Due velocità, perché un transcript ha due autori.** La riga del comando si *digita*
+(`PromptMsPerChar = 20`, una mano su una tastiera); tutto quello che sta sotto si *stampa*
+(`PrintMsPerChar = 2`, cinquecento caratteri al secondo, otto per frame): non una macchina
+da scrivere, un programma che scrive su una tty. Due respiri, 160 ms dopo il comando e
+60 ms fra una risposta e la successiva. Un test tiene la corsa **sotto i due secondi in
+entrambe le lingue**, ed è il test con cui litigare il giorno in cui l'introduzione vorrà
+diventare un carosello per accumulo.
+
+**Niente barre di avanzamento finte**: il file non mente, e uno spinner che conta fino a
+un numero che l'app ha già sarebbe un'animazione che inventa lavoro. È animato l'*arrivo*
+di un testo che sarebbe stato lì comunque. Il tempo lo dà `withFrameNanos`, non un
+`delay(2)` per carattere: quella è una promessa che lo scheduler non mantiene, e la deriva
+si vede.
+
+**Tre vie d'uscita.** Un **tocco** la chiude — un `Box` in overlay, colpito prima della
+canvas, così il tocco che ferma la stampa non può anche far comparire il dialogo di
+sistema del permesso; esce dalla composizione appena ha fatto il suo unico lavoro.
+**«Rimuovi animazioni»** (`ANIMATOR_DURATION_SCALE == 0`) non la fa nemmeno partire:
+`finished` nasce `true`, quindi la schermata è completa al **primo frame** e non un frame
+dopo. E **TalkBack la salta** per un motivo suo: un testo che cresce di un carattere alla
+volta è un albero di semantica che cambia sessanta volte al secondo.
+
+**Il latch è un `rememberSaveable`**, e qui pesa più che altrove: `> turn on the step
+counter` apre il dialogo di `ACTIVITY_RECOGNITION`, e la riga `# permission denied` arriva
+*dopo* — senza il latch il transcript si sarebbe allungato al ritorno e l'animazione
+sarebbe ripartita dalla coda.
+
+**Questa canvas va sempre a capo**, qualunque cosa dica `word_wrap`: lo stesso override di
+`HELP.md` (Fase 22b), per una ragione più netta — un cursore che esce dal bordo destro è
+un cursore che non si vede. Si muove solo il wrap, non `line_numbers`. **La status bar non
+dice `wrap`**: quel marcatore esiste perché un file non sembri ignorare un interruttore
+che il lettore ha impostato, e al primo avvio nessuno ha impostato niente. Questa non è la
+scheda di un file, è una sessione, e infatti non ha nemmeno `ro`/`rw`.
+
+**Il testo è cresciuto, e questa è metà della modifica.** Erano due righe `#`; ora sono
+quattro: cos'è l'app, in che forma tiene quello che conta, cosa non esce dal telefono,
+cosa le serve per partire. Il sensore è tornato dentro `init_intro` invece di stare in una
+riga sua, così `init_privacy` mantiene la frase che vale davvero («dal telefono non esce
+niente»). Una sessione che impiega un secondo e mezzo a stamparsi se le può permettere;
+una schermata ferma no.
+
+**`Typist` è una timeline pura** — dato un millisecondo, quali righe sono a video e quanta
+parte dell'ultima — così l'animazione si asserisce invece di guardarla: nove test, compresi
+il cursore parcheggiato durante la pausa e il frame in ritardo. Una riga a metà perde il
+suo `onClick`: superfluo (l'overlay intercetta tutto), ma è una verità che va nel modello.
+
+**Il dispositivo di default di Robolectric non è un telefono**: il transcript tiene
+l'ultima riga in vista, quindi su un 320×470dp che nessuno vende la testa della sessione è
+onestamente scorsa via. `InitScreenTest` ha ora `@Config(qualifiers = "w360dp-h740dp")`, e
+`TstepsNavigationTest` identifica la sessione dalla **tab** (`tsteps.sh`), che è il fatto
+di cui parla.
+
+**Verifiche**: suite verde (`InitScreenTest` 9 test, `TypistTest` 9), lint 0 errori.
+
+- [ ] Da verificare su device: la velocità (fluida, non una macchina da scrivere), il
+      tap-to-skip a metà stampa, «Rimuovi animazioni» in Accessibilità, TalkBack, e che le
+      quattro righe più le risposte ci stiano su uno schermo da 360×640
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

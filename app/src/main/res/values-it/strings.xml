@@ -190,9 +190,12 @@
     <string name="readme_rec_longest_walk">Camminata pi\u00f9 lunga: **%1$d min** \u00b7 %2$s (%3$s)</string>
     <string name="readme_rec_best_week">Settimana migliore: **%1$s passi** (settimana %2$d)</string>
     <string name="readme_footer">Calcolato sul dispositivo \u00b7 %1$d giorni committati</string>
-    <!-- `$ tsteps init` (Fase 17): prosa per chi vede l\'app per la prima volta -->
-    <string name="init_intro">tsteps conta i passi con il sensore del telefono.</string>
+    <!-- `$ tsteps init` (Fase 17): prosa per chi vede l\'app per la prima volta.
+         Dalla Fase 23 il transcript si scrive da solo. -->
+    <string name="init_intro">tsteps conta i passi con il sensore del telefono, e sembra un editor di codice.</string>
+    <string name="init_files">Oggi è un file JSON, ogni giorno prima è un commit in un diff, le settimane sono una griglia colorata.</string>
     <string name="init_privacy">Niente rete, niente account, niente GPS: dal telefono non esce niente.</string>
+    <string name="init_ask">Per contare anche un solo passo gli serve un permesso.</string>
     <string name="init_option_grant">attiva il contapassi</string>
     <string name="init_option_grant_note">permesso Attività fisica, te lo chiede Android</string>
     <string name="init_option_skip">salta</string>
