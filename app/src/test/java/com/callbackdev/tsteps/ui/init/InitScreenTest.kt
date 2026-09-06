@@ -164,13 +164,17 @@ class InitScreenTest {
      * where a first-run screen starts costing the reader time. This is the test to
      * argue with before the intro becomes a carousel by accretion.
      *
-     * The floor is the device's answer. At five hundred characters a second the whole
-     * session was over in a second and a half, and that does not read as writing — it
-     * reads as a flicker, which is the "fuffa" the animation exists to avoid. "Under
-     * two seconds" was the guard that had allowed it, so the guard now has two ends.
-     * Italian is the longer of the two languages and both are checked.
+     * The floor is the device's answer, and it has moved twice. At five hundred
+     * characters a second the whole session was over in a second and a half, and that
+     * does not read as writing — it reads as a flicker, which is the "fuffa" the
+     * animation exists to avoid. "Under two seconds" was the guard that had allowed
+     * it, so the guard grew a second end. Then the shape turned out to matter more
+     * than the rate: the answers are prompts too, so they are typed at the command's
+     * speed and wait after themselves, and the session became a conversation with
+     * turns instead of one command followed by everything at once. Italian is the
+     * longer of the two languages and both are checked.
      */
-    private val budgetMs = 2_000L..4_000L
+    private val budgetMs = 4_000L..8_000L
 
     @Test
     fun `the whole session prints inside its budget`() {

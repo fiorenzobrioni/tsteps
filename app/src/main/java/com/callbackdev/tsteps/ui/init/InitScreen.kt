@@ -128,15 +128,13 @@ internal fun buildInitScript(
     onSkip: () -> Unit
 ): List<TypedLine> = buildList {
     add(
-        TypedLine(
+        typed(
             CodeLine(
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = syntax.comment)) { append("$ ") }
                     withStyle(SpanStyle(color = syntax.string)) { append("tsteps init") }
                 }
-            ),
-            msPerChar = PromptMsPerChar,
-            pauseAfterMs = PromptPauseMs
+            )
         )
     )
     add(blank())
@@ -166,7 +164,7 @@ private fun MutableList<TypedLine>.option(
 ) {
     add(blank())
     add(
-        printed(
+        typed(
             CodeLine(
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = syntax.comment)) { append("> ") }
@@ -180,6 +178,16 @@ private fun MutableList<TypedLine>.option(
     add(printed(comment(note, syntax, indent = 1), pauseAfterMs = StanzaPauseMs))
 }
 
+/**
+ * A **prompt** line at a hand's speed, with a beat after it: the `$` command and each
+ * `>` answer. They are the turns of the session — the places where somebody types and
+ * where the session then waits — and giving them one rhythm is what stops the whole
+ * transcript arriving as a single breath after the command (device, Fase 23b/23c).
+ */
+private fun typed(line: CodeLine): TypedLine =
+    TypedLine(line, msPerChar = PromptMsPerChar, pauseAfterMs = PromptPauseMs)
+
+/** Output: the `#` lines the session prints between one turn and the next. */
 private fun printed(line: CodeLine, pauseAfterMs: Int = LinePauseMs): TypedLine =
     TypedLine(line, msPerChar = PrintMsPerChar, pauseAfterMs = pauseAfterMs)
 

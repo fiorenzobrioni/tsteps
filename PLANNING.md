@@ -688,6 +688,31 @@ gesti come se lo prende `EditorNavBar`.
 - [ ] Da verificare su device: la nuova velocità, e che tab e barra di stato stiano dentro
       le loro barre di sistema (navigazione a gesti e a tre bottoni)
 
+## Fase 23c — Le risposte sono prompt anche loro (device, 6 set 2026)
+
+Decisione di serie: stessa modifica in tweather (Fase 27c, dove sta il verbale
+completo) e thabit (Fase 19c). Trovata di nuovo qui, provando l'app.
+
+Verbale del committente: il comando ha la velocità giusta, la pausa dopo il comando ha
+la durata giusta, «poi fa tutto il testo in un colpo solo fino alla fine». Il difetto
+non era la velocità ma la **forma**: la sessione aveva due tempi ma un solo respiro —
+un turno, e poi un annuncio.
+
+**La correzione non è altra lentezza, è un ritmo.** Ogni riga che si apre con un prompt
+— il `$` del comando e ogni `>` di risposta — è **digitata** alla stessa velocità e
+seguita dallo stesso respiro; tutto il resto è **stampato**. Il glifo del prompt è la
+spia in tutte e due le direzioni: è dove una mano sta sullo schermo, ed è dove una
+sessione aspetta.
+
+**E la prosa scende ancora**, da 250 a ~165 caratteri al secondo (`PrintMsPerChar` 4 →
+6), con respiri più larghi fra le righe (`LinePauseMs` 40 → 100, `StanzaPauseMs` 100 →
+160). La corsa passa a **5,8 s** in entrambe le lingue, e il budget del test a
+`4_000..8_000` ms.
+
+**Verifiche**: suite verde, lint 0 errori.
+
+- [ ] Da verificare su device: il ritmo spezzato, e se sei secondi sono troppi
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

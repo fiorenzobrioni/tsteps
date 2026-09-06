@@ -39,20 +39,24 @@ import com.callbackdev.tsteps.ui.components.CodeLine
 import com.callbackdev.tsteps.ui.components.LocalEditorOptions
 import com.callbackdev.tsteps.ui.components.WidgetLine
 
-/** A hand at the keyboard: only the `$` command line is typed at this rate. */
+/**
+ * A hand at the keyboard: the rate of every line that opens with a prompt — the `$`
+ * command and each `>` answer alike. About twenty-two characters a second, which is
+ * what a hand does; fifty was the first guess and read as a machine pretending.
+ */
 internal const val PromptMsPerChar = 45
 
-/** A program writing to a tty: ~250 characters a second, four per frame. */
-internal const val PrintMsPerChar = 4
+/** A program writing to a tty: ~165 characters a second. */
+internal const val PrintMsPerChar = 6
 
-/** The beat between the command and the first line of its output. */
+/** The beat after a prompt line, where a session waits for what comes next. */
 internal const val PromptPauseMs = 240
 
 /** The beat after every printed line, so a line lands as a line and not as a stream. */
-internal const val LinePauseMs = 40
+internal const val LinePauseMs = 100
 
-/** The beat between one answer and the next, so the choices do not run together. */
-internal const val StanzaPauseMs = 100
+/** The beat that closes a stanza, so an answer and its note do not run into the next. */
+internal const val StanzaPauseMs = 160
 
 /**
  * The block cursor. Deliberately not the `_` of `TerminalInput`: that one marks an
@@ -124,19 +128,23 @@ internal class Typist(private val script: List<TypedLine>) {
  * shell never is, and the block cursor — the single glyph that says the machine is
  * *at* this character, right now — had nowhere to be.
  *
- * **Two speeds, because a transcript has two authors.** The command line is *typed*
- * ([PromptMsPerChar], a hand at a keyboard); everything under it is *printed*
- * ([PrintMsPerChar], a program writing to a tty and not a typewriter). The gap
- * between the two rates is what makes the first line read as somebody's and the
- * rest as the machine's answer.
+ * **Two speeds, because a transcript has two authors.** Every line that opens with a
+ * prompt — the `$` command and each `>` answer — is *typed* ([PromptMsPerChar], a
+ * hand at a keyboard) and is followed by a beat; everything else is *printed*
+ * ([PrintMsPerChar], a program writing to a tty and not a typewriter). The prompt
+ * glyph is the tell in both directions: it is where a hand belongs on screen, and
+ * where a session waits.
  *
- * **The rates are the device's, not the desk's.** The first pass printed at five
- * hundred characters a second and was over in a second and a half, and on a phone
- * that does not read as writing at all — it reads as a flicker, and text that
- * arrives faster than the eye tracks is exactly the "fuffa" the animation was
- * supposed to avoid. Half that rate, plus a [LinePauseMs] beat after every line so a
- * line lands as a line rather than as a stream, puts the run near three seconds and
- * lets the eye follow the cursor — which is the only reason the cursor is there.
+ * **The rates are the device's, not the desk's**, and they took two rounds. The
+ * first pass printed everything at five hundred characters a second and was over in
+ * a second and a half: that does not read as writing, it reads as a flicker, and
+ * text arriving faster than the eye tracks is exactly the "fuffa" the animation
+ * exists to avoid. The second pass halved the rate and still had the shape wrong —
+ * one command, then the whole rest of the session in a single breath. The fix was
+ * not more slowness but a **rhythm**: the answers are prompts too, so they are typed
+ * at the command's own speed and wait after themselves, and the session reads as a
+ * conversation with turns instead of an announcement. It runs six to seven seconds
+ * now, which is a screen a fresh install sees once and a tap ends whenever.
  *
  * **Nothing here is a fake progress bar.** The series' rule is that the file must
  * not lie, and a spinner counting up to a number the app already holds would be the
