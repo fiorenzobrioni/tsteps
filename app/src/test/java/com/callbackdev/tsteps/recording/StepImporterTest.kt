@@ -187,6 +187,56 @@ class StepImporterTest {
         assertEquals(millis("2026-09-20T09:00:00"), to)
         assertEquals(StepImporter.MAX_BACKFILL_MILLIS, to - from)
     }
+
+    /**
+     * Fase 24e. Revoking the permission cancels the jobs, which stops us reading;
+     * the recorder has to be told too, or Play services keeps recording for an
+     * app the user has just told to stop counting.
+     */
+    @Test
+    fun `stopping hands the recorder back and forgets the watermark`() = runBlocking {
+        importer.run(millis("2026-09-12T10:20:00"))
+        gateway.hours = listOf(hour("2026-09-12T11:00:00", 500L))
+        importer.run(millis("2026-09-12T12:30:00"))
+
+        assertTrue(importer.stop())
+
+        assertEquals(1, gateway.unsubscribeCalls)
+        val state = store.read()
+        assertFalse(state.subscribed)
+        // The watermark is a claim that those hours are covered by an import.
+        // With the import gone the claim is false, and leaving it would keep the
+        // counter standing down from hours nobody is going to write.
+        assertEquals(0L, state.importedUntilMillis)
+        assertEquals(0L, state.importFromMillis)
+    }
+
+    @Test
+    fun `stopping what never started asks the recorder nothing`() = runBlocking {
+        assertFalse(importer.stop())
+        assertEquals(0, gateway.unsubscribeCalls)
+    }
+
+    /** A refused unsubscribe still clears our side: the claim is false either way. */
+    @Test
+    fun `a failed unsubscribe still forgets the watermark`() = runBlocking {
+        importer.run(millis("2026-09-12T10:20:00"))
+        importer.run(millis("2026-09-12T12:30:00"))
+        gateway.unsubscribeResult = false
+
+        assertFalse(importer.stop())
+        assertFalse(store.read().subscribed)
+        assertEquals(0L, store.read().importedUntilMillis)
+    }
+
+    @Test
+    fun `after stopping, the next pass arms from scratch`() = runBlocking {
+        importer.run(millis("2026-09-12T10:20:00"))
+        importer.stop()
+
+        assertEquals(StepImportOutcome.Arming, importer.run(millis("2026-09-12T14:20:00")))
+        assertEquals(millis("2026-09-12T15:00:00"), store.read().importFromMillis)
+    }
 }
 
 private class FakeRecordingGateway : StepRecordingGateway {
@@ -196,6 +246,8 @@ private class FakeRecordingGateway : StepRecordingGateway {
     var hours: List<RecordedHour> = emptyList()
     var failWith: Exception? = null
     var subscribeCalls: Int = 0
+    var unsubscribeCalls: Int = 0
+    var unsubscribeResult: Boolean = true
     var lastRange: Pair<Long, Long>? = null
 
     override fun availability(): RecordingAvailability = availabilityValue
@@ -205,7 +257,10 @@ private class FakeRecordingGateway : StepRecordingGateway {
         return subscribeResult
     }
 
-    override suspend fun unsubscribe(): Boolean = true
+    override suspend fun unsubscribe(): Boolean {
+        unsubscribeCalls++
+        return unsubscribeResult
+    }
 
     override suspend fun readHourlySteps(fromMillis: Long, toMillis: Long): List<RecordedHour> {
         lastRange = fromMillis to toMillis

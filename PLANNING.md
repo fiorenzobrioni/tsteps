@@ -873,6 +873,23 @@ superfici dove si vedeva un vuoto muto.
       non traduce), 4 in `StepsReadmeTest` (compresa l'italiana). Suite: **525 verdi**,
       lint 0 errori
 
+### 24e — Il registratore si restituisce ✅
+
+Trovata chiudendo la fase: `unsubscribe()` esisteva nel gateway e non lo chiamava
+nessuno. Revocare `ACTIVITY_RECOGNITION` cancellava i job — cioè smettevamo di
+leggere — ma Play services continuava a registrare **per noi**, per un'app a cui
+l'utente aveva appena detto di smettere di contare.
+
+- [x] `StepImporter.stop()`: disiscrizione e **azzeramento dello stato**, anche se la
+      chiamata fallisce. Il watermark è l'affermazione che quelle ore le copre un
+      import: sparito l'import l'affermazione è falsa, e lasciarla terrebbe il contatore
+      ritirato da ore che non scriverà più nessuno
+- [x] Chiamato da `SyncScheduler.reconcile`, che è già l'unico proprietario della
+      decisione «dobbiamo raccogliere o no»
+- [x] Test: 4 in `StepImporterTest` (restituzione e oblio, stop di ciò che non è mai
+      partito, unsubscribe fallita che pulisce lo stesso, ri-armo da zero al giro dopo).
+      Suite: **529 verdi**, lint 0 errori
+
 ### Principi rivisti (approvati dal committente il 13 set 2026)
 
 Il committente ha chiesto esplicitamente che i principi non blocchino una soluzione

@@ -37,6 +37,10 @@ object SyncScheduler {
         if (!canSample) {
             workManager.cancelUniqueWork(SYNC_WORK)
             workManager.cancelUniqueWork(ROLLOVER_WORK)
+            // Fase 24e: and hand the recorder back. Cancelling the jobs only stops
+            // us from reading; without this, Play services would go on recording
+            // steps for an app the user has just told to stop counting.
+            ServiceLocator.stopRecording(context)
             return
         }
         workManager.enqueueUniquePeriodicWork(

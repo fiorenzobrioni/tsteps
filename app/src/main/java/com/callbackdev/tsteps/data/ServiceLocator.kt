@@ -208,6 +208,17 @@ object ServiceLocator {
         importScope.launch { runCatching { stepImporter(appContext).run() } }
     }
 
+    /**
+     * The other half of [importSteps]: give the recorder back when the app is no
+     * longer allowed to count. Fire-and-forget on the same detached scope — the
+     * caller is `SyncScheduler.reconcile`, which is synchronous and owns the
+     * decision, not the waiting.
+     */
+    fun stopRecording(context: Context) {
+        val appContext = context.applicationContext
+        importScope.launch { runCatching { stepImporter(appContext).stop() } }
+    }
+
     /** Singleton: its mutex serializes the overlapping passes, like the HC sync. */
     fun stepImporter(context: Context): StepImporter =
         stepImporter ?: synchronized(this) {

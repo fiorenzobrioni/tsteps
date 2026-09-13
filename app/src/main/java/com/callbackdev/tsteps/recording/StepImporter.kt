@@ -86,6 +86,30 @@ class StepImporter(
         return StepImportOutcome.Imported(hours = shares.size, steps = shares.sumOf { it.steps })
     }
 
+    /**
+     * Stops the recording and forgets everything about it. Called when the app
+     * loses the permission to count at all ([com.callbackdev.tsteps.work.SyncScheduler]
+     * is the single owner of that decision): revoking `ACTIVITY_RECOGNITION` must
+     * stop Play services from recording *for us* too, not just stop us reading —
+     * data kept on behalf of an app that may no longer look at it is data nobody
+     * asked for.
+     *
+     * The state is cleared even when the call fails, and that is deliberate: what
+     * it holds is a claim that hours are covered by an import, and the moment the
+     * import is gone that claim is false. Leaving the watermark behind would keep
+     * the counter standing down from hours nobody is going to write.
+     */
+    suspend fun stop(): Boolean = mutex.withLock {
+        if (!store.read().subscribed) return@withLock false
+        val stopped = try {
+            gateway.unsubscribe()
+        } catch (error: Exception) {
+            false
+        }
+        store.write(RecordingState())
+        stopped
+    }
+
     private suspend fun arm(
         state: RecordingState,
         nowMillis: Long,
