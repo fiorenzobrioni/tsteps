@@ -127,6 +127,15 @@ interface HourlyStepsDao {
         val current = steps(date, hour) ?: 0L
         upsert(HourlyStepsEntity(date, hour, current + delta))
     }
+
+    /**
+     * Replaces one bucket outright — what the background import writes with
+     * (Fase 24c). Adding would double an hour on the second read of it, and the
+     * import deliberately reads the last finished hour more than once, because
+     * the recorder it reads from writes with a lag of its own.
+     */
+    suspend fun setSteps(date: String, hour: Int, steps: Long) =
+        upsert(HourlyStepsEntity(date, hour, steps))
 }
 
 @Dao

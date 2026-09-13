@@ -67,6 +67,14 @@
     <string name="note_stride_measured">passo misurato, batte height_cm</string>
     <string name="note_commit_message">il messaggio di commit del giorno chiuso</string>
     <string name="note_goal_notify">una volta al giorno, quando il check passa</string>
+    <string name="note_gap_day">nessuna lettura per il %1$s</string>
+    <string name="note_gap_days">nessuna lettura per %1$d giorni (%2$s)</string>
+    <string name="note_source_live">l\'ora in corso la conta il sensore di passi del telefono, mentre tsteps è aperta</string>
+    <string name="note_source_recorded">le ore con tsteps chiusa le registra sul dispositivo Google Play services</string>
+    <string name="note_source_arming">Google Play services inizia a registrare le ore con tsteps chiusa al prossimo giro</string>
+    <string name="note_source_unavailable">qui non c\'è Google Play services: si contano solo le ore con tsteps aperta</string>
+    <string name="note_source_stale">ultima lettura dal registratore: %1$s fa (il sistema potrebbe star sospendendo tsteps)</string>
+    <string name="note_source_update">Google Play services è troppo vecchio per registrare le ore con tsteps chiusa</string>
     <string name="note_hc_interop">scambio dati sul dispositivo con altre app di salute — niente rete</string>
     <string name="note_hc_writes">scrive: passi orari + sessioni di camminata · legge: i loro passi</string>
     <string name="note_hc_external">i passi esterni sono mostrati, mai sommati ai tuoi</string>
@@ -175,6 +183,8 @@
     <string name="readme_goal_reached">\u2713 Obiettivo raggiunto: %1$s passi su %2$s (%3$d%%)</string>
     <string name="readme_goal_progress">%1$s passi su %2$s (%3$d%%) \u00b7 ne mancano %4$s</string>
     <string name="readme_goal_none">Nessun obiettivo impostato.</string>
+    <string name="readme_gap_week_one">Un giorno di questa settimana non ha letture: manca, non è vuoto.</string>
+    <string name="readme_gap_week">%1$d giorni di questa settimana non hanno letture: mancano, non sono vuoti.</string>
     <string name="readme_streak">Streak corrente: %1$d giorni</string>
     <string name="readme_warn_no_sensor">\u26a0\ufe0f Nessun sensore di passi su questo dispositivo</string>
     <string name="readme_warn_no_permission">\u26a0\ufe0f Manca il permesso per leggere il contapassi. Tocca per concederlo.</string>

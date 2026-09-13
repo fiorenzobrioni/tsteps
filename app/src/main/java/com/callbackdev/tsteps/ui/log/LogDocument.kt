@@ -8,6 +8,8 @@ import androidx.compose.ui.text.withStyle
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.CommitHash
+import com.callbackdev.tsteps.domain.Gap
+import com.callbackdev.tsteps.domain.Gaps
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.ui.components.CanvasLine
@@ -98,7 +100,17 @@ object LogDocument {
         val weekTotals: Map<Pair<Int, Int>, Long> = days.groupBy { weekOf(it.date) }
             .mapValues { (_, weekDays) -> weekDays.sumOf { it.steps } }
         var currentWeek: Pair<Int, Int>? = null
+        // Fase 24d: the days between two commits. git shows nothing for a day
+        // nobody committed, and here that silence is ambiguous — a day with no
+        // reading and a day with no steps look identical, and only one of them
+        // is something the app knows. So it says which one it is looking at.
+        var newerDate: LocalDate? = today?.date
         days.forEach { day ->
+            Gaps.between(newerDate ?: day.date, day.date)?.let { gap ->
+                add(blank())
+                add(gapLine(gap, resources, locale, syntax))
+            }
+            newerDate = day.date
             val week = weekOf(day.date)
             if (week != currentWeek) {
                 currentWeek = week
@@ -120,6 +132,31 @@ object LogDocument {
                 toggleLabel = toggleLabel
             )
         }
+    }
+
+    /**
+     * `# no reading for 2 days (10 Sep..11 Sep)`. The range uses the same `..`
+     * the session hunks do — a span is a span, whatever it is made of. Prose
+     * around the token, per the register rule: `#` is the file's syntax and the
+     * dates are data, so both stay put while the sentence between them moves.
+     */
+    private fun gapLine(
+        gap: Gap,
+        resources: Resources,
+        locale: Locale,
+        syntax: SyntaxColors
+    ): CanvasLine {
+        val format = DateTimeFormatter.ofPattern("d MMM", locale)
+        val text = if (gap.days == 1) {
+            resources.getString(R.string.note_gap_day, gap.from.format(format))
+        } else {
+            resources.getString(
+                R.string.note_gap_days,
+                gap.days,
+                "${gap.from.format(format)}..${gap.to.format(format)}"
+            )
+        }
+        return commentLine("# $text", syntax)
     }
 
     /** `--- week 34 · 52,340 steps (+2,340 vs week 33) ---`, delta in diff colors. */

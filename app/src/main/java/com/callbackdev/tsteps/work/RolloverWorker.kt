@@ -51,6 +51,9 @@ class RolloverWorker(
         val repository = ServiceLocator.stepRepository(applicationContext)
         ServiceLocator.stepSensorReader(applicationContext).readCurrent()
             ?.let { repository.ingest(it) }
+        // Same order as the sampler, and for the same reason: the day being
+        // closed gets everything the recorder has for it before it is frozen.
+        ServiceLocator.stepImporter(applicationContext).run()
         val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
         committed.maxByOrNull { it.date }?.let { newest ->
             val settings = ServiceLocator.settingsStore(applicationContext).read()

@@ -7,6 +7,7 @@ import com.callbackdev.tsteps.data.local.SessionEntity
 import com.callbackdev.tsteps.data.local.StepSampleEntity
 import com.callbackdev.tsteps.data.local.TstepsDatabase
 import com.callbackdev.tsteps.domain.StepReading
+import com.callbackdev.tsteps.recording.ImportCoverage
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -41,6 +42,9 @@ class StepRepositoryTest {
     private lateinit var settingsStore: SettingsStore
     private lateinit var repository: StepRepository
 
+    /** Fase 24c: what the background import covers. Empty = nothing records. */
+    private var coverage = ImportCoverage()
+
     @Before
     fun setUp() {
         database = Room.inMemoryDatabaseBuilder(
@@ -59,7 +63,8 @@ class StepRepositoryTest {
                 PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("t.preferences_pb") }
             ),
             settingsStore = settingsStore,
-            zone = { rome }
+            zone = { rome },
+            importCoverage = { coverage }
         )
     }
 
@@ -72,8 +77,13 @@ class StepRepositoryTest {
     private fun millis(dateTime: String): Long =
         LocalDateTime.parse(dateTime).atZone(rome).toInstant().toEpochMilli()
 
-    private fun reading(cumulative: Long, at: String, boot: Int = 3) =
-        StepReading(cumulative, boot, millis(at))
+    private fun reading(cumulative: Long, at: String, boot: Int = 3, bootAt: String? = null) =
+        StepReading(
+            cumulativeSteps = cumulative,
+            bootCount = boot,
+            timestampMillis = millis(at),
+            bootMillis = bootAt?.let(::millis) ?: 0L
+        )
 
     @Test
     fun `first reading anchors silently, the second writes its delta`() = runBlocking {
@@ -180,6 +190,91 @@ class StepRepositoryTest {
         repository.ingest(reading(250L, "2026-08-18T12:00:00", boot = 4))
         assertEquals(750L, database.hourlyStepsDao().day("2026-08-18").sumOf { it.steps })
     }
+
+    /**
+     * The device case that found the bug (Sep 2026): installed on Wednesday, not
+     * opened Thursday or Friday, phone switched off every night, opened again on
+     * Saturday morning. The steps of the two days off are gone with the counter
+     * that was zeroed at each boot — but Saturday's own walk must stay Saturday's.
+     * Before the clamp the delta was spread from the Wednesday anchor and those
+     * two untouched days were credited with ~1,000 and ~1,750 steps each.
+     */
+    @Test
+    fun `a morning walk after days off is not spread over the days the phone was off`() =
+        runBlocking {
+            repository.ingest(reading(2_000L, "2026-09-09T21:00:00", boot = 3))
+            repository.ingest(reading(4_130L, "2026-09-09T22:00:00", boot = 3))
+            // Two nights off, two boots. Saturday's counter starts at zero at 07:00
+            // and reads 3,545 at 09:45 — every one of them walked on Saturday.
+            repository.ingest(
+                reading(3_545L, "2026-09-12T09:45:00", boot = 5, bootAt = "2026-09-12T07:00:00")
+            )
+
+            val dao = database.hourlyStepsDao()
+            assertEquals(0L, dao.day("2026-09-10").sumOf { it.steps })
+            assertEquals(0L, dao.day("2026-09-11").sumOf { it.steps })
+            assertEquals(3_545L, dao.day("2026-09-12").sumOf { it.steps })
+        }
+
+    /**
+     * Fase 24c. The counter and the recorder count the same steps, so an hour
+     * written by both would be a doubled hour. The line is time: everything
+     * before the import's watermark is its own, the hour in progress stays the
+     * counter's — which is what keeps the number on screen ticking while you
+     * watch it. Shown here on a recorder gone quiet, because that is the case
+     * where the counter still spreads a delta across the boundary at all (a live
+     * one keeps its whole history — the test below this one).
+     */
+    @Test
+    fun `the counter does not write the hours the import already owns`() = runBlocking {
+        coverage = ImportCoverage(
+            importedUntilMillis = millis("2026-09-12T09:00:00"),
+            lastImportMillis = millis("2026-09-11T09:05:00")
+        )
+        repository.ingest(reading(1_000L, "2026-09-12T08:30:00"))
+        // Spread over 08:30..10:30: the quarter landing before the watermark is
+        // the import's and is dropped, the rest is the counter's.
+        repository.ingest(reading(1_600L, "2026-09-12T10:30:00"))
+
+        val dao = database.hourlyStepsDao()
+        assertEquals(0L, dao.steps("2026-09-12", 8) ?: 0L)
+        assertEquals(450L, dao.day("2026-09-12").sumOf { it.steps })
+    }
+
+    /** No recorder, no watermark: the counter keeps writing every hour it can. */
+    @Test
+    fun `without an import the counter still owns the whole day`() = runBlocking {
+        repository.ingest(reading(1_000L, "2026-09-12T11:30:00"))
+        repository.ingest(reading(1_600L, "2026-09-12T12:30:00"))
+
+        assertEquals(600L, database.hourlyStepsDao().day("2026-09-12").sumOf { it.steps })
+    }
+
+
+    /**
+     * Fase 24c-bis. Opening the app after days away hands the counter one huge
+     * delta. Spreading it would give the hour in progress a slice of a three-day
+     * interval — proportional to time, which is to say invented. That history is
+     * the recorder's; the hour fills from the next reading, which is seconds away
+     * and whose span is entirely ours.
+     */
+    @Test
+    fun `a delta reaching back into imported hours is the recorder's, not a guess`() =
+        runBlocking {
+            coverage = ImportCoverage(
+                importedUntilMillis = millis("2026-09-12T09:00:00"),
+                lastImportMillis = millis("2026-09-12T09:05:00")
+            )
+            repository.ingest(reading(0L, "2026-09-10T08:00:00"))
+            // Two days later, one reading carrying 20,000 steps.
+            repository.ingest(reading(20_000L, "2026-09-12T10:20:00"))
+
+            assertEquals(0L, database.hourlyStepsDao().day("2026-09-12").sumOf { it.steps })
+
+            // And the next reading, whose span starts after the watermark, lands.
+            repository.ingest(reading(20_150L, "2026-09-12T10:22:00"))
+            assertEquals(150L, database.hourlyStepsDao().day("2026-09-12").sumOf { it.steps })
+        }
 
     // --- Fase 11: sample spans, tombstones, boundary edits -------------------
 

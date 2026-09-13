@@ -25,7 +25,14 @@ data class StepReading(
      * hardware the two differ by however long the user has been sitting still.
      * This is the one the widget's `# last_sync` and `# stale` are made of.
      */
-    val readAtMillis: Long = timestampMillis
+    val readAtMillis: Long = timestampMillis,
+    /**
+     * Wall clock of the last boot — the instant the counter was zeroed. Only a
+     * restarted counter needs it (see [StepTracker.advance]); `0` means the
+     * reading does not know, which is what a synthetic one says, and the clamp
+     * built on it then does nothing.
+     */
+    val bootMillis: Long = 0L
 )
 
 /**
@@ -77,17 +84,28 @@ object StepTracker {
         }
         // Clock moved backwards (manual change, sync): the span is meaningless,
         // collapse it so the delta lands at the reading's own instant.
-        val from = minOf(state.lastTimestampMillis, reading.timestampMillis)
-        val delta = when {
-            // Reboot: the counter restarted from zero, so the cumulative value IS
-            // the delta. Steps between the last sample and the shutdown are lost;
-            // that loss is accepted and documented (they were never sampled).
-            reading.bootCount != state.bootCount -> reading.cumulativeSteps
-            // Counter went backwards without a reboot (sensor HAL restart):
-            // treat it as a reset for the same reason.
-            reading.cumulativeSteps < state.lastCumulative -> reading.cumulativeSteps
-            else -> reading.cumulativeSteps - state.lastCumulative
-        }
+        val earliest = minOf(state.lastTimestampMillis, reading.timestampMillis)
+        // Reboot: the counter restarted from zero, so the cumulative value IS the
+        // delta. Steps between the last sample and the shutdown are lost; that
+        // loss is accepted and documented (they were never sampled). A counter
+        // that went backwards without a reboot (sensor HAL restart) is the same
+        // case for the same reason.
+        val restarted =
+            reading.bootCount != state.bootCount ||
+                reading.cumulativeSteps < state.lastCumulative
+        val delta =
+            if (restarted) reading.cumulativeSteps
+            else reading.cumulativeSteps - state.lastCumulative
+        // A counter that restarted cannot have counted before it was zeroed, so
+        // the span starts at the boot instant at the earliest. Without this the
+        // delta spread back to the *pre-reboot* anchor, and a phone switched off
+        // every night credited days it never had a reading for — a Saturday
+        // morning walk sprinkled over the Thursday and Friday it was off. The
+        // steps of those days are gone either way; inventing them is the bug.
+        val from =
+            if (restarted) maxOf(earliest, reading.bootMillis)
+                .coerceAtMost(reading.timestampMillis)
+            else earliest
         return Advance(newState, delta, from, reading.timestampMillis)
     }
 }

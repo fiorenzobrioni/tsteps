@@ -18,6 +18,8 @@ import com.callbackdev.tsteps.export.ExportFormat
 import com.callbackdev.tsteps.export.ExportResult
 import com.callbackdev.tsteps.healthconnect.HcAvailability
 import com.callbackdev.tsteps.healthconnect.HcSectionStatus
+import com.callbackdev.tsteps.recording.RecordingAvailability
+import com.callbackdev.tsteps.recording.StepSourceStatus
 import com.callbackdev.tsteps.ui.theme.TstepsTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,6 +75,10 @@ class SettingsScreenTest {
         settings: AppSettings = AppSettings(dailyGoalSteps = 10_000, weightKg = 78.0, heightCm = 175),
         recorded: RecordedActions = RecordedActions(),
         hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE),
+        sourceStatus: StepSourceStatus = StepSourceStatus(
+            availability = RecordingAvailability.AVAILABLE,
+            recording = true
+        ),
         exportState: ExportState = ExportState.Idle
     ): RecordedActions {
         compose.setContent {
@@ -81,6 +87,7 @@ class SettingsScreenTest {
                     settings = settings,
                     actions = recorded.actions(),
                     hcStatus = hcStatus,
+                    sourceStatus = sourceStatus,
                     exportState = exportState,
                     onExport = { exported = it }
                 )
@@ -342,5 +349,63 @@ class SettingsScreenTest {
         }
         line("// ERROR: notifications permission missing — tap to grant").performClick()
         assertTrue(tapped)
+    }
+
+    /**
+     * Fase 24c. The section has no value to tap on purpose: counting is the
+     * app's job, not a switch to hand the user. What it owes them is the truth
+     * about who counted, and that is two lines.
+     */
+    @Test
+    fun `the steps section says who counts, and offers nothing to set`() {
+        setContent()
+
+        line("\"steps\"").assertExists()
+        line("the hour in progress is counted by the phone step sensor").assertExists()
+        line("recorded on the device by Google Play services").assertExists()
+    }
+
+    @Test
+    fun `without Play services the section says only the open hours are counted`() {
+        setContent(sourceStatus = StepSourceStatus(RecordingAvailability.UNAVAILABLE))
+
+        line("only the hours with tsteps open are counted").assertExists()
+        compose.onNodeWithText("Google Play services", substring = true).assertExists()
+    }
+
+    @Test
+    fun `before the recorder is armed the section says so instead of claiming it`() {
+        setContent(
+            sourceStatus = StepSourceStatus(RecordingAvailability.AVAILABLE, recording = false)
+        )
+
+        line("starts recording the hours with tsteps closed at the next pass").assertExists()
+    }
+
+    /**
+     * Fase 24f. A recorder that stops is silent by nature — the numbers simply
+     * stop moving — and on a phone whose system suspends apps that silence is
+     * the thing the user most needs named.
+     */
+    @Test
+    fun `a recorder gone quiet is named, with how long it has been quiet`() {
+        setContent(
+            sourceStatus = StepSourceStatus(
+                availability = RecordingAvailability.AVAILABLE,
+                recording = true,
+                staleForMillis = 7 * 3_600_000L
+            )
+        )
+
+        line("last read from the recorder: 7h ago").assertExists()
+    }
+
+    /** And it says nothing at all while the recorder is answering. */
+    @Test
+    fun `a recorder that answers adds no line`() {
+        setContent()
+
+        compose.onNodeWithText("last read from the recorder", substring = true)
+            .assertDoesNotExist()
     }
 }

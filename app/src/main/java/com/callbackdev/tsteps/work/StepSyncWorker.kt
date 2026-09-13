@@ -70,6 +70,10 @@ class StepSyncWorker(
             ServiceLocator.stepSensorReader(applicationContext).readCurrent()
                 ?.let { repository.ingest(it) }
         }
+        // Fase 24c: the hours nobody was awake for, before the commit and not
+        // after it — a day is frozen once, and a day committed without the hours
+        // the import was about to write would stay wrong for good.
+        ServiceLocator.stepImporter(applicationContext).run()
         val committed = repository.commitDaysBefore(LocalDate.now(ZoneId.systemDefault()))
         notifyDailyCommit(committed)
         GoalWatcher.evaluate(applicationContext)

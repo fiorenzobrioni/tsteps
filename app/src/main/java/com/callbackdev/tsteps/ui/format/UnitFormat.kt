@@ -52,6 +52,21 @@ object UnitFormat {
     private val ClockTime = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 
     /** `09:32` — the wall-clock shape used by session hunks and arrays. */
+    /**
+     * A compact age for the comment channel: `45m`, `6h`, `2d` (Fase 24f). The
+     * unit is a token and stays put in both languages — which is also why it is
+     * a letter and not a word: a sentence that carries `6 hours` has to decide
+     * about plurals in two languages to say a number.
+     */
+    fun compactAge(millis: Long): String {
+        val minutes = (millis / 60_000L).coerceAtLeast(0L)
+        return when {
+            minutes < 60L -> "${minutes}m"
+            minutes < 48L * 60L -> "${minutes / 60L}h"
+            else -> "${minutes / (24L * 60L)}d"
+        }
+    }
+
     fun clockTime(epochMillis: Long, zone: ZoneId): String =
         Instant.ofEpochMilli(epochMillis).atZone(zone).format(ClockTime)
 

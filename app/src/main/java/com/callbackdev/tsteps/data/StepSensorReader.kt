@@ -147,7 +147,11 @@ class StepSensorReader(context: Context) : StepSource {
             // age belongs to the steps, not to the reading. `readAtMillis` is what
             // the widget's freshness is measured against; `timestampMillis` is
             // what the hourly attribution is measured against.
-            readAtMillis = now
+            readAtMillis = now,
+            // `elapsedRealtime` counts from the last boot (deep sleep included),
+            // so this subtraction is the instant the counter was zeroed — the
+            // floor under a post-reboot delta's span.
+            bootMillis = now - SystemClock.elapsedRealtime()
         )
     }
 

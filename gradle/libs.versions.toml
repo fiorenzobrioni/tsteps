@@ -13,6 +13,7 @@ datastore = "1.1.1"
 room = "2.8.4"
 work = "2.10.5"
 healthConnect = "1.1.0"
+playServicesFitness = "21.2.0"
 ksp = "2.2.20-2.0.4"
 junit = "4.13.2"
 androidxJunit = "1.2.1"
@@ -45,6 +46,10 @@ androidx-work-testing = { group = "androidx.work", name = "work-testing", versio
 # Health Connect client is a Jetpack (androidx) library, NOT Google Play Services:
 # it talks over local IPC to the on-device HC module. No network, no GMS.
 androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
+# Fase 24 — the Recording API only (`LocalRecordingClient`): on-device, accountless,
+# offline. Declares no permission of its own, so the merged manifest still carries
+# no INTERNET; verified against the published AARs, not assumed.
+play-services-fitness = { group = "com.google.android.gms", name = "play-services-fitness", version.ref = "playServicesFitness" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

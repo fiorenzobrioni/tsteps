@@ -66,7 +66,11 @@ import com.callbackdev.tsteps.export.ExportResult
 import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
 import com.callbackdev.tsteps.healthconnect.HcAvailability
 import com.callbackdev.tsteps.healthconnect.HcPermissions
+import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.healthconnect.HcSectionStatus
+import com.callbackdev.tsteps.recording.RecordingAvailability
+import com.callbackdev.tsteps.ui.format.UnitFormat
+import com.callbackdev.tsteps.recording.StepSourceStatus
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeCanvas
 import com.callbackdev.tsteps.ui.components.CodeLine
@@ -233,6 +237,16 @@ fun SettingsScreen(
     LaunchedEffect(permissionEpoch) {
         hcStatus = HcPermissions.sectionStatus(AndroidHealthConnectGateway(context))
     }
+    // Fase 24c: who is counting. A version check and a DataStore read, on the
+    // same epochs — the recorder can be updated or its permission revoked while
+    // tsteps is paused, exactly like Health Connect's.
+    var sourceStatus by remember { mutableStateOf(StepSourceStatus()) }
+    LaunchedEffect(permissionEpoch) {
+        sourceStatus = StepSourceStatus.of(
+            ServiceLocator.stepRecordingGateway(context),
+            ServiceLocator.recordingStateStore(context)
+        )
+    }
     val hcLauncher = rememberLauncherForActivityResult(HcPermissions.requestContract()) { granted ->
         permissionEpoch++
         // Whatever subset the user granted is what the sync will do; nothing
@@ -261,6 +275,7 @@ fun SettingsScreen(
         onSelectFile = { activeFile = it },
         notifState = notifState,
         hcStatus = hcStatus,
+        sourceStatus = sourceStatus,
         exportState = exportState,
         onExport = viewModel::export,
         onHcLine = {
@@ -316,6 +331,10 @@ fun SettingsScreen(
     onNotifLine: () -> Unit = {},
     hcStatus: HcSectionStatus = HcSectionStatus(availability = HcAvailability.AVAILABLE),
     onHcLine: () -> Unit = {},
+    sourceStatus: StepSourceStatus = StepSourceStatus(
+        availability = RecordingAvailability.AVAILABLE,
+        recording = true
+    ),
     exportState: ExportState = ExportState.Idle,
     onExport: (ExportFormat) -> Unit = {},
     canvasState: LazyListState = rememberLazyListState(),
@@ -394,6 +413,7 @@ fun SettingsScreen(
         notifLabel = resources.getString(R.string.cd_grant_notifications),
         onNotifLine = onNotifLine,
         hcStatus = hcStatus,
+        sourceStatus = sourceStatus,
         hcGrantLabel = resources.getString(R.string.cd_grant_health),
         onHcLine = onHcLine,
         changeLabel = { key -> resources.getString(R.string.cd_change_setting, key) },
@@ -519,6 +539,7 @@ private fun buildSettingsLines(
     notifLabel: String,
     onNotifLine: () -> Unit,
     hcStatus: HcSectionStatus,
+    sourceStatus: StepSourceStatus,
     hcGrantLabel: String,
     onHcLine: () -> Unit,
     changeLabel: (String) -> String,
@@ -752,6 +773,47 @@ private fun buildSettingsLines(
         onClickLabel = changeLabel("goal_check")) {
         actions.onGoalCheck(!settings.notifications.goalCheck)
     })
+    add(punctLine("},", 1, syntax))
+
+    // Fase 24c: where the steps come from. Comments only — there is nothing to
+    // configure, and that is the point: counting is automatic, and the file just
+    // says who did it.
+    add(keyOpenLine("steps", 1, syntax))
+    add(commentLine("// " + resources.getString(R.string.note_source_live), syntax, indent = 2))
+    add(
+        commentLine(
+            "// " + resources.getString(
+                when (sourceStatus.availability) {
+                    RecordingAvailability.AVAILABLE ->
+                        if (sourceStatus.recording) {
+                            R.string.note_source_recorded
+                        } else {
+                            R.string.note_source_arming
+                        }
+                    RecordingAvailability.UPDATE_REQUIRED -> R.string.note_source_update
+                    RecordingAvailability.UNAVAILABLE -> R.string.note_source_unavailable
+                }
+            ),
+            syntax,
+            indent = 2
+        )
+    )
+    // Fase 24f: a third line only when there is something wrong to say. The
+    // recorder failing is silent by nature — the numbers simply stop moving —
+    // and on a phone whose system suspends apps that silence is the thing the
+    // user most needs named.
+    sourceStatus.staleForMillis?.let { staleFor ->
+        add(
+            commentLine(
+                "// " + resources.getString(
+                    R.string.note_source_stale,
+                    UnitFormat.compactAge(staleFor)
+                ),
+                syntax,
+                indent = 2
+            )
+        )
+    }
     add(punctLine("},", 1, syntax))
 
     // Fase 12: Health Connect interop, opt-in and default off. These comments

@@ -713,6 +713,227 @@ sessione aspetta.
 
 - [ ] Da verificare su device: il ritmo spezzato, e se sei secondi sono troppi
 
+## Fase 24 — I giorni che l'app non ha visto (feedback su device, 12 set 2026)
+
+**Verbale del committente**: app installata mercoledì, non aperta giovedì e venerdì,
+telefono spento ogni sera. Sabato mattina l'app mostra `—` su giovedì e venerdì.
+Domanda: «il sabato non poteva recuperare dal sensore i passi dei giorni passati?»
+
+**Diagnosi.** No, e la ragione non è l'app chiusa: è lo spegnimento. `TYPE_STEP_COUNTER`
+è un solo numero cumulativo azzerato a ogni boot, non un archivio; i passi di giovedì
+muoiono con il contatore giovedì sera. A telefono acceso non si perde nulla — il
+contatore conta da solo e la lettura successiva porta dentro tutto l'intervallo (clamp
+48h) — ma il riavvio cancella davvero. Nessuna API può andarli a riprendere, perché
+sul dispositivo non li ha conservati nessuno.
+
+**E cercandolo è saltato fuori un bug vero** (24a), più la sola via d'uscita che
+esista (24b e seguenti).
+
+### 24a — Un contatore riazzerato non può aver contato prima del boot ✅
+
+`StepTracker.advance` calcolava `from` dall'àncora **prima** e indipendentemente dal
+ramo riavvio: il delta post-reboot — che per costruzione copre solo boot→adesso — si
+spalmava all'indietro fino all'ancora pre-riavvio, clampato a 48h. Sul caso del
+committente: i 3.545 passi di sabato mattina sarebbero finiti 1.040 su giovedì, 1.752
+su venerdì e 753 su sabato. Due giorni inventati e il sabato falsato — esattamente ciò
+che «il file non deve mentire» vieta. Sul suo telefono non è successo per fortuna di
+orario (la prima lettura di sabato è arrivata col contatore ancora a ~0), non per
+progetto.
+
+- [x] `StepReading.bootMillis` — istante di boot da `currentTimeMillis - elapsedRealtime`,
+      riempito dal sensore; `0` = lettura sintetica che non lo sa, e il clamp è un no-op
+      (nessun test esistente cambia comportamento)
+- [x] `advance`: su contatore riazzerato (reboot **o** HAL restart) `from` parte dal boot,
+      con `coerceAtMost(timestampMillis)` perché uno skew d'orologio non produca uno span
+      al contrario
+- [x] Test: 5 nuovi in `StepTrackerTest` (clamp, HAL restart, boot ignoto, boot dopo la
+      lettura, caso ordinario intatto) + la regressione del device in `StepRepositoryTest`
+      (mercoledì → sabato con due boot: giovedì e venerdì restano a zero)
+
+### 24b — Il seam della Recording API ✅
+
+L'unico modo di avere i giorni non aperti, su un telefono con solo tsteps installato, è
+**delegare la registrazione a un componente di sistema**: Play services (`LocalRecordingClient`)
+non subisce i limiti sui sensori in background, registra delta di passi con i loro
+timestamp, on-device, offline, senza account, e **sopravvive ai riavvii**. Health Connect
+non serve a questo: è un magazzino, resta vuoto se nessun'altra app ci scrive (deciso
+col committente il 13 set: l'opzione «recupero da HC» è accantonata, HC resta la porta di
+interoperabilità che è).
+
+- [x] `com.google.android.gms:play-services-fitness:21.2.0` nel catalogo
+- [x] `recording/StepRecordingGateway` (interfaccia + DTO puri), `GmsStepRecordingGateway`
+      (l'unica classe che tocca `com.google.android.gms`), `RecordingInterop` (mappatura
+      pura ore→bucket, con `StepAttribution` come rete di sicurezza per un bucket a cavallo
+      di due ore locali)
+- [x] `readHourlySteps` **rilancia** l'errore invece di restituire lista vuota: chi importa
+      avanza un watermark su questa risposta, e «silenzio» e «zero passi» non possono
+      essere lo stesso valore — sarebbe perdita di dati silenziosa
+- [x] `ServiceLocator.stepRecordingGateway` + override per i test
+- [x] Test: `RecordingInteropTest` (6, incluse l'ora ripetuta della notte di DST e il buco
+      di primavera). Suite: **492 verdi**
+
+### 24c — L'importazione, automatica ✅
+
+**Decisione del committente (13 set 2026), che cambia il disegno di ieri**: niente
+interruttore. «Un utente si aspetta che l'app funzioni in automatico.» L'opzione
+«default off più riga in `settings.config` per accenderla» è **superata**: chiedere a
+qualcuno di accendere il conteggio è chiedergli di sapere cos'è una sottoscrizione.
+Resta solo la parte onesta della proposta — una riga `//` che **dichiara chi sta
+contando**, senza niente da toccare.
+
+- [x] `RecordingStateStore` (DataStore `recording_state`, suo come l'anchor: `git restore
+      settings.config` non deve poterlo perdere). **Due watermark, non uno**:
+      `importFromMillis` (da dove legge il prossimo giro) e `importedUntilMillis` (fin dove
+      l'import ha davvero scritto). Al momento della sottoscrizione il primo parte dall'ora
+      successiva e il secondo resta a zero: fra l'iscrizione e il primo import riuscito
+      l'import non possiede niente, e con un campo solo il sensore si sarebbe ritirato da
+      ore che nessuno aveva importato
+- [x] `StepImporter`: un giro = disponibilità → sottoscrizione → lettura delle sole ore
+      **finite** → scrittura → watermark. Il mutex serializza i chiamanti sovrapposti come
+      fa `HealthConnectSync`
+- [x] **Una sola sorgente per ora.** Il confine è il tempo: tutto ciò che sta prima di
+      `importedUntilMillis` è dell'import (`StepRepository.ingest` scarta quelle quote),
+      l'ora in corso resta del sensore — ed è ciò che tiene vivo il tick a schermo. L'ora
+      appena finita viene riletta un giro dopo: l'import scrive in SET, quindi ripetere è
+      gratis e il numero autorevole vince comunque
+- [x] Watermark **un'ora indietro rispetto all'orizzonte**: Play services scrive con un suo
+      ritardo, e congelare l'ora appena chiusa la lascerebbe registrata a metà
+- [x] Un errore di lettura **non muove niente** e azzera la sottoscrizione, così il giro
+      dopo si ri-arma da solo: è ciò che serve a un permesso revocato e poi riconcesso
+- [x] Un'ora che il registratore dà vuota **si lascia com'è, non si azzera**: l'import
+      riempie ciò che nessuno ha contato, non cancella ciò che qualcuno aveva contato
+- [x] Tetto a **10 giorni** (la finestra che Play services tiene): un telefono spento due
+      settimane non chiede ore che non esistono più
+- [x] Import **prima del commit** nei due worker: un giorno si congela una volta sola, e
+      committarlo senza le ore che l'import stava per scrivere lo lascerebbe sbagliato per
+      sempre. *Imprecisione nota e accettata*: gli ultimi minuti prima di mezzanotte
+      possono arrivare dal registratore dopo il commit e restare solo nelle righe orarie
+- [x] Import anche all'**onStart** dell'activity (scope staccato: uno swipe via non deve
+      poter interrompere un giro fra i bucket e il watermark) — aprire l'app è il momento in
+      cui la giornata deve già essere intera
+- [x] `HourlyStepsDao.setSteps` accanto a `increment`: sommare raddoppierebbe l'ora alla
+      seconda lettura
+- [x] **La riga che dichiara la fonte** — sezione `steps` in `settings.config`, soli
+      commenti, niente da tappare: l'ora in corso la conta il sensore, le ore con l'app
+      chiusa le registra Google Play services; e dove Play services non c'è (o è troppo
+      vecchio) lo dice, invece di lasciar credere che qualcuno stia registrando. Cinque
+      `note_source_*` IT/EN, dentro le guardie della Fase 20
+- [x] Test: `StepImporterTest` (9: arming, ore finite, SET che sostituisce, ora vuota
+      lasciata stare, errore che non muove il watermark, giro a vuoto, niente Play services,
+      sottoscrizione rifiutata e poi riuscita, tetto dei 10 giorni), 2 in `StepRepositoryTest`
+      (il sensore non scrive le ore dell'import; senza import scrive tutto), 3 in
+      `SettingsScreenTest`, 2 asserzioni di token in `RegisterRuleTest`. Suite: **506 verdi**,
+      lint 0 errori
+
+**Da provare sul device** (non verificabile qui): che Play services registri davvero su un
+Pixel; se la finestra dei 10 giorni sia leggibile all'indietro rispetto alla prima
+sottoscrizione o parta da lì; il ritardo reale di scrittura del registratore; e il widget
+che si aggiorna da solo a app chiusa, che è l'effetto più visibile di tutta la fase.
+
+### 24c-bis — La storia è del registratore, non una stima ✅
+
+Trovata rispondendo a una domanda del committente sul widget. Riaprendo l'app dopo
+giorni, la prima lettura porta un delta enorme che veniva spalmato all'indietro (fino
+a 48h): il guardiano scartava le quote sulle ore già dell'import, ma quella che cadeva
+sull'ora in corso passava — un numero proporzionale al tempo, cioè inventato.
+
+- [x] Un delta il cui span **rientra nelle ore importate è storia**, e la storia è del
+      registratore: non si attribuisce affatto. La lettura successiva è a due secondi e
+      il suo span è tutto nostro, quindi l'ora si riempie da lì, per davvero
+- [x] **Solo finché il registratore risponde** (`ImportCoverage.isLiveAt`, finestra di 6
+      ore): uno che ha smesso si riprende la storia il contatore, perché quelle ore non
+      le scriverà più nessuno e un watermark fermo trasformerebbe un import rotto in
+      passi persi in silenzio
+- [x] Test: 1 nuovo in `StepRepositoryTest` (il delta di due giorni non lascia niente, la
+      lettura dopo sì) e quello della 24c riscritto sul caso del registratore muto, che è
+      dove il guardiano per-quota lavora ancora
+
+### 24d — Il buco si dichiara ✅
+
+Un giorno senza dati non è un giorno con zero passi, e l'app non può sapere quale dei
+due sia: sa solo di non avere letture. Quindi è quello che dice, in tutte e due le
+superfici dove si vedeva un vuoto muto.
+
+- [x] `domain/Gaps`: aritmetica pura sulle date (`between` per due commit adiacenti,
+      `inWindow`/`daysMissing` per una finestra). Niente orologio, niente zone: chi chiama
+      ha già deciso cos'è "oggi"
+- [x] **Log**: riga di gap fra i commit, `# nessuna lettura per 2 giorni (10 set..11 set)`,
+      con il range nella stessa sintassi `..` degli hunk di sessione. Compare anche fra
+      oggi e il commit più recente, che è il buco che l'utente sta effettivamente
+      guardando
+- [x] **`README.md`, `## Stato`**: una frase quando la settimana ha giorni senza letture
+      («mancano, non sono vuoti»), muta quando la settimana è intera — una riga che non
+      segnala niente su una settimana buona è rumore
+- [x] **Heatmap di `stats.md`: lasciata com'è, deciso e non dimenticato.** Una cella è un
+      glifo di densità, e il grafo dei contributi di GitHub — che è l'originale della
+      metafora — disegna identiche la giornata a zero e il giorno senza commit. Un terzo
+      glifo renderebbe il mese rumoroso per un'informazione che il log dà già per esteso
+- [x] Test: `GapsTest` (9 puri), 5 in `LogDocumentTest` (gap dichiarato, singolare col
+      suo giorno, settimana intera muta, posizione sotto oggi, italiano con il `#` che
+      non traduce), 4 in `StepsReadmeTest` (compresa l'italiana). Suite: **525 verdi**,
+      lint 0 errori
+
+### 24e — Il registratore si restituisce ✅
+
+Trovata chiudendo la fase: `unsubscribe()` esisteva nel gateway e non lo chiamava
+nessuno. Revocare `ACTIVITY_RECOGNITION` cancellava i job — cioè smettevamo di
+leggere — ma Play services continuava a registrare **per noi**, per un'app a cui
+l'utente aveva appena detto di smettere di contare.
+
+- [x] `StepImporter.stop()`: disiscrizione e **azzeramento dello stato**, anche se la
+      chiamata fallisce. Il watermark è l'affermazione che quelle ore le copre un
+      import: sparito l'import l'affermazione è falsa, e lasciarla terrebbe il contatore
+      ritirato da ore che non scriverà più nessuno
+- [x] Chiamato da `SyncScheduler.reconcile`, che è già l'unico proprietario della
+      decisione «dobbiamo raccogliere o no»
+- [x] Test: 4 in `StepImporterTest` (restituzione e oblio, stop di ciò che non è mai
+      partito, unsubscribe fallita che pulisce lo stesso, ri-armo da zero al giro dopo).
+      Suite: **529 verdi**, lint 0 errori
+
+### 24f — Il silenzio del registratore si dice ✅
+
+Chiesta dal committente sapendo che il device di prova è un **Samsung Galaxy S24
+Ultra**, non un Pixel: la gestione batteria Samsung è la più aggressiva in
+circolazione, e quando strozza il worker il modo in cui la cosa fallisce è
+silenzioso — i numeri semplicemente smettono di muoversi. Su un telefono così, quel
+silenzio è la cosa che l'utente ha più bisogno di vedere nominata.
+
+- [x] `StepSourceStatus.staleForMillis` + `staleFor(state, now)` puro: riporta il
+      silenzio solo quando c'è stato un import e poi ha smesso. **Due stati non contano
+      apposta**: una sottoscrizione mai letta non è in ritardo, è nuova (il primo import
+      aspetta la fine dell'ora), e un registratore a cui nessuno si è iscritto non ha
+      niente su cui essere in ritardo. Uno stamp nel futuro è un orologio spostato, non
+      un ritardo: si tace
+- [x] Soglia = la finestra di fiducia della 24c-bis (6h), **lo stesso numero in un posto
+      solo**: oltre quella l'app già smette di fidarsi del registratore e restituisce la
+      storia al contatore, quindi è esattamente il momento in cui vale la pena dirlo
+- [x] `UnitFormat.compactAge` (`45m`, `7h`, `3d`): l'unità è un token e resta tale in
+      entrambe le lingue — che è anche il motivo per cui è una lettera e non una parola,
+      `6 ore` costringerebbe due lingue a decidere sui plurali per dire un numero
+- [x] Terza riga nella sezione `steps`, **solo quando c'è qualcosa che non va**
+- [x] Test: `StepSourceStatusTest` (7 puri) e 2 in `SettingsScreenTest`. Suite:
+      **538 verdi**, lint 0 errori
+
+### Principi rivisti (approvati dal committente il 13 set 2026)
+
+Il committente ha chiesto esplicitamente che i principi non blocchino una soluzione
+migliore. Cambia questo, e solo questo:
+
+- **VISION §7 — «il telefono basta, e a contare è tsteps»**: a contare le ore che tsteps
+  non vede è Play services. Il conteggio resta on-device, ma non è più solo nostro. E
+  succede **in automatico**, senza opt-in: l'utente non deve accendere niente, il file
+  gli dice chi ha contato.
+- **Dipendenza da GMS**: la prima del progetto. Su ROM senza Play services la funzione
+  non esiste e l'app degrada al path sensore.
+- **Ciò che NON cambia, verificato e non assunto**: il manifest fuso con e senza
+  `play-services-fitness` ha **le stesse identiche permission** — nessuna INTERNET
+  (`ACCESS_NETWORK_STATE` c'era già, la porta WorkManager). Nessun account, nessuna rete,
+  nessun servizio in foreground permanente: la §7 su servizi e batteria resta intatta, e
+  anzi il path recording toglie lavoro al processo di tsteps invece di aggiungerne.
+- **Alternativa scartata**: foreground service permanente. Funziona ovunque e senza
+  Google, ma impone la notifica fissa (contro §3.3 e §7) e in pratica viene ucciso dai
+  gestori di batteria OEM — cioè lo stesso bug di oggi, in forma più difficile da spiegare.
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.

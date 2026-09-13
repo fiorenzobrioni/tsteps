@@ -238,4 +238,47 @@ class StepsReadmeTest {
     fun `the footer says where the numbers live`() {
         build().lineWith("*Computed on device · 1 committed days*")
     }
+
+    /**
+     * Fase 24d. The week table writes `—` for a day with no data, which says the
+     * cell is empty and not why. The sentence says the rest, and says it as what
+     * the app actually knows: no reading, never no steps.
+     */
+    @Test
+    fun `days the app never saw are named as missing, not as empty`() {
+        val lines = build(
+            history = listOf(DayStats(LocalDate.parse("2026-08-17"), 11_204, 8_300.0, 96))
+        )
+
+        assertTrue(lines.lineWith("no reading").contains("5 days"))
+        assertTrue(lines.lineWith("no reading").contains("missing, not empty"))
+    }
+
+    @Test
+    fun `one missing day is said in the singular`() {
+        val history = (12..17).filter { it != 14 }
+            .map { DayStats(LocalDate.parse("2026-08-$it"), 9_000, 6_000.0, 60) }
+
+        assertTrue(build(history = history).lineWith("no reading").startsWith("One day"))
+    }
+
+    /** A line that reports nothing wrong on a good week is noise. */
+    @Test
+    fun `a whole week says nothing about gaps`() {
+        val history = (12..17).map {
+            DayStats(LocalDate.parse("2026-08-$it"), 9_000, 6_000.0, 60)
+        }
+
+        assertTrue(build(history = history).none { it.contains("no reading") })
+    }
+
+    @Test
+    @org.robolectric.annotation.Config(qualifiers = "it")
+    fun `the missing days speak Italian too`() {
+        val lines = build(
+            history = listOf(DayStats(LocalDate.parse("2026-08-17"), 11_204, 8_300.0, 96))
+        )
+
+        assertTrue(lines.lineWith("non hanno letture").contains("mancano, non sono vuoti"))
+    }
 }

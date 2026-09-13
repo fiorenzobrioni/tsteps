@@ -123,6 +123,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.health.connect)
+    implementation(libs.play.services.fitness)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

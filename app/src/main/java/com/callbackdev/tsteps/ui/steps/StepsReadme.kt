@@ -4,6 +4,7 @@ import android.content.res.Resources
 import com.callbackdev.tsteps.R
 import com.callbackdev.tsteps.data.UnitsSystem
 import com.callbackdev.tsteps.domain.DayStats
+import com.callbackdev.tsteps.domain.Gaps
 import com.callbackdev.tsteps.domain.Records
 import com.callbackdev.tsteps.domain.SessionItem
 import com.callbackdev.tsteps.ui.format.TableAlign
@@ -136,6 +137,26 @@ object StepsReadme {
                     add(s(R.string.readme_goal_none))
                 }
             }
+        }
+
+        // Fase 24d: the week table writes `—` for a day with no data, and a dash
+        // is only half an answer — it says the cell is empty, not why. The
+        // sentence says the rest, and says it as what the app actually knows:
+        // no reading, not no steps. Silent when the week is whole, because a
+        // line that reports nothing wrong on a good week is noise.
+        val missing = Gaps.daysMissing(
+            covered = history.map { it.date }.toSet(),
+            from = today.minusDays(6),
+            to = today.minusDays(1)
+        )
+        if (missing > 0) {
+            add(
+                if (missing == 1) {
+                    s(R.string.readme_gap_week_one)
+                } else {
+                    s(R.string.readme_gap_week, missing)
+                }
+            )
         }
 
         if (sessions.isNotEmpty()) {

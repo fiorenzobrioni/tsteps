@@ -98,6 +98,18 @@ class MainActivity : ComponentActivity() {
         // widget kept the last worker's number until the next 15-minute pass —
         // the app told you the truth and did not pass it on.
         lifecycle.addObserver(object : DefaultLifecycleObserver {
+            /**
+             * Fase 24c: opening the app is the moment its day should already be
+             * whole. The 15-minute sampler would get there on its own, but "on
+             * its own" can be a quarter of an hour away, and the hours walked
+             * with the app closed are exactly what the user came to look at.
+             * Detached from this scope on purpose — a pass must not be cancelled
+             * halfway by a swipe away, or the watermark and the buckets disagree.
+             */
+            override fun onStart(owner: LifecycleOwner) {
+                ServiceLocator.importSteps(applicationContext)
+            }
+
             override fun onStop(owner: LifecycleOwner) {
                 TstepsWidgetUpdater.updateAllDetached(applicationContext)
             }
