@@ -69,6 +69,7 @@ import com.callbackdev.tsteps.healthconnect.HcPermissions
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.healthconnect.HcSectionStatus
 import com.callbackdev.tsteps.recording.RecordingAvailability
+import com.callbackdev.tsteps.ui.format.UnitFormat
 import com.callbackdev.tsteps.recording.StepSourceStatus
 import com.callbackdev.tsteps.ui.components.CanvasLine
 import com.callbackdev.tsteps.ui.components.CodeCanvas
@@ -797,6 +798,22 @@ private fun buildSettingsLines(
             indent = 2
         )
     )
+    // Fase 24f: a third line only when there is something wrong to say. The
+    // recorder failing is silent by nature — the numbers simply stop moving —
+    // and on a phone whose system suspends apps that silence is the thing the
+    // user most needs named.
+    sourceStatus.staleForMillis?.let { staleFor ->
+        add(
+            commentLine(
+                "// " + resources.getString(
+                    R.string.note_source_stale,
+                    UnitFormat.compactAge(staleFor)
+                ),
+                syntax,
+                indent = 2
+            )
+        )
+    }
     add(punctLine("},", 1, syntax))
 
     // Fase 12: Health Connect interop, opt-in and default off. These comments

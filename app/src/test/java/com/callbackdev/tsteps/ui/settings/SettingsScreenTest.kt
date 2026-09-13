@@ -381,4 +381,31 @@ class SettingsScreenTest {
 
         line("starts recording the hours with tsteps closed at the next pass").assertExists()
     }
+
+    /**
+     * Fase 24f. A recorder that stops is silent by nature — the numbers simply
+     * stop moving — and on a phone whose system suspends apps that silence is
+     * the thing the user most needs named.
+     */
+    @Test
+    fun `a recorder gone quiet is named, with how long it has been quiet`() {
+        setContent(
+            sourceStatus = StepSourceStatus(
+                availability = RecordingAvailability.AVAILABLE,
+                recording = true,
+                staleForMillis = 7 * 3_600_000L
+            )
+        )
+
+        line("last read from the recorder: 7h ago").assertExists()
+    }
+
+    /** And it says nothing at all while the recorder is answering. */
+    @Test
+    fun `a recorder that answers adds no line`() {
+        setContent()
+
+        compose.onNodeWithText("last read from the recorder", substring = true)
+            .assertDoesNotExist()
+    }
 }

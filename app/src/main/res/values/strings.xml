@@ -86,6 +86,7 @@
     <string name="note_source_recorded">the hours with tsteps closed are recorded on the device by Google Play services</string>
     <string name="note_source_arming">Google Play services starts recording the hours with tsteps closed at the next pass</string>
     <string name="note_source_unavailable">no Google Play services here: only the hours with tsteps open are counted</string>
+    <string name="note_source_stale">last read from the recorder: %1$s ago (the system may be suspending tsteps)</string>
     <string name="note_source_update">Google Play services is too old to record the hours with tsteps closed</string>
     <string name="note_hc_interop">on-device interop with other health apps — no network</string>
     <string name="note_hc_writes">writes: hourly steps + walk sessions · reads: their steps</string>

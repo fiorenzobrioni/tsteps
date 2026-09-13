@@ -890,6 +890,30 @@ l'utente aveva appena detto di smettere di contare.
       partito, unsubscribe fallita che pulisce lo stesso, ri-armo da zero al giro dopo).
       Suite: **529 verdi**, lint 0 errori
 
+### 24f — Il silenzio del registratore si dice ✅
+
+Chiesta dal committente sapendo che il device di prova è un **Samsung Galaxy S24
+Ultra**, non un Pixel: la gestione batteria Samsung è la più aggressiva in
+circolazione, e quando strozza il worker il modo in cui la cosa fallisce è
+silenzioso — i numeri semplicemente smettono di muoversi. Su un telefono così, quel
+silenzio è la cosa che l'utente ha più bisogno di vedere nominata.
+
+- [x] `StepSourceStatus.staleForMillis` + `staleFor(state, now)` puro: riporta il
+      silenzio solo quando c'è stato un import e poi ha smesso. **Due stati non contano
+      apposta**: una sottoscrizione mai letta non è in ritardo, è nuova (il primo import
+      aspetta la fine dell'ora), e un registratore a cui nessuno si è iscritto non ha
+      niente su cui essere in ritardo. Uno stamp nel futuro è un orologio spostato, non
+      un ritardo: si tace
+- [x] Soglia = la finestra di fiducia della 24c-bis (6h), **lo stesso numero in un posto
+      solo**: oltre quella l'app già smette di fidarsi del registratore e restituisce la
+      storia al contatore, quindi è esattamente il momento in cui vale la pena dirlo
+- [x] `UnitFormat.compactAge` (`45m`, `7h`, `3d`): l'unità è un token e resta tale in
+      entrambe le lingue — che è anche il motivo per cui è una lettera e non una parola,
+      `6 ore` costringerebbe due lingue a decidere sui plurali per dire un numero
+- [x] Terza riga nella sezione `steps`, **solo quando c'è qualcosa che non va**
+- [x] Test: `StepSourceStatusTest` (7 puri) e 2 in `SettingsScreenTest`. Suite:
+      **538 verdi**, lint 0 errori
+
 ### Principi rivisti (approvati dal committente il 13 set 2026)
 
 Il committente ha chiesto esplicitamente che i principi non blocchino una soluzione
