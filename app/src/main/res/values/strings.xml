@@ -78,6 +78,10 @@
     <string name="note_goal_notify">once per day, when the check passes</string>
     <!-- Fase 24c: the `steps` section says who is counting, and nothing more —
          the source is the app's business, not a switch to hand the user. -->
+    <!-- Fase 24d: a day with no reading is not a day with no steps, and the
+         log says which one it is looking at. -->
+    <string name="note_gap_day">no reading for %1$s</string>
+    <string name="note_gap_days">no reading for %1$d days (%2$s)</string>
     <string name="note_source_live">the hour in progress is counted by the phone step sensor, while tsteps is open</string>
     <string name="note_source_recorded">the hours with tsteps closed are recorded on the device by Google Play services</string>
     <string name="note_source_arming">Google Play services starts recording the hours with tsteps closed at the next pass</string>
@@ -208,6 +212,8 @@
     <string name="readme_goal_reached">\u2713 Goal reached: %1$s of %2$s steps (%3$d%%)</string>
     <string name="readme_goal_progress">%1$s of %2$s steps (%3$d%%) \u00b7 %4$s to go</string>
     <string name="readme_goal_none">No goal set.</string>
+    <string name="readme_gap_week_one">One day this week has no reading: it is missing, not empty.</string>
+    <string name="readme_gap_week">%1$d days this week have no reading: they are missing, not empty.</string>
     <string name="readme_streak">Current streak: %1$d days</string>
     <string name="readme_warn_no_sensor">\u26a0\ufe0f No step sensor on this device</string>
     <string name="readme_warn_no_permission">\u26a0\ufe0f Missing permission to read the step counter. Tap to grant it.</string>

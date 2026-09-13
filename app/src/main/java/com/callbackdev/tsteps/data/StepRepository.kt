@@ -18,6 +18,7 @@ import com.callbackdev.tsteps.domain.SessionResize
 import com.callbackdev.tsteps.domain.StepAttribution
 import com.callbackdev.tsteps.domain.StepReading
 import com.callbackdev.tsteps.domain.StepTracker
+import com.callbackdev.tsteps.recording.ImportCoverage
 import com.callbackdev.tsteps.recording.hourStartMillis
 import java.time.LocalDate
 import java.time.ZoneId
@@ -45,14 +46,14 @@ class StepRepository(
     private val settingsStore: SettingsStore,
     private val zone: () -> ZoneId = { ZoneId.systemDefault() },
     /**
-     * How far the background import has written (Fase 24c), `0` when nothing
-     * records for us — no Play services, or the first pass has yet to land.
-     * Hours before it belong to the import and the counter must not add to them:
+     * What the background import covers (Fase 24c), empty when nothing records
+     * for us — no Play services, or the first pass has yet to land. Hours before
+     * its watermark belong to the import and the counter must not add to them:
      * the two sources count the same steps, so a bucket written by both would be
      * a doubled hour. Everything from there on, the hour in progress above all,
      * is still the counter's — that is what keeps the number on screen ticking.
      */
-    private val importedUntilMillis: suspend () -> Long = { 0L }
+    private val importCoverage: suspend () -> ImportCoverage = { ImportCoverage() }
 ) {
 
     // ingest is read-modify-write on the anchor: serialize callers (foreground
@@ -67,15 +68,28 @@ class StepRepository(
             // double-count it on retry.
             trackerStateStore.write(advance.newState)
             val zoneId = zone()
-            val ownedByImport = importedUntilMillis()
-            StepAttribution.attribute(
-                deltaSteps = advance.deltaSteps,
-                fromMillis = advance.fromMillis,
-                toMillis = advance.toMillis,
-                zone = zoneId
-            ).forEach { share ->
-                if (hourStartMillis(share.date, share.hour, zoneId) >= ownedByImport) {
-                    hourlyDao.increment(share.date.toString(), share.hour, share.steps)
+            val coverage = importCoverage()
+            val ownedByImport = coverage.importedUntilMillis
+            // A delta whose span reaches back into imported territory is history,
+            // and history belongs to the recorder (Fase 24c-bis). Spreading it
+            // would hand the hour in progress a share of a three-day interval —
+            // a number proportional to time, which is to say invented. The next
+            // reading is seconds away and its span is entirely ours: the hour
+            // fills from there, truthfully. Only while the recorder is actually
+            // answering, though — one that has gone quiet gets its history back,
+            // because nobody else is going to write those hours.
+            val isHistory = advance.fromMillis < ownedByImport &&
+                coverage.isLiveAt(advance.toMillis)
+            if (!isHistory) {
+                StepAttribution.attribute(
+                    deltaSteps = advance.deltaSteps,
+                    fromMillis = advance.fromMillis,
+                    toMillis = advance.toMillis,
+                    zone = zoneId
+                ).forEach { share ->
+                    if (hourStartMillis(share.date, share.hour, zoneId) >= ownedByImport) {
+                        hourlyDao.increment(share.date.toString(), share.hour, share.steps)
+                    }
                 }
             }
             // Sample spans exist only for the auto detector — and only while

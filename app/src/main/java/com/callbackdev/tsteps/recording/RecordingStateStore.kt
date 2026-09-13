@@ -39,7 +39,39 @@ data class RecordingState(
     val lastImportMillis: Long = 0L
 )
 
+/**
+ * What the counter path needs to know about the import, in one read (Fase 24c-bis).
+ * Two numbers, and the second one is the reason this is not just a `Long`: a
+ * recorder that has stopped answering must not keep the counter standing down
+ * for hours nobody is going to fill.
+ */
+data class ImportCoverage(
+    /** Hours before this belong to the import. `0` when nothing records for us. */
+    val importedUntilMillis: Long = 0L,
+    /** Wall clock of the last successful pass; `0` when there has never been one. */
+    val lastImportMillis: Long = 0L
+) {
+    /**
+     * The recorder answered recently enough to be trusted with the past. Beyond
+     * this the counter takes its history back, because a silent recorder and a
+     * quiet day look the same from here and only one of them is safe to assume.
+     */
+    fun isLiveAt(nowMillis: Long): Boolean =
+        lastImportMillis > 0L && nowMillis - lastImportMillis <= TRUST_WINDOW_MILLIS
+
+    companion object {
+        /** Six 15-minute passes' worth of slack, Doze included. */
+        const val TRUST_WINDOW_MILLIS = 6L * 3_600_000L
+    }
+}
+
 class RecordingStateStore(private val dataStore: DataStore<Preferences>) {
+
+    /** The two numbers `StepRepository.ingest` asks for on every reading. */
+    suspend fun coverage(): ImportCoverage = read().let {
+        ImportCoverage(it.importedUntilMillis, it.lastImportMillis)
+    }
+
 
     val state: Flow<RecordingState> = dataStore.data.map { it.toState() }
 

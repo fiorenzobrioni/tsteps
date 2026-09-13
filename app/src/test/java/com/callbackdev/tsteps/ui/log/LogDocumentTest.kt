@@ -290,4 +290,58 @@ class LogDocumentTest {
         assertTrue(lines.toString(), lines.any { it.startsWith("Author:") })
     }
 
+    /**
+     * Fase 24d. git prints nothing for a day nobody committed, and here that
+     * silence is ambiguous: a day with no reading and a day with no steps look
+     * the same. Only one of the two is something the app knows, so it says it.
+     */
+    @Test
+    fun `the days between two commits are declared, not left silent`() {
+        val lines = build(days = listOf(day("2026-08-15"))).texts()
+
+        assertTrue(
+            "no gap line in:\n${lines.joinToString("\n")}",
+            lines.any { it.contains("no reading for 2 days") && it.contains("16 Aug..17 Aug") }
+        )
+    }
+
+    @Test
+    fun `one missing day is named by its date, not counted`() {
+        val lines = build(days = listOf(day("2026-08-16"))).texts()
+
+        assertTrue(lines.any { it.contains("no reading for 17 Aug") })
+        assertTrue(lines.none { it.contains("days") && it.contains("no reading") })
+    }
+
+    @Test
+    fun `a week without holes says nothing about gaps`() {
+        val lines = build(
+            days = listOf(day("2026-08-17"), day("2026-08-16"), day("2026-08-15"))
+        ).texts()
+
+        assertTrue(lines.none { it.contains("no reading") })
+    }
+
+    /** The gap above the newest commit is the one the user is looking at. */
+    @Test
+    fun `the gap between today and the last commit is the first thing under it`() {
+        val lines = build(days = listOf(day("2026-08-15"))).texts()
+
+        val gapAt = lines.indexOfFirst { it.contains("no reading") }
+        val commitAt = lines.indexOfFirst { it.startsWith("commit ") }
+        assertTrue("gap ($gapAt) should precede the commit ($commitAt)", gapAt in 0..<commitAt)
+    }
+
+    @Test
+    @Config(qualifiers = "it")
+    fun `the gap line speaks Italian around its dates`() {
+        val lines = build(days = listOf(day("2026-08-15"))).texts()
+
+        assertTrue(
+            "no Italian gap line in:\n${lines.joinToString("\n")}",
+            lines.any { it.contains("nessuna lettura per 2 giorni") }
+        )
+        // The marker is the file's syntax and does not translate.
+        assertTrue(lines.any { it.startsWith("# nessuna lettura") })
+    }
 }

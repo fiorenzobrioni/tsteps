@@ -111,7 +111,7 @@ object ServiceLocator {
                 // watermark forward from a worker while the screen is streaming
                 // readings, and a stale copy would let the counter add to an hour
                 // the import had just taken over.
-                importedUntilMillis = { recordingStateStore(context).read().importedUntilMillis }
+                importCoverage = { recordingStateStore(context).coverage() }
             ).also { stepRepository = it }
         }
 

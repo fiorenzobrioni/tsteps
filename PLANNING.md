@@ -830,12 +830,48 @@ Pixel; se la finestra dei 10 giorni sia leggibile all'indietro rispetto alla pri
 sottoscrizione o parta da lì; il ritardo reale di scrittura del registratore; e il widget
 che si aggiorna da solo a app chiusa, che è l'effetto più visibile di tutta la fase.
 
-### 24d — Il buco si dichiara (da fare)
+### 24c-bis — La storia è del registratore, non una stima ✅
 
-- [ ] Un giorno senza dati non è uno zero e oggi è un `—` muto: riga `//` in
-      `steps_data.json` e nel `## Stato` quando l'ultima lettura è vecchia, riga di gap nel
-      log fra i commit (`# gap: 2 days without a reading`), e decidere cosa fa la heatmap,
-      dove «nessun dato» e «zero passi» sono la stessa cella spenta
+Trovata rispondendo a una domanda del committente sul widget. Riaprendo l'app dopo
+giorni, la prima lettura porta un delta enorme che veniva spalmato all'indietro (fino
+a 48h): il guardiano scartava le quote sulle ore già dell'import, ma quella che cadeva
+sull'ora in corso passava — un numero proporzionale al tempo, cioè inventato.
+
+- [x] Un delta il cui span **rientra nelle ore importate è storia**, e la storia è del
+      registratore: non si attribuisce affatto. La lettura successiva è a due secondi e
+      il suo span è tutto nostro, quindi l'ora si riempie da lì, per davvero
+- [x] **Solo finché il registratore risponde** (`ImportCoverage.isLiveAt`, finestra di 6
+      ore): uno che ha smesso si riprende la storia il contatore, perché quelle ore non
+      le scriverà più nessuno e un watermark fermo trasformerebbe un import rotto in
+      passi persi in silenzio
+- [x] Test: 1 nuovo in `StepRepositoryTest` (il delta di due giorni non lascia niente, la
+      lettura dopo sì) e quello della 24c riscritto sul caso del registratore muto, che è
+      dove il guardiano per-quota lavora ancora
+
+### 24d — Il buco si dichiara ✅
+
+Un giorno senza dati non è un giorno con zero passi, e l'app non può sapere quale dei
+due sia: sa solo di non avere letture. Quindi è quello che dice, in tutte e due le
+superfici dove si vedeva un vuoto muto.
+
+- [x] `domain/Gaps`: aritmetica pura sulle date (`between` per due commit adiacenti,
+      `inWindow`/`daysMissing` per una finestra). Niente orologio, niente zone: chi chiama
+      ha già deciso cos'è "oggi"
+- [x] **Log**: riga di gap fra i commit, `# nessuna lettura per 2 giorni (10 set..11 set)`,
+      con il range nella stessa sintassi `..` degli hunk di sessione. Compare anche fra
+      oggi e il commit più recente, che è il buco che l'utente sta effettivamente
+      guardando
+- [x] **`README.md`, `## Stato`**: una frase quando la settimana ha giorni senza letture
+      («mancano, non sono vuoti»), muta quando la settimana è intera — una riga che non
+      segnala niente su una settimana buona è rumore
+- [x] **Heatmap di `stats.md`: lasciata com'è, deciso e non dimenticato.** Una cella è un
+      glifo di densità, e il grafo dei contributi di GitHub — che è l'originale della
+      metafora — disegna identiche la giornata a zero e il giorno senza commit. Un terzo
+      glifo renderebbe il mese rumoroso per un'informazione che il log dà già per esteso
+- [x] Test: `GapsTest` (9 puri), 5 in `LogDocumentTest` (gap dichiarato, singolare col
+      suo giorno, settimana intera muta, posizione sotto oggi, italiano con il `#` che
+      non traduce), 4 in `StepsReadmeTest` (compresa l'italiana). Suite: **525 verdi**,
+      lint 0 errori
 
 ### Principi rivisti (approvati dal committente il 13 set 2026)
 
