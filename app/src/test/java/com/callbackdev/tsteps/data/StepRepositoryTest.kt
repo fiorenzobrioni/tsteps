@@ -72,8 +72,13 @@ class StepRepositoryTest {
     private fun millis(dateTime: String): Long =
         LocalDateTime.parse(dateTime).atZone(rome).toInstant().toEpochMilli()
 
-    private fun reading(cumulative: Long, at: String, boot: Int = 3) =
-        StepReading(cumulative, boot, millis(at))
+    private fun reading(cumulative: Long, at: String, boot: Int = 3, bootAt: String? = null) =
+        StepReading(
+            cumulativeSteps = cumulative,
+            bootCount = boot,
+            timestampMillis = millis(at),
+            bootMillis = bootAt?.let(::millis) ?: 0L
+        )
 
     @Test
     fun `first reading anchors silently, the second writes its delta`() = runBlocking {
@@ -180,6 +185,31 @@ class StepRepositoryTest {
         repository.ingest(reading(250L, "2026-08-18T12:00:00", boot = 4))
         assertEquals(750L, database.hourlyStepsDao().day("2026-08-18").sumOf { it.steps })
     }
+
+    /**
+     * The device case that found the bug (Sep 2026): installed on Wednesday, not
+     * opened Thursday or Friday, phone switched off every night, opened again on
+     * Saturday morning. The steps of the two days off are gone with the counter
+     * that was zeroed at each boot — but Saturday's own walk must stay Saturday's.
+     * Before the clamp the delta was spread from the Wednesday anchor and those
+     * two untouched days were credited with ~1,000 and ~1,750 steps each.
+     */
+    @Test
+    fun `a morning walk after days off is not spread over the days the phone was off`() =
+        runBlocking {
+            repository.ingest(reading(2_000L, "2026-09-09T21:00:00", boot = 3))
+            repository.ingest(reading(4_130L, "2026-09-09T22:00:00", boot = 3))
+            // Two nights off, two boots. Saturday's counter starts at zero at 07:00
+            // and reads 3,545 at 09:45 — every one of them walked on Saturday.
+            repository.ingest(
+                reading(3_545L, "2026-09-12T09:45:00", boot = 5, bootAt = "2026-09-12T07:00:00")
+            )
+
+            val dao = database.hourlyStepsDao()
+            assertEquals(0L, dao.day("2026-09-10").sumOf { it.steps })
+            assertEquals(0L, dao.day("2026-09-11").sumOf { it.steps })
+            assertEquals(3_545L, dao.day("2026-09-12").sumOf { it.steps })
+        }
 
     // --- Fase 11: sample spans, tombstones, boundary edits -------------------
 

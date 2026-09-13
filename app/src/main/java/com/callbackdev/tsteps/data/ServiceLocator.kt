@@ -9,6 +9,8 @@ import com.callbackdev.tsteps.export.DownloadsExportSink
 import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
 import com.callbackdev.tsteps.healthconnect.HcStateStore
 import com.callbackdev.tsteps.healthconnect.HealthConnectSync
+import com.callbackdev.tsteps.recording.GmsStepRecordingGateway
+import com.callbackdev.tsteps.recording.StepRecordingGateway
 
 /**
  * Hand-rolled DI, tweather's pattern: the app is small enough that a lazy
@@ -52,6 +54,11 @@ object ServiceLocator {
 
     @Volatile
     private var healthConnectSync: HealthConnectSync? = null
+
+    // Typed to the interface so a test can hand the import pass a fake recorder;
+    // the real one is the only thing in the app that touches Play services.
+    @Volatile
+    private var stepRecordingGateway: StepRecordingGateway? = null
 
     fun database(context: Context): TstepsDatabase =
         database ?: synchronized(this) {
@@ -153,6 +160,18 @@ object ServiceLocator {
         }
 
     /**
+     * Play services' local step recorder (Fase 24). A singleton because the
+     * client it wraps is one per process, and cheap to hold: building it opens
+     * nothing — [StepRecordingGateway.availability] is a version check, and the
+     * client itself is created lazily behind it.
+     */
+    fun stepRecordingGateway(context: Context): StepRecordingGateway =
+        stepRecordingGateway ?: synchronized(this) {
+            stepRecordingGateway ?: GmsStepRecordingGateway(context.applicationContext)
+                .also { stepRecordingGateway = it }
+        }
+
+    /**
      * Stateless like the detector, built per call: an export is one pass over
      * Room triggered by a tap, with nothing to keep between taps.
      */
@@ -176,8 +195,10 @@ object ServiceLocator {
         stepSensorReader: StepSource? = null,
         settingsStore: SettingsStore? = null,
         trackerStateStore: TrackerStateStore? = null,
-        firstRunStore: FirstRunStore? = null
+        firstRunStore: FirstRunStore? = null,
+        stepRecordingGateway: StepRecordingGateway? = null
     ) {
+        this.stepRecordingGateway = stepRecordingGateway
         this.firstRunStore = firstRunStore
         this.stepRepository = stepRepository
         this.stepSensorReader = stepSensorReader

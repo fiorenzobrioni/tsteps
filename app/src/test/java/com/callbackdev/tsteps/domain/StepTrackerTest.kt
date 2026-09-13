@@ -5,8 +5,17 @@ import org.junit.Test
 
 class StepTrackerTest {
 
-    private fun reading(cumulative: Long, boot: Int = 7, ts: Long = 1_000_000L) =
-        StepReading(cumulativeSteps = cumulative, bootCount = boot, timestampMillis = ts)
+    private fun reading(
+        cumulative: Long,
+        boot: Int = 7,
+        ts: Long = 1_000_000L,
+        bootAt: Long = 0L
+    ) = StepReading(
+        cumulativeSteps = cumulative,
+        bootCount = boot,
+        timestampMillis = ts,
+        bootMillis = bootAt
+    )
 
     @Test
     fun `first reading ever anchors without producing steps`() {
@@ -97,5 +106,55 @@ class StepTrackerTest {
         assertEquals(100L, advance.deltaSteps)
         assertEquals(500L, advance.fromMillis)
         assertEquals(500L, advance.toMillis)
+    }
+
+    /**
+     * The bug this clamp closes: the delta of a restarted counter was spread from
+     * the *pre-reboot* anchor, so a phone switched off every night credited the
+     * days it was off with steps walked after the last boot. The counter cannot
+     * have counted before it was zeroed, and now the span says so.
+     */
+    @Test
+    fun `a restarted counter cannot have counted before the boot that zeroed it`() {
+        val state = TrackerState(bootCount = 7, lastCumulative = 50_000L, lastTimestampMillis = 100L)
+        val advance = StepTracker.advance(state, reading(300L, boot = 8, ts = 400L, bootAt = 250L))
+        assertEquals(300L, advance.deltaSteps)
+        assertEquals(250L, advance.fromMillis)
+        assertEquals(400L, advance.toMillis)
+    }
+
+    /** Same floor for a HAL restart: it happened inside this boot, so boot holds. */
+    @Test
+    fun `a counter that went backwards is clamped to the boot instant too`() {
+        val state = TrackerState(bootCount = 7, lastCumulative = 5_000L, lastTimestampMillis = 100L)
+        val advance = StepTracker.advance(state, reading(120L, boot = 7, ts = 400L, bootAt = 250L))
+        assertEquals(120L, advance.deltaSteps)
+        assertEquals(250L, advance.fromMillis)
+    }
+
+    /** A synthetic reading knows no boot instant; the clamp must then do nothing. */
+    @Test
+    fun `an unknown boot instant leaves the span where it was`() {
+        val state = TrackerState(bootCount = 7, lastCumulative = 50_000L, lastTimestampMillis = 100L)
+        val advance = StepTracker.advance(state, reading(300L, boot = 8, ts = 400L))
+        assertEquals(100L, advance.fromMillis)
+    }
+
+    /** Clock skew must never produce a span that ends before it starts. */
+    @Test
+    fun `a boot instant after the reading collapses the span`() {
+        val state = TrackerState(bootCount = 7, lastCumulative = 50_000L, lastTimestampMillis = 100L)
+        val advance = StepTracker.advance(state, reading(300L, boot = 8, ts = 400L, bootAt = 900L))
+        assertEquals(400L, advance.fromMillis)
+        assertEquals(400L, advance.toMillis)
+    }
+
+    /** The ordinary case is untouched: no restart, no clamp, whatever boot says. */
+    @Test
+    fun `an increment within one boot keeps the sample interval`() {
+        val state = TrackerState(bootCount = 7, lastCumulative = 1_000L, lastTimestampMillis = 100L)
+        val advance = StepTracker.advance(state, reading(1_250L, ts = 400L, bootAt = 250L))
+        assertEquals(250L, advance.deltaSteps)
+        assertEquals(100L, advance.fromMillis)
     }
 }

@@ -713,6 +713,114 @@ sessione aspetta.
 
 - [ ] Da verificare su device: il ritmo spezzato, e se sei secondi sono troppi
 
+## Fase 24 — I giorni che l'app non ha visto (feedback su device, 12 set 2026)
+
+**Verbale del committente**: app installata mercoledì, non aperta giovedì e venerdì,
+telefono spento ogni sera. Sabato mattina l'app mostra `—` su giovedì e venerdì.
+Domanda: «il sabato non poteva recuperare dal sensore i passi dei giorni passati?»
+
+**Diagnosi.** No, e la ragione non è l'app chiusa: è lo spegnimento. `TYPE_STEP_COUNTER`
+è un solo numero cumulativo azzerato a ogni boot, non un archivio; i passi di giovedì
+muoiono con il contatore giovedì sera. A telefono acceso non si perde nulla — il
+contatore conta da solo e la lettura successiva porta dentro tutto l'intervallo (clamp
+48h) — ma il riavvio cancella davvero. Nessuna API può andarli a riprendere, perché
+sul dispositivo non li ha conservati nessuno.
+
+**E cercandolo è saltato fuori un bug vero** (24a), più la sola via d'uscita che
+esista (24b e seguenti).
+
+### 24a — Un contatore riazzerato non può aver contato prima del boot ✅
+
+`StepTracker.advance` calcolava `from` dall'àncora **prima** e indipendentemente dal
+ramo riavvio: il delta post-reboot — che per costruzione copre solo boot→adesso — si
+spalmava all'indietro fino all'ancora pre-riavvio, clampato a 48h. Sul caso del
+committente: i 3.545 passi di sabato mattina sarebbero finiti 1.040 su giovedì, 1.752
+su venerdì e 753 su sabato. Due giorni inventati e il sabato falsato — esattamente ciò
+che «il file non deve mentire» vieta. Sul suo telefono non è successo per fortuna di
+orario (la prima lettura di sabato è arrivata col contatore ancora a ~0), non per
+progetto.
+
+- [x] `StepReading.bootMillis` — istante di boot da `currentTimeMillis - elapsedRealtime`,
+      riempito dal sensore; `0` = lettura sintetica che non lo sa, e il clamp è un no-op
+      (nessun test esistente cambia comportamento)
+- [x] `advance`: su contatore riazzerato (reboot **o** HAL restart) `from` parte dal boot,
+      con `coerceAtMost(timestampMillis)` perché uno skew d'orologio non produca uno span
+      al contrario
+- [x] Test: 5 nuovi in `StepTrackerTest` (clamp, HAL restart, boot ignoto, boot dopo la
+      lettura, caso ordinario intatto) + la regressione del device in `StepRepositoryTest`
+      (mercoledì → sabato con due boot: giovedì e venerdì restano a zero)
+
+### 24b — Il seam della Recording API ✅
+
+L'unico modo di avere i giorni non aperti, su un telefono con solo tsteps installato, è
+**delegare la registrazione a un componente di sistema**: Play services (`LocalRecordingClient`)
+non subisce i limiti sui sensori in background, registra delta di passi con i loro
+timestamp, on-device, offline, senza account, e **sopravvive ai riavvii**. Health Connect
+non serve a questo: è un magazzino, resta vuoto se nessun'altra app ci scrive (deciso
+col committente il 13 set: l'opzione «recupero da HC» è accantonata, HC resta la porta di
+interoperabilità che è).
+
+- [x] `com.google.android.gms:play-services-fitness:21.2.0` nel catalogo
+- [x] `recording/StepRecordingGateway` (interfaccia + DTO puri), `GmsStepRecordingGateway`
+      (l'unica classe che tocca `com.google.android.gms`), `RecordingInterop` (mappatura
+      pura ore→bucket, con `StepAttribution` come rete di sicurezza per un bucket a cavallo
+      di due ore locali)
+- [x] `readHourlySteps` **rilancia** l'errore invece di restituire lista vuota: chi importa
+      avanza un watermark su questa risposta, e «silenzio» e «zero passi» non possono
+      essere lo stesso valore — sarebbe perdita di dati silenziosa
+- [x] `ServiceLocator.stepRecordingGateway` + override per i test
+- [x] Test: `RecordingInteropTest` (6, incluse l'ora ripetuta della notte di DST e il buco
+      di primavera). Suite: **492 verdi**
+
+### 24c — L'importazione (da fare)
+
+Disegno deciso, da implementare:
+
+- [ ] `RecordingStateStore`: watermark d'importazione + modalità sorgente. **Avanza solo
+      dopo una lettura riuscita**
+- [ ] **Una sola sorgente per ora**, mai due: in modalità `recording` il path del contatore
+      smette di scrivere bucket (resta per il tick live a schermo e per le sessioni), e le
+      ore le scrive l'import. Passando in modalità, il watermark parte dall'**ora successiva**:
+      le ore già scritte dal sensore restano sue, le nuove sono dell'import. Sommare le due
+      sorgenti raddoppierebbe la giornata
+- [ ] Scrittura dei bucket in SET, non in INCREMENT: rileggere l'ora corrente (ancora aperta)
+      deve essere idempotente
+- [ ] Import in `StepSyncWorker` (la lettura è IPC su DB locale: nessun sensore, nessun
+      wakeup) + a ogni resume in foreground
+- [ ] Display live: totale dai bucket + delta del contatore dall'ultimo import, addendo in
+      memoria mai persistito
+- [ ] Degradazione esplicita: senza Play services (ROM de-googlate) o con versione vecchia
+      si resta sul path sensore di oggi, **detto nel canale `//`**, mai in silenzio
+- [ ] Default **off** e riga in `settings.config` per accenderla: la modalità cambia il
+      cuore della pipeline dati e va provata sul device del committente prima di diventare
+      il default
+
+### 24d — Il buco si dichiara (da fare)
+
+- [ ] Un giorno senza dati non è uno zero e oggi è un `—` muto: riga `//` in
+      `steps_data.json` e nel `## Stato` quando l'ultima lettura è vecchia, riga di gap nel
+      log fra i commit (`# gap: 2 days without a reading`), e decidere cosa fa la heatmap,
+      dove «nessun dato» e «zero passi» sono la stessa cella spenta
+
+### Principi rivisti (approvati dal committente il 13 set 2026)
+
+Il committente ha chiesto esplicitamente che i principi non blocchino una soluzione
+migliore. Cambia questo, e solo questo:
+
+- **VISION §7 — «il telefono basta, e a contare è tsteps»**: in modalità recording a
+  contare le ore che tsteps non vede è Play services. Il conteggio resta on-device, ma
+  non è più solo nostro.
+- **Dipendenza da GMS**: la prima del progetto. Su ROM senza Play services la funzione
+  non esiste e l'app degrada al path sensore.
+- **Ciò che NON cambia, verificato e non assunto**: il manifest fuso con e senza
+  `play-services-fitness` ha **le stesse identiche permission** — nessuna INTERNET
+  (`ACCESS_NETWORK_STATE` c'era già, la porta WorkManager). Nessun account, nessuna rete,
+  nessun servizio in foreground permanente: la §7 su servizi e batteria resta intatta, e
+  anzi il path recording toglie lavoro al processo di tsteps invece di aggiungerne.
+- **Alternativa scartata**: foreground service permanente. Funziona ovunque e senza
+  Google, ma impone la notifica fissa (contro §3.3 e §7) e in pratica viene ucciso dai
+  gestori di batteria OEM — cioè lo stesso bug di oggi, in forma più difficile da spiegare.
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.
