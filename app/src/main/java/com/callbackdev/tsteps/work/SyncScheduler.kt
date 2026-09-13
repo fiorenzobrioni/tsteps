@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.callbackdev.tsteps.data.ServiceLocator
 import com.callbackdev.tsteps.domain.Rollover
+import com.callbackdev.tsteps.widget.ScreenWakeRefresh
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
@@ -23,7 +24,8 @@ import java.util.concurrent.TimeUnit
  *
  * Without the permission or the sensor there is nothing to sample, so both jobs
  * are cancelled — a user who revokes ACTIVITY_RECOGNITION also revokes the
- * battery spend.
+ * battery spend. The widget's screen-wake refresh (Fase 25) follows the same
+ * decision from here, for the same reason.
  */
 object SyncScheduler {
 
@@ -34,6 +36,11 @@ object SyncScheduler {
         val canSample = hasPermission(context) &&
             ServiceLocator.stepSensorReader(context).isAvailable
         val workManager = WorkManager.getInstance(context)
+        // Fase 25: the widget's screen-wake refresh lives behind the same gate and
+        // hears about the same changes — a widget placed or removed, a permission
+        // granted or revoked. It is the only other thing armed from here, and it
+        // arms nothing on its own: no widget, no receiver.
+        ScreenWakeRefresh.reconcile(context, canSample)
         if (!canSample) {
             workManager.cancelUniqueWork(SYNC_WORK)
             workManager.cancelUniqueWork(ROLLOVER_WORK)

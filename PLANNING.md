@@ -934,6 +934,124 @@ migliore. Cambia questo, e solo questo:
   Google, ma impone la notifica fissa (contro §3.3 e §7) e in pratica viene ucciso dai
   gestori di batteria OEM — cioè lo stesso bug di oggi, in forma più difficile da spiegare.
 
+## Fase 25 — Il widget si aggiorna quando accendi lo schermo (chiesta dal committente, 13 set 2026)
+
+**Domanda del committente**: «si può aggiornare il widget al risveglio dello schermo, oltre
+al meccanismo attuale dei 15 minuti? Verifica se c'è già, ma non credo.»
+
+**Verifica: non c'era.** Nel codice non esisteva un solo riferimento a `ACTION_SCREEN_ON`,
+`ACTION_USER_PRESENT`, `PowerManager` o `registerReceiver`. Il widget veniva ridipinto da
+sei posti — i due worker, il minute tick del tracking, il collector delle settings,
+l'uscita dall'app, il tap ↻ — e nessuno di loro ha niente a che vedere con l'accensione
+dello schermo. Il `updatePeriodMillis` resta assente per scelta (Fase 10) e nessuno lo
+rimette.
+
+**Perché serve davvero, e non è cosmesi.** I 15 minuti sono un pavimento, non un soffitto:
+in Doze le finestre di manutenzione di WorkManager si allargano fino alle ore, quindi un
+telefono lasciato in pace tutta la notte si sveglia con un widget fermo alla sera prima e
+`# stale` in rosso. È l'unico momento in cui il widget è insieme il più sbagliato e il più
+guardato — la prima occhiata del mattino — e aspettare un altro quarto d'ora che il sampler
+se ne accorga è esattamente il buco che questa fase chiude.
+
+**Il limite, detto prima di tutto il resto**: un pass al risveglio **non campiona il
+contatore**. `TYPE_STEP_COUNTER` è on-change e Android non consegna eventi on-change a
+un'app che non è in foreground (Fase 19), e un broadcast di sistema non è un'esenzione per
+avviare un foreground service. Quello che il pass può portare sono le **ore chiuse dal
+registratore** (Fase 24c: Play services è l'unica fonte che conta ad app chiusa) più il
+ridisegno, cioè `# stale` che si accende o si spegne, la data dopo mezzanotte e tutto ciò
+che è stato scritto e mai dipinto. L'ora in corso resta del sensore e resta ferma finché
+non si apre l'app o non si tocca ↻: è il confine della Fase 24c e non è stato toccato.
+
+### Il segnale: accendere non è guardare
+
+- [x] `widget/ScreenWakeRefresh`, un `BroadcastReceiver` registrato a runtime su
+      `ACTION_SCREEN_ON` + `ACTION_USER_PRESENT`. A runtime perché non c'è alternativa:
+      `ACTION_SCREEN_ON` è un broadcast protetto che **nessun receiver nel manifest vedrà
+      mai**. In cambio il sistema lo manda con `FLAG_RECEIVER_FOREGROUND`, quindi arriva
+      subito anche a un processo in cache invece di accodarsi alla coda di background
+- [x] **Il keyguard decide.** Lo schermo si accende anche solo per sbirciare una notifica, e
+      lì il widget sta dietro la lock screen: uno `SCREEN_ON` a keyguard chiuso non fa
+      niente e l'evento buono è `ACTION_USER_PRESENT`, lo sblocco. Su un telefono senza
+      blocco non c'è nessuno sblocco da aspettare, e lo `SCREEN_ON` **è** il momento. Una
+      regola sola: si ridipinge quando il widget diventa visibile, mai quando non può esserlo
+- [x] `RECEIVER_NOT_EXPORTED` via `ContextCompat`: gratis e corretto, sono entrambi broadcast
+      di sistema protetti, quindi il flag chiude una porta che nessun'altra app poteva usare
+
+### Il contratto batteria della Fase 10 resta identico
+
+Niente polling, nessun listener sul sensore, nessun wake lock, nessun risveglio del
+dispositivo: il dispositivo è sveglio per definizione, l'ha svegliato l'utente. Un pass è
+la stessa lettura-e-ridisegno che il sampler fa già, **meno il campionamento**. Tre cose
+tengono il costo dove deve stare:
+
+- [x] **Senza widget non si registra niente.** Nessuna istanza sulla home, nessun permesso,
+      nessun contatore → nessun receiver, quindi uno `SCREEN_ON` non raggiunge nemmeno il
+      processo. Senza questo, ogni accensione scongelerebbe il processo per non dipingere
+      niente. Il proprietario della decisione è `SyncScheduler.reconcile`, che è già
+      l'unico che sa di piazzamenti, rimozioni, permessi concessi e revocati
+- [x] **Un debounce di 5 minuti**, perché sbloccare il telefono è una cosa che si fa decine
+      di volte al giorno e quasi nessuna di quelle occhiate cade su un'immagine che possa
+      essere cambiata: ad app chiusa l'unico scrittore è l'import orario, `# stale` gira a
+      45 minuti e il sampler a 15. Cinque minuti è un terzo del periodo del sampler: più
+      stretto di così si pagherebbero pixel identici
+- [x] **Tranne attraverso un'ora**, il solo confine che il debounce non deve mangiarsi: il
+      risveglio subito dopo la fine di un'ora è l'unico che può portare un numero che il
+      registratore prima non aveva. Due orologi, e non uno: `elapsedRealtime` per
+      l'intervallo (deve continuare a contare in deep sleep, che è tutto l'intervallo di
+      cui si parla) e il wall clock per l'ora, che è l'unità in cui scrive il registratore
+- [x] Un pass che trova l'ultimo widget rimosso **si smonta da solo** invece di dipingere
+      il nulla: il receiver era sopravvissuto alla sua ragione
+
+### Dove si arma (e la sola ragione per cui esiste un `Application`)
+
+Una registrazione a runtime vive e muore col processo, e tutte le riconciliazioni di questa
+app pendono dall'activity o da un broadcast del widget: un processo avviato da un worker —
+il caso ordinario, un telefono il cui proprietario oggi non ha aperto tsteps — non avrebbe
+avuto nessuno ad armarla.
+
+- [x] `TstepsApplication`, la prima e unica `Application` del progetto: `onCreate` è il
+      momento che li copre tutti, perché sampler, broadcast del widget, servizi e app
+      passano tutti di lì. Fuori dal main thread (armare legge permesso, lista sensori e id
+      dei widget: tre chiamate di sistema che non stanno sul primo frame) e in `runCatching`.
+      Nient'altro: il `ServiceLocator` è lazy per progetto e deve restarlo, visto che questo
+      gira anche prima di ogni worker
+- [x] `SyncScheduler.reconcile` arma e disarma con lo stesso `canSample` dei job. Perdere il
+      receiver costa il refresh al risveglio e nient'altro: i 15 minuti, la mezzanotte e il
+      tap ↻ non lo toccano — e il sampler stesso rimette in piedi il processo, quindi al
+      massimo un periodo dopo qualunque kill il receiver è di nuovo lì
+
+### Test (8 nuovi, 546 totali)
+
+- [x] `ScreenWakeRefreshTest`: lo sblocco ridipinge; senza widget non succede niente; il
+      permesso revocato **via `SyncScheduler.reconcile`** smonta il receiver; `SCREEN_ON` a
+      keyguard chiuso non è un risveglio e lo sblocco dopo sì; senza keyguard lo `SCREEN_ON`
+      lo è; una raffica di sblocchi è un pass solo; il debounce non si mangia il risveglio
+      che attraversa l'ora; passato l'intervallo il pickup successivo ridipinge. Verificati
+      per mutazione (disarmando la registrazione: 5 test su 8 falliscono)
+- [x] **Strada sbagliata, tenuta a verbale.** Il piazzamento del widget nel test armava
+      passando da `SyncScheduler.reconcile`, che è la cosa "giusta" da chiamare — e sotto la
+      WorkManager di test uno schedule armato fa girare **inline** un pass di sync completo,
+      che costruisce `HealthConnectSync`, un singleton di `ServiceLocator` che cattura il
+      settings store che gli viene dato e sopravvive alla classe, mentre lo store di quella
+      classe muore con lo scope cancellato in `tearDown`. Il conto lo pagava la classe
+      successiva (`StepSyncWorkerTest`, cancellata a metà pass): è la lezione della Fase 18
+      sui test del widget, raccontata una seconda volta. Il piazzamento chiama
+      `ScreenWakeRefresh.reconcile`; il cablaggio con l'unico proprietario resta pinnato dal
+      test del permesso revocato
+- [x] Suite: **546 verdi**, lint 0 errori, APK debug costruito
+
+### Ciò che NON è stato fatto, e perché
+
+- **Niente campionamento al risveglio**: impossibile fuori dal foreground (Fase 19) e un
+  `SCREEN_ON` non è un'esenzione per avviare un foreground service. La ↻ resta l'unico
+  campione su richiesta
+- **Niente `updatePeriodMillis`, niente alarm**: sveglierebbero un dispositivo che dorme,
+  che è la cosa che la Fase 10 ha deciso di non fare
+- **L'ora in corso non si legge dal registratore** nemmeno quando l'app è chiusa e quindi
+  nessuno la sta scrivendo: sposterebbe il watermark dentro l'ora corrente e il tick a
+  schermo — stride dopo stride, quando l'app è aperta — si spegnerebbe. È una decisione
+  della Fase 24c e cambiarla è una fase sua, non una riga di questa
+
 ## Note trasversali
 
 - **Vincoli di design non negoziabili** (vedi `CLAUDE.md` e VISION §1.2): solo JetBrains Mono (eccetto widget), griglia 4px, indent 20px, niente ombre (bordi 1px + glow del FAB), raggio 4px ovunque, controlli renderizzati come testo, emoji come icone nel testo.
