@@ -41,6 +41,9 @@ class StepRepositoryTest {
     private lateinit var settingsStore: SettingsStore
     private lateinit var repository: StepRepository
 
+    /** Fase 24c: how far the background import has written. 0 = nothing records. */
+    private var importedUntil = 0L
+
     @Before
     fun setUp() {
         database = Room.inMemoryDatabaseBuilder(
@@ -59,7 +62,8 @@ class StepRepositoryTest {
                 PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("t.preferences_pb") }
             ),
             settingsStore = settingsStore,
-            zone = { rome }
+            zone = { rome },
+            importedUntilMillis = { importedUntil }
         )
     }
 
@@ -210,6 +214,34 @@ class StepRepositoryTest {
             assertEquals(0L, dao.day("2026-09-11").sumOf { it.steps })
             assertEquals(3_545L, dao.day("2026-09-12").sumOf { it.steps })
         }
+
+    /**
+     * Fase 24c. The counter and the recorder count the same steps, so an hour
+     * written by both would be a doubled hour. The line is time: everything
+     * before the import's watermark is its own, the hour in progress stays the
+     * counter's — which is what keeps the number on screen ticking while you
+     * watch it.
+     */
+    @Test
+    fun `the counter does not write the hours the import already owns`() = runBlocking {
+        importedUntil = millis("2026-09-12T12:00:00")
+        repository.ingest(reading(1_000L, "2026-09-12T11:30:00"))
+        // Spread over 11:30..12:30: half lands in an imported hour, half does not.
+        repository.ingest(reading(1_600L, "2026-09-12T12:30:00"))
+
+        val dao = database.hourlyStepsDao()
+        assertEquals(0L, dao.steps("2026-09-12", 11) ?: 0L)
+        assertEquals(300L, dao.steps("2026-09-12", 12))
+    }
+
+    /** No recorder, no watermark: the counter keeps writing every hour it can. */
+    @Test
+    fun `without an import the counter still owns the whole day`() = runBlocking {
+        repository.ingest(reading(1_000L, "2026-09-12T11:30:00"))
+        repository.ingest(reading(1_600L, "2026-09-12T12:30:00"))
+
+        assertEquals(600L, database.hourlyStepsDao().day("2026-09-12").sumOf { it.steps })
+    }
 
     // --- Fase 11: sample spans, tombstones, boundary edits -------------------
 

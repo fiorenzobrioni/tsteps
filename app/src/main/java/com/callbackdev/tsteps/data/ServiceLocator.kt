@@ -3,6 +3,10 @@ package com.callbackdev.tsteps.data
 import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.room.Room
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.callbackdev.tsteps.data.local.TstepsDatabase
 import com.callbackdev.tsteps.export.DataExporter
 import com.callbackdev.tsteps.export.DownloadsExportSink
@@ -10,6 +14,8 @@ import com.callbackdev.tsteps.healthconnect.AndroidHealthConnectGateway
 import com.callbackdev.tsteps.healthconnect.HcStateStore
 import com.callbackdev.tsteps.healthconnect.HealthConnectSync
 import com.callbackdev.tsteps.recording.GmsStepRecordingGateway
+import com.callbackdev.tsteps.recording.RecordingStateStore
+import com.callbackdev.tsteps.recording.StepImporter
 import com.callbackdev.tsteps.recording.StepRecordingGateway
 
 /**
@@ -60,6 +66,15 @@ object ServiceLocator {
     @Volatile
     private var stepRecordingGateway: StepRecordingGateway? = null
 
+    /** Outlives the activity that starts an import (see [importSteps]). */
+    private val importScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    private var recordingStateStore: RecordingStateStore? = null
+
+    @Volatile
+    private var stepImporter: StepImporter? = null
+
     fun database(context: Context): TstepsDatabase =
         database ?: synchronized(this) {
             database ?: Room.databaseBuilder(
@@ -91,7 +106,12 @@ object ServiceLocator {
                 sessionDao = database(context).sessionDao(),
                 sampleDao = database(context).stepSampleDao(),
                 trackerStateStore = trackerStateStore(context),
-                settingsStore = settingsStore(context)
+                settingsStore = settingsStore(context),
+                // Read per ingest rather than captured: the import moves this
+                // watermark forward from a worker while the screen is streaming
+                // readings, and a stale copy would let the counter add to an hour
+                // the import had just taken over.
+                importedUntilMillis = { recordingStateStore(context).read().importedUntilMillis }
             ).also { stepRepository = it }
         }
 
@@ -171,6 +191,33 @@ object ServiceLocator {
                 .also { stepRecordingGateway = it }
         }
 
+    fun recordingStateStore(context: Context): RecordingStateStore =
+        recordingStateStore ?: synchronized(this) {
+            recordingStateStore ?: RecordingStateStore.create(context)
+                .also { recordingStateStore = it }
+        }
+
+    /**
+     * Fire-and-forget import for callers with nothing to await — the activity
+     * coming to the front. Its own scope, like the widget updater's: an import
+     * interrupted between the buckets and the watermark would leave the two
+     * disagreeing, and a swipe away must not be able to do that.
+     */
+    fun importSteps(context: Context) {
+        val appContext = context.applicationContext
+        importScope.launch { runCatching { stepImporter(appContext).run() } }
+    }
+
+    /** Singleton: its mutex serializes the overlapping passes, like the HC sync. */
+    fun stepImporter(context: Context): StepImporter =
+        stepImporter ?: synchronized(this) {
+            stepImporter ?: StepImporter(
+                gateway = stepRecordingGateway(context),
+                store = recordingStateStore(context),
+                hourlyDao = database(context).hourlyStepsDao()
+            ).also { stepImporter = it }
+        }
+
     /**
      * Stateless like the detector, built per call: an export is one pass over
      * Room triggered by a tap, with nothing to keep between taps.
@@ -196,9 +243,12 @@ object ServiceLocator {
         settingsStore: SettingsStore? = null,
         trackerStateStore: TrackerStateStore? = null,
         firstRunStore: FirstRunStore? = null,
-        stepRecordingGateway: StepRecordingGateway? = null
+        stepRecordingGateway: StepRecordingGateway? = null,
+        recordingStateStore: RecordingStateStore? = null
     ) {
         this.stepRecordingGateway = stepRecordingGateway
+        this.recordingStateStore = recordingStateStore
+        this.stepImporter = null
         this.firstRunStore = firstRunStore
         this.stepRepository = stepRepository
         this.stepSensorReader = stepSensorReader

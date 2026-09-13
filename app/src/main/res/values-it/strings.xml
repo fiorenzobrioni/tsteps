@@ -67,6 +67,11 @@
     <string name="note_stride_measured">passo misurato, batte height_cm</string>
     <string name="note_commit_message">il messaggio di commit del giorno chiuso</string>
     <string name="note_goal_notify">una volta al giorno, quando il check passa</string>
+    <string name="note_source_live">l\'ora in corso la conta il sensore di passi del telefono, mentre tsteps è aperta</string>
+    <string name="note_source_recorded">le ore con tsteps chiusa le registra sul dispositivo Google Play services</string>
+    <string name="note_source_arming">Google Play services inizia a registrare le ore con tsteps chiusa al prossimo giro</string>
+    <string name="note_source_unavailable">qui non c\'è Google Play services: si contano solo le ore con tsteps aperta</string>
+    <string name="note_source_update">Google Play services è troppo vecchio per registrare le ore con tsteps chiusa</string>
     <string name="note_hc_interop">scambio dati sul dispositivo con altre app di salute — niente rete</string>
     <string name="note_hc_writes">scrive: passi orari + sessioni di camminata · legge: i loro passi</string>
     <string name="note_hc_external">i passi esterni sono mostrati, mai sommati ai tuoi</string>

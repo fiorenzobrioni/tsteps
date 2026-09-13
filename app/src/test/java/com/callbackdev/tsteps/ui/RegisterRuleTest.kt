@@ -110,5 +110,11 @@ class RegisterRuleTest {
         assertTrue(resources.getString(R.string.note_widget_no_data_yet).contains("tsteps"))
         assertTrue(resources.getString(R.string.note_on_device).contains("tsteps"))
         assertTrue(resources.getString(R.string.note_err_expected_range).contains("%1\$s"))
+        // Fase 24c: the two names in the `steps` section are what they are in
+        // both languages — one is the app, the other is a Google product.
+        assertTrue(resources.getString(R.string.note_source_live).contains("tsteps"))
+        assertTrue(
+            resources.getString(R.string.note_source_recorded).contains("Google Play services")
+        )
     }
 }

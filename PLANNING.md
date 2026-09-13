@@ -772,28 +772,63 @@ interoperabilità che è).
 - [x] Test: `RecordingInteropTest` (6, incluse l'ora ripetuta della notte di DST e il buco
       di primavera). Suite: **492 verdi**
 
-### 24c — L'importazione (da fare)
+### 24c — L'importazione, automatica ✅
 
-Disegno deciso, da implementare:
+**Decisione del committente (13 set 2026), che cambia il disegno di ieri**: niente
+interruttore. «Un utente si aspetta che l'app funzioni in automatico.» L'opzione
+«default off più riga in `settings.config` per accenderla» è **superata**: chiedere a
+qualcuno di accendere il conteggio è chiedergli di sapere cos'è una sottoscrizione.
+Resta solo la parte onesta della proposta — una riga `//` che **dichiara chi sta
+contando**, senza niente da toccare.
 
-- [ ] `RecordingStateStore`: watermark d'importazione + modalità sorgente. **Avanza solo
-      dopo una lettura riuscita**
-- [ ] **Una sola sorgente per ora**, mai due: in modalità `recording` il path del contatore
-      smette di scrivere bucket (resta per il tick live a schermo e per le sessioni), e le
-      ore le scrive l'import. Passando in modalità, il watermark parte dall'**ora successiva**:
-      le ore già scritte dal sensore restano sue, le nuove sono dell'import. Sommare le due
-      sorgenti raddoppierebbe la giornata
-- [ ] Scrittura dei bucket in SET, non in INCREMENT: rileggere l'ora corrente (ancora aperta)
-      deve essere idempotente
-- [ ] Import in `StepSyncWorker` (la lettura è IPC su DB locale: nessun sensore, nessun
-      wakeup) + a ogni resume in foreground
-- [ ] Display live: totale dai bucket + delta del contatore dall'ultimo import, addendo in
-      memoria mai persistito
-- [ ] Degradazione esplicita: senza Play services (ROM de-googlate) o con versione vecchia
-      si resta sul path sensore di oggi, **detto nel canale `//`**, mai in silenzio
-- [ ] Default **off** e riga in `settings.config` per accenderla: la modalità cambia il
-      cuore della pipeline dati e va provata sul device del committente prima di diventare
-      il default
+- [x] `RecordingStateStore` (DataStore `recording_state`, suo come l'anchor: `git restore
+      settings.config` non deve poterlo perdere). **Due watermark, non uno**:
+      `importFromMillis` (da dove legge il prossimo giro) e `importedUntilMillis` (fin dove
+      l'import ha davvero scritto). Al momento della sottoscrizione il primo parte dall'ora
+      successiva e il secondo resta a zero: fra l'iscrizione e il primo import riuscito
+      l'import non possiede niente, e con un campo solo il sensore si sarebbe ritirato da
+      ore che nessuno aveva importato
+- [x] `StepImporter`: un giro = disponibilità → sottoscrizione → lettura delle sole ore
+      **finite** → scrittura → watermark. Il mutex serializza i chiamanti sovrapposti come
+      fa `HealthConnectSync`
+- [x] **Una sola sorgente per ora.** Il confine è il tempo: tutto ciò che sta prima di
+      `importedUntilMillis` è dell'import (`StepRepository.ingest` scarta quelle quote),
+      l'ora in corso resta del sensore — ed è ciò che tiene vivo il tick a schermo. L'ora
+      appena finita viene riletta un giro dopo: l'import scrive in SET, quindi ripetere è
+      gratis e il numero autorevole vince comunque
+- [x] Watermark **un'ora indietro rispetto all'orizzonte**: Play services scrive con un suo
+      ritardo, e congelare l'ora appena chiusa la lascerebbe registrata a metà
+- [x] Un errore di lettura **non muove niente** e azzera la sottoscrizione, così il giro
+      dopo si ri-arma da solo: è ciò che serve a un permesso revocato e poi riconcesso
+- [x] Un'ora che il registratore dà vuota **si lascia com'è, non si azzera**: l'import
+      riempie ciò che nessuno ha contato, non cancella ciò che qualcuno aveva contato
+- [x] Tetto a **10 giorni** (la finestra che Play services tiene): un telefono spento due
+      settimane non chiede ore che non esistono più
+- [x] Import **prima del commit** nei due worker: un giorno si congela una volta sola, e
+      committarlo senza le ore che l'import stava per scrivere lo lascerebbe sbagliato per
+      sempre. *Imprecisione nota e accettata*: gli ultimi minuti prima di mezzanotte
+      possono arrivare dal registratore dopo il commit e restare solo nelle righe orarie
+- [x] Import anche all'**onStart** dell'activity (scope staccato: uno swipe via non deve
+      poter interrompere un giro fra i bucket e il watermark) — aprire l'app è il momento in
+      cui la giornata deve già essere intera
+- [x] `HourlyStepsDao.setSteps` accanto a `increment`: sommare raddoppierebbe l'ora alla
+      seconda lettura
+- [x] **La riga che dichiara la fonte** — sezione `steps` in `settings.config`, soli
+      commenti, niente da tappare: l'ora in corso la conta il sensore, le ore con l'app
+      chiusa le registra Google Play services; e dove Play services non c'è (o è troppo
+      vecchio) lo dice, invece di lasciar credere che qualcuno stia registrando. Cinque
+      `note_source_*` IT/EN, dentro le guardie della Fase 20
+- [x] Test: `StepImporterTest` (9: arming, ore finite, SET che sostituisce, ora vuota
+      lasciata stare, errore che non muove il watermark, giro a vuoto, niente Play services,
+      sottoscrizione rifiutata e poi riuscita, tetto dei 10 giorni), 2 in `StepRepositoryTest`
+      (il sensore non scrive le ore dell'import; senza import scrive tutto), 3 in
+      `SettingsScreenTest`, 2 asserzioni di token in `RegisterRuleTest`. Suite: **506 verdi**,
+      lint 0 errori
+
+**Da provare sul device** (non verificabile qui): che Play services registri davvero su un
+Pixel; se la finestra dei 10 giorni sia leggibile all'indietro rispetto alla prima
+sottoscrizione o parta da lì; il ritardo reale di scrittura del registratore; e il widget
+che si aggiorna da solo a app chiusa, che è l'effetto più visibile di tutta la fase.
 
 ### 24d — Il buco si dichiara (da fare)
 
@@ -807,9 +842,10 @@ Disegno deciso, da implementare:
 Il committente ha chiesto esplicitamente che i principi non blocchino una soluzione
 migliore. Cambia questo, e solo questo:
 
-- **VISION §7 — «il telefono basta, e a contare è tsteps»**: in modalità recording a
-  contare le ore che tsteps non vede è Play services. Il conteggio resta on-device, ma
-  non è più solo nostro.
+- **VISION §7 — «il telefono basta, e a contare è tsteps»**: a contare le ore che tsteps
+  non vede è Play services. Il conteggio resta on-device, ma non è più solo nostro. E
+  succede **in automatico**, senza opt-in: l'utente non deve accendere niente, il file
+  gli dice chi ha contato.
 - **Dipendenza da GMS**: la prima del progetto. Su ROM senza Play services la funzione
   non esiste e l'app degrada al path sensore.
 - **Ciò che NON cambia, verificato e non assunto**: il manifest fuso con e senza
